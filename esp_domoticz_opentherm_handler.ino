@@ -18,14 +18,16 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <OpenTherm.h>            //https://github.com/ihormelnyk/opentherm_library
 #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
 #include <ESP8266WebServer.h>     //Local Webserver for receiving http commands
+#include <ESP8266mDNS.h>          // To respond on hostname as well
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
 // constants
-const int inPin = 2;                            // pin number for opentherm adapter connection, for Arduino, 4 for ESP8266 (D2), 21 for ESP32
-const int outPin = 3;                           // pin number for opentherm adapter connection, for Arduino, 5 for ESP8266 (D1), 22 for ESP32
-const int domoticzTimeoutInMillis = 60 * 1000;  // if no command was send in this period, the thermostat will stop sending commands to opentherm
+const int inPin = 4;                            // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
+const int outPin = 5;                           // pin number for opentherm adapter connection, 3 for Arduino, 5 for ESP8266 (D1), 22 for ESP32
+const int domoticzTimeoutInMillis = 60 * 1000;  // if no command was sent in this period, the thermostat will assume domoticz is nog longer there and stops sending commands to opentherm
 const int heartbeatTickInMillis = 1000;         // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
+const String host = "domesphelper";             // mdns hostname
 
 
 // vars to manage boiler
@@ -33,7 +35,7 @@ bool enableCentralHeating = true;
 bool enableHotWater = true;
 bool enableCooling = false;
 float boiler_SetPoint = 0;
-float dhw_SetPoint = 0;
+float dhw_SetPoint = 65;
 
 // return values from boiler
 float dhw_Temperature = 0;
@@ -217,9 +219,14 @@ void setup()
     WiFiManager wifiManager;
     wifiManager.autoConnect("Thermostat");
 
+    if (MDNS.begin(host)) {
+      Serial.println("MDNS responder started");
+    }
     // Log IP adress
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());  //Print the local IP to access the server
+
+
 
     // Register commands on webserver
     server.on("/SetBoilerTemp", handleSetBoilerTemp);
@@ -292,6 +299,9 @@ void loop()
           }
       } 
       //Handle incoming webrequests
-      server.handleClient();    
+      server.handleClient(); 
+
+      // handle MDNS
+      MDNS.update();
     }
 } 
