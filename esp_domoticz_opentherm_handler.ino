@@ -21,14 +21,17 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <ESP8266mDNS.h>          // To respond on hostname as well
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
+#include <OneWire.h>              // One Wire bus
+#include <DallasTemperature.h>    // temperature sensors
 
 // constants
 const int inPin = 4;                            // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
 const int outPin = 5;                           // pin number for opentherm adapter connection, 3 for Arduino, 5 for ESP8266 (D1), 22 for ESP32
-const int domoticzTimeoutInMillis = 60 * 1000;  // if no command was sent in this period, the thermostat will assume domoticz is nog longer there and stops sending commands to opentherm
+const int OneWireBus = 14;                      //Data wire is connected to 14 pin on the OpenTherm Shield
+const int domoticzTimeoutInMillis = 15 * 1000;  // if no command was sent in this period, the thermostat will assume domoticz is nog longer there and stops sending commands to opentherm
 const int heartbeatTickInMillis = 1000;         // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
 const String host = "domesphelper";             // mdns hostname
-
+const float ThermostatTemperatureCalibration=-4.2;  // set to a differenct value to zero is DS18B20 give a too high or low reading
 
 // vars to manage boiler
 bool enableCentralHeating = true;
@@ -48,13 +51,15 @@ bool CentralHeating = false;
 bool HotWater = false;
 bool Cooling = false;
 bool Flame = false;
-
+  
 // vars for program logic
 unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat timestamp
 unsigned long t_last_command=millis()-domoticzTimeoutInMillis; // last domoticz command timestamp
 
 // objects to be used by program
 ESP8266WebServer server(80);   //Web server object. Will be listening in port 80 (default for HTTP)
+OneWire oneWire(OneWireBus);  // OneWire Bus
+DallasTemperature sensors(&oneWire); // for the temp sensor 
 OpenTherm ot(inPin, outPin);
 
 
@@ -164,21 +169,16 @@ String getSensors() { //Handler
 
     String message;
 
-    OpenThermResponseStatus responseStatus = ot.getLastResponseStatus();
-
     // Add Status
     message += ",\n  \"OpenThermStatus\":";
     if (responseStatus == OpenThermResponseStatus::SUCCESS) {
         message += "\"OK\"";
-    }
-    if (responseStatus == OpenThermResponseStatus::NONE) {
+    } else if (responseStatus == OpenThermResponseStatus::NONE) {
         message += "\"OpenTherm is not initialized\"";
-    }
-    else if (responseStatus == OpenThermResponseStatus::INVALID) {
+    } else if (responseStatus == OpenThermResponseStatus::INVALID) {
         message += "\"Invalid response\"";
-    }
-    else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
-        message += "\"Response timeout\"";
+    } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
+        message += "\"Response timeout, is the boiler connected?\"";
     } else {
         message += "\"Unknown Status\"";
     }
@@ -206,6 +206,11 @@ String getSensors() { //Handler
     message +=",\n  \"Modulation\": " + (String(modulation));
     message +=",\n  \"Pressure\": " + (String(pressure));
 
+    // Add Temp Sensor value
+    sensors.requestTemperatures(); // Send the command to get temperature readings 
+    float currentTemperature = sensors.getTempCByIndex(0);
+    message +=",\n  \"ThermostatTemperature\": " + (String(currentTemperature+ThermostatTemperatureCalibration));
+
     return message;
 }
 
@@ -226,8 +231,6 @@ void setup()
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());  //Print the local IP to access the server
 
-
-
     // Register commands on webserver
     server.on("/SetBoilerTemp", handleSetBoilerTemp);
     server.on("/SetDHWTemp",handleSetDHWTemp);
@@ -244,6 +247,12 @@ void setup()
     server.begin();   
     Serial.println("Opentherm Helper is waiting for commands");   
 
+    //Init DS18B20 sensor
+    sensors.begin();
+
+    // Init builtin led
+    pinMode(LED_BUILTIN, OUTPUT);
+
     // Start OpenTherm
     ot.begin(handleInterrupt);
 }
@@ -256,10 +265,12 @@ void loop()
       if (millis()-t_last_command>domoticzTimeoutInMillis) {
           // Domoticz was not there for a long time, so do nothing
           Serial.print("."); // Just print a dot, so we can see the software in still running
+          digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we lost connection
       } else {
+          digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have a connection          
           // enable/disable heating, hotwater, heating and get status from opentherm connection and boiler (if it can be reached)
           unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
-          OpenThermResponseStatus responseStatus = ot.getLastResponseStatus();
+          responseStatus = ot.getLastResponseStatus();
           if (responseStatus == OpenThermResponseStatus::SUCCESS) {
               // Yes we have a connection, update statuses
               Serial.println("Central Heating: " + String(ot.isCentralHeatingActive(response) ? "on" : "off"));
@@ -278,17 +289,13 @@ void loop()
               modulation = ot.getModulation();
               pressure = ot.getPressure();
 
-              // Communicate setpoints to Boiler (if applicable)
-              if (enableCentralHeating) {
-                Serial.println("Sending boiler setpoint ("+String(boiler_SetPoint)+")");
-                ot.setBoilerTemperature(boiler_SetPoint);
-              }
-              if (enableHotWater) {
-                  Serial.println("Setting dhw setpoint ("+String(dhw_SetPoint)+")");
-                  ot.setDHWSetpoint(dhw_SetPoint);
-              }
-          }
-          if (responseStatus == OpenThermResponseStatus::NONE) {
+              // Communicate setpoints to Boiler
+              Serial.println("Sending boiler setpoint ("+String(boiler_SetPoint)+")");
+              ot.setBoilerTemperature(boiler_SetPoint);
+              Serial.println("Setting dhw setpoint ("+String(dhw_SetPoint)+")");
+              ot.setDHWSetpoint(dhw_SetPoint);
+              
+          } else if (responseStatus == OpenThermResponseStatus::NONE) {
               Serial.println("Opentherm Error: OpenTherm is not initialized");
           } else if (responseStatus == OpenThermResponseStatus::INVALID) {
               Serial.println("Opentherm Error: Invalid response " + String(response, HEX));
@@ -298,6 +305,8 @@ void loop()
               Serial.println("Opentherm Error: unknown error");
           }
       } 
+
+      
       //Handle incoming webrequests
       server.handleClient(); 
 
