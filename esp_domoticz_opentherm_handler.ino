@@ -30,7 +30,7 @@ const int outPin = 5;                           // pin number for opentherm adap
 const int OneWireBus = 14;                      //Data wire is connected to 14 pin on the OpenTherm Shield
 const int domoticzTimeoutInMillis = 15 * 1000;  // if no command was sent in this period, the thermostat will assume domoticz is nog longer there and stops sending commands to opentherm
 const int heartbeatTickInMillis = 1000;         // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
-const String host = "domesphelper";             // mdns hostname
+const String host = "domesphelper2";             // mdns hostname
 const float ThermostatTemperatureCalibration=-4.2;  // set to a differenct value to zero is DS18B20 give a too high or low reading
 
 // vars to manage boiler
@@ -67,49 +67,6 @@ void ICACHE_RAM_ATTR handleInterrupt() {
     ot.handleInterrupt();
 }
 
-void handleEnableHotWater() {
-  Serial.println("Enabling hot water");
-  t_last_command=millis();
-  enableHotWater = true;
-  SendHTTP("EnableHotWater","OK");
-}
-
-void handleDisableHotWater() {
-  Serial.println("Disabling hot water");
-  t_last_command=millis();
-  enableHotWater = false;
-  SendHTTP("DisableHotWater","OK");
-}
-
-void handleEnableCentralHeating() {
-  Serial.println("Enabling Central Heating");
-  t_last_command=millis();
-  enableCentralHeating = true;
-  SendHTTP("EnableCentralHeating","OK");
-}
-
-void handleDisableCentralHeating() {
-  Serial.println("Disabling Central Heating");
-  t_last_command=millis();
-  enableCentralHeating = false;
-  SendHTTP("DisableCentralHeating","OK");
-}
-
-void handleEnableCooling() {
-  Serial.println("Enabling Cooling");
-  t_last_command=millis();
-  enableCooling= true;
-  SendHTTP("EnableCooling","OK");
-}
-
-void handleDisableCooling() {
-  Serial.println("Disabling Cooling");
-  t_last_command=millis();
-  enableCooling = false;
-  SendHTTP("DisableCooling","OK");
-}
-
-
 void handleResetWifiCredentials() {
   Serial.println("Resetting Wifi Credentials");
   WiFiManager wifiManager;
@@ -123,46 +80,88 @@ void handleResetWifiCredentials() {
   while (1) {}
 }
 
-void handleSetBoilerTemp() { //Handler
-
-    String Statustext;
-
-    if (server.arg("Temperature")== ""){     //Parameter not found
-        Serial.println("Temperature Argument not found");
-        Statustext="Temperature Argument not specified";
-    }else{         
-        Serial.println("Setting boiler temp to "+server.arg("Temperature"));
-        boiler_SetPoint=server.arg("Temperature").toFloat();
-        Statustext="OK";
-        t_last_command=millis();
-    }
-    SendHTTP("SetBoilerTemp",Statustext);
-}
-
-void handleSetDHWTemp() { //Handler
-
-    String Statustext;
-
-    if (server.arg("Temperature")== ""){     //Parameter not found
-        Serial.println("Temperature Argument not found");
-        Statustext="Temperature Argument not specified";
-    }else{         
-        Serial.println("Setting dhw temp to "+server.arg("Temperature"));
-        dhw_SetPoint=server.arg("Temperature").toFloat();
-        Statustext="OK";
-        t_last_command=millis();
-    }
-    SendHTTP("SetDHWTemp",Statustext);
-}
-
 void handleGetSensors() {
+  Serial.println("Getting the sensors");
   SendHTTP("GetSensors","OK");
   t_last_command=millis();
 }
 
 void SendHTTP(String command, String result) {
-    String message = "{\n  \"InterfaceVersion\":1,\n  \"Command\":\""+command+"\",\n  \"Result\":\""+result+"\""+getSensors()+"\n}";
+    String message = "{\n  \"InterfaceVersion\":2,\n  \"Command\":\""+command+"\",\n  \"Result\":\""+result+"\""+getSensors()+"\n}";
     server.send(200, "text/plain", message);       //Response to the HTTP request
+}
+
+void handleCommand() {
+  String Statustext="Unknown Command";
+
+  // blink the LED, so we can see a command was sent
+  digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off , to indicate we are executing a command
+
+  // for Debugging purposes
+  Serial.println("Handling Command: Number of args received: "+server.args());
+  for (int i = 0; i < server.args(); i++) {
+    Serial.println ("Argument "+String(i)+" -> "+server.argName(i)+": "+server.arg(i));
+
+  } 
+
+  // Set DHWTemp
+  if (server.arg("DHWTemperature")!="") {
+    Serial.println("Setting dhw temp to "+server.arg("DHWTemperature"));
+    dhw_SetPoint=server.arg("DHWTemperature").toFloat();
+    Statustext="OK";
+    t_last_command=millis();
+  }
+
+  // Set Boiler Temp
+  if (server.arg("BoilerTemperature")!="") {
+    Serial.println("Setting boiler temp to "+server.arg("BoilerTemperature"));
+    boiler_SetPoint=server.arg("BoilerTemperature").toFloat();
+    Statustext="OK";
+    t_last_command=millis();
+  }
+
+  // Enable/Disable Cooling
+  if (server.arg("Cooling")!="") {
+    t_last_command=millis();
+    Statustext="OK";
+    if (server.arg("Cooling").equalsIgnoreCase("On")) {
+      Serial.println("Enabling Cooling");
+      enableCooling= true;
+    } else {
+      Serial.println("Disabling Cooling");
+      enableCooling=false;
+    }
+  }
+
+  // Enable/Disable Central Heating
+  if (server.arg("CentralHeating")!="") {
+    t_last_command=millis();
+    Statustext="OK";
+    if (server.arg("CentralHeating").equalsIgnoreCase("On")) {
+      Serial.println("Enabling Central Heating");
+      enableCentralHeating=true;
+    } else {
+      Serial.println("Disabling Central Heating");
+      enableCentralHeating=false;
+    }
+  }
+
+  // Enable/Disable HotWater
+  if (server.arg("HotWater")!="") {
+    t_last_command=millis();
+    Statustext="OK";
+    if (server.arg("HotWater").equalsIgnoreCase("On")) {
+      Serial.println("Enabling Domestic Hot Water");
+      enableHotWater=true;
+    } else {
+      Serial.println("Disabling Domestic Hot Water");
+      enableHotWater=false;
+    }
+  }
+
+  digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we executed the command
+
+  SendHTTP("SetDHWTemp",Statustext);
 }
 
 String getSensors() { //Handler
@@ -232,16 +231,9 @@ void setup()
     Serial.println(WiFi.localIP());  //Print the local IP to access the server
 
     // Register commands on webserver
-    server.on("/SetBoilerTemp", handleSetBoilerTemp);
-    server.on("/SetDHWTemp",handleSetDHWTemp);
-    server.on("/EnableHotWater", handleEnableHotWater);
-    server.on("/DisableHotWater", handleDisableHotWater);
-    server.on("/EnableCentralHeating", handleEnableCentralHeating);
-    server.on("/DisableCentralHeating", handleDisableCentralHeating);
-    server.on("/EnableCooling", handleEnableCooling);
-    server.on("/DisableCooling", handleDisableCooling);
     server.on("/ResetWifiCredentials", handleResetWifiCredentials);
     server.on("/GetSensors",handleGetSensors);
+    server.on("/command", handleCommand);   //Associate the handler function to the path
 
     //Start the server
     server.begin();   
@@ -267,7 +259,7 @@ void loop()
           Serial.print("."); // Just print a dot, so we can see the software in still running
           digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we lost connection
       } else {
-          digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have a connection          
+          digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we start the loop
           // enable/disable heating, hotwater, heating and get status from opentherm connection and boiler (if it can be reached)
           unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
           responseStatus = ot.getLastResponseStatus();
@@ -304,8 +296,8 @@ void loop()
           }  else {
               Serial.println("Opentherm Error: unknown error");
           }
+          digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to finished the loop action 
       } 
-
       
       //Handle incoming webrequests
       server.handleClient(); 
