@@ -16,13 +16,14 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
 - Connect your Wemos D1 to the USB of your laptop/pc
 - A new com port should now be available on your system. If not, install CH340 drivers (just google on it and you will find them) 
 - Install Arduino IDE (https://www.arduino.cc/en/software)
-- Within IDE, enable ESP8266 support by adding the url https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the settings (setting "more boardmanager urls")
-    - Install the following the libraries (menu Tools / Manage Libraries in Arduino IDE)
+- Within IDE, 
+    - Add the url https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the settings (menu File, Settings, "more boardmanager urls")
+    - Install the following libraries (menu Tools / Manage Libraries in Arduino IDE)
         -  WhareHauoraWiFiManager by Tzapu
         -  OpenTherm by Ihor Melnyk
     - Create a new sketch and copy the contents of the file esp_domoticz_opentherm_handler.ino into that sketch
     - Open the board manager (menu Tools / Board / Board Manager)
-    - search for ESP8266 and click install, then close
+    - Search for ESP8266 and click install, then close
     - Select Board type "LOLIN(WEMOS) D1 R2 & mini (menu Tools/Board)
     - Select the com Port to which your wemos is connected (menu Tools / Port)
     - Upload the firmware to your Wemos (menu Sketch / Upload)
@@ -55,6 +56,6 @@ Default config is hard coded and ok for typical domoticz install and the Wemos D
     - Cooling=<on|off> will enable or disable heating
     - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
     - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
-  e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot waer and set boiler temperature to 50. The other steering vars remain unchanged
+  e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
   
   
