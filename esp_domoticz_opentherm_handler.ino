@@ -23,6 +23,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <OneWire.h>              // One Wire bus
 #include <DallasTemperature.h>    // temperature sensors
+#include <ArduinoOTA.h>           // OTA updates
 
 // constants
 const int inPin = 4;                            // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
@@ -174,6 +175,9 @@ String getSensors() { //Handler
 
     String message;
 
+    // Add Compile Date
+    message += ",\n  \"CompileDate\": \"" + String(compile_date) + "\"";
+ 
     // Add Status
     message += ",\n  \"OpenThermStatus\":";
     if (responseStatus == OpenThermResponseStatus::SUCCESS) {
@@ -257,6 +261,55 @@ void setup()
     server.on("/GetSensors",handleGetSensors);
     server.on("/command", handleCommand);   //Associate the handler function to the path
 
+    // Initialize OTA
+    // Port defaults to 8266
+    // ArduinoOTA.setPort(8266);
+  
+    // Hostname defaults to esp8266-[ChipID]
+    ArduinoOTA.setHostname(host.c_str());
+  
+    // No authentication by default
+    ArduinoOTA.setPassword("domesphelper");
+  
+    // Password can be set with it's md5 value as well
+    // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
+    // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
+
+    ArduinoOTA.onStart([]() {
+      if (ArduinoOTA.getCommand() == U_FLASH) {
+        Serial.println("OTA: Start updating sketch...");
+      } else { // U_FS
+        Serial.println("OTA: Start updating filesystem...");
+      }
+    });
+
+    ArduinoOTA.onEnd([]() {
+      Serial.println("\nEnd");
+    });
+
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
+    });
+    
+    ArduinoOTA.onError([](ota_error_t error) {
+      Serial.printf("OTA: Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) {
+        Serial.println("OTA: Auth Failed");
+      } else if (error == OTA_BEGIN_ERROR) {
+        Serial.println("OTA: Begin Failed");
+      } else if (error == OTA_CONNECT_ERROR) {
+        Serial.println("OTA: Connect Failed");
+      } else if (error == OTA_RECEIVE_ERROR) {
+        Serial.println("OTA: Receive Failed");
+      } else if (error == OTA_END_ERROR) {
+        Serial.println("OTA: End Failed");
+      }
+    });
+    
+    ArduinoOTA.begin();
+
+    
+    
     //Start the server
     server.begin();   
     Serial.println("Opentherm Helper is waiting for commands");   
@@ -322,10 +375,14 @@ void loop()
   
         // handle MDNS
         MDNS.update();
+
         
     }
 
     //Handle incoming webrequests
     server.handleClient(); 
+
+    // handle OTA
+    ArduinoOTA.handle();
 
 } 
