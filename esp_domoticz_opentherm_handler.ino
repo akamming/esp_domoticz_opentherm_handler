@@ -24,6 +24,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <OneWire.h>              // One Wire bus
 #include <DallasTemperature.h>    // temperature sensors
 #include <ArduinoOTA.h>           // OTA updates
+#include <ArduinoJson.h>
 
 // constants
 const int inPin = 4;                            // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
@@ -34,6 +35,8 @@ const int heartbeatTickInMillis = 1000;         // has to be max 1000, Opentherm
 const String host = "domesphelper";             // mdns hostname
 const float ThermostatTemperatureCalibration=0;  // set to a differenct value to zero is DS18B20 give a too high or low reading
 const char compile_date[] = __DATE__ " " __TIME__;
+
+enum OTCommand { SetBoilerStatus, SetBoilerTemp, SetDHWTemp, GetBoilerTemp,  GetDHWTemp, GetReturnTemp, GetOutsideTemp, GetModulation, GetPressure, GetFlowRate, GetFaultCode } OpenThermCommand ;
 
 // vars to manage boiler
 bool enableCentralHeating = false;
@@ -62,6 +65,7 @@ unsigned char FaultCode=65;
 // vars for program logic
 unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat timestamp
 unsigned long t_last_command=millis()-domoticzTimeoutInMillis; // last domoticz command timestamp
+bool OTAUpdateInProgress=false;
 
 // objects to be used by program
 ESP8266WebServer server(80);   //Web server object. Will be listening in port 80 (default for HTTP)
@@ -72,6 +76,11 @@ OpenTherm ot(inPin, outPin);
 
 void ICACHE_RAM_ATTR handleInterrupt() {
     ot.handleInterrupt();
+}
+
+void SendHTTP(String command, String result) {
+    String message = "{\n  \"InterfaceVersion\":2,\n  \"Command\":\""+command+"\",\n  \"Result\":\""+result+"\""+getSensors()+"\n}";
+    server.send(200, "application/json", message);       //Response to the HTTP request
 }
 
 void handleResetWifiCredentials() {
@@ -91,11 +100,6 @@ void handleGetSensors() {
   Serial.println("Getting the sensors");
   SendHTTP("GetSensors","OK");
   t_last_command=millis();
-}
-
-void SendHTTP(String command, String result) {
-    String message = "{\n  \"InterfaceVersion\":2,\n  \"Command\":\""+command+"\",\n  \"Result\":\""+result+"\""+getSensors()+"\n}";
-    server.send(200, "text/plain", message);       //Response to the HTTP request
 }
 
 void handleCommand() {
@@ -183,16 +187,7 @@ String getSensors() { //Handler
     if (responseStatus == OpenThermResponseStatus::SUCCESS) {
         message += "\"OK\"";
 
-        // we have a connection, so read the sensors         
-        boiler_Temperature = ot.getBoilerTemperature();
-        dhw_Temperature = ot.getDHWTemperature();
-        return_Temperature = ot.getReturnTemperature();
-        outside_Temperature = ot.getOutsideTemperature();
-        modulation = ot.getModulation();
-        pressure = ot.getPressure();
-        flowrate = ot.getDHWFlowrate();
-        FaultCode = ot.getFault();
-
+ 
     } else if (responseStatus == OpenThermResponseStatus::NONE) {
         message += "\"OpenTherm is not initialized\"";
     } else if (responseStatus == OpenThermResponseStatus::INVALID) {
@@ -239,6 +234,38 @@ String getSensors() { //Handler
     return message;
 }
 
+void handleGetInfo()
+{
+  Serial.println("GetInfo");
+  StaticJsonBuffer<512> jsonBuffer;
+  char buf[512];
+  JsonObject& json = jsonBuffer.createObject();
+  json["heap"] = ESP.getFreeHeap();
+  json["sketchsize"] = ESP.getSketchSize();
+  json["sketchspace"] = ESP.getFreeSketchSpace();
+  json["cpufrequency"] = ESP.getCpuFreqMHz();
+  json["chipid"] = ESP.getChipId();
+  json["sdkversion"] = ESP.getSdkVersion();
+  json["bootversion"] = ESP.getBootVersion();
+  json["bootmode"] = ESP.getBootMode();
+  json["flashid"] = ESP.getFlashChipId();
+  json["flashspeed"] = ESP.getFlashChipSpeed();
+  json["flashsize"] = ESP.getFlashChipRealSize();
+  json["resetreason"] = ESP.getResetReason();
+  json["resetinfo"] = ESP.getResetInfo();
+
+  long seconds=millis()/1000;
+  int secs = seconds % 60;
+  int mins = (seconds/60) % 60;
+  int hrs = (seconds/3600) % 24;
+  int days = (seconds/(3600*24));
+  json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
+
+  json.printTo(buf, sizeof(buf));
+  server.send(200, "application/json", buf);       //Response to the HTTP request
+}
+
+
 void setup()
 {
     // start Serial port
@@ -259,6 +286,7 @@ void setup()
     // Register commands on webserver
     server.on("/ResetWifiCredentials", handleResetWifiCredentials);
     server.on("/GetSensors",handleGetSensors);
+    server.on("/info", handleGetInfo);
     server.on("/command", handleCommand);   //Associate the handler function to the path
 
     // Initialize OTA
@@ -281,10 +309,12 @@ void setup()
       } else { // U_FS
         Serial.println("OTA: Start updating filesystem...");
       }
+      OTAUpdateInProgress=true;
     });
 
     ArduinoOTA.onEnd([]() {
       Serial.println("\nEnd");
+      OTAUpdateInProgress=false;
     });
 
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -304,11 +334,10 @@ void setup()
       } else if (error == OTA_END_ERROR) {
         Serial.println("OTA: End Failed");
       }
+      OTAUpdateInProgress=false;
     });
     
     ArduinoOTA.begin();
-
-    
     
     //Start the server
     server.begin();   
@@ -324,65 +353,147 @@ void setup()
     ot.begin(handleInterrupt);
 }
 
-void loop()
+void handleOpenTherm()
 {
-    if (millis()-t_heartbeat>heartbeatTickInMillis) {
-        //reset tick time
-        t_heartbeat=millis();
-        if (millis()-t_last_command>domoticzTimeoutInMillis) {
-            // Domoticz was not there for a long time, so do nothing
-            Serial.print("."); // Just print a dot, so we can see the software in still running
-            digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we lost connection
-
-            // Switch off Heating since there is no domoticz to control it
-            enableCentralHeating=false;
-            boiler_SetPoint=0;
-        } else {
-            digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have connection
-        }
-        
-        // enable/disable heating, hotwater, heating and get status from opentherm connection and boiler (if it can be reached)
-        unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
-        responseStatus = ot.getLastResponseStatus();
-        if (responseStatus == OpenThermResponseStatus::SUCCESS) {
-            // Yes we have a connection, update statuses
-            Serial.println("Central Heating: " + String(ot.isCentralHeatingActive(response) ? "on" : "off"));
-            Serial.println("Hot Water: " + String(ot.isHotWaterActive(response) ? "on" : "off"));
-            Serial.println("Cooling: " + String(ot.isCoolingActive(response) ? "on" : "off"));
-            Serial.println("Flame: " + String(ot.isFlameOn(response) ? "on" : "off"));
-            Flame=ot.isFlameOn(response);
-            CentralHeating=ot.isCentralHeatingActive(response);
-            HotWater=ot.isHotWaterActive(response);
-            Cooling=ot.isCoolingActive(response);
-            Fault=ot.isFault(response);
-            Diagnostic=ot.isDiagnostic(response);
   
-            // Communicate setpoints to Boiler
-            Serial.println("Sending boiler setpoint ("+String(boiler_SetPoint)+")");
-            ot.setBoilerTemperature(boiler_SetPoint);
-            Serial.println("Setting dhw setpoint ("+String(dhw_SetPoint)+")");
-            ot.setDHWSetpoint(dhw_SetPoint);
-            
-        } else if (responseStatus == OpenThermResponseStatus::NONE) {
-            Serial.println("Opentherm Error: OpenTherm is not initialized");
-        } else if (responseStatus == OpenThermResponseStatus::INVALID) {
-            Serial.println("Opentherm Error: Invalid response " + String(response, HEX));
-        } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
-            Serial.println("Opentherm Error: Response timeout");
-        }  else {
-            Serial.println("Opentherm Error: unknown error");
-        }
+  switch (OpenThermCommand)
+  {
+    case SetBoilerStatus:
+    {
+      // enable/disable heating, hotwater, heating and get status from opentherm connection and boiler (if it can be reached)
+      unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
+      responseStatus = ot.getLastResponseStatus();
+      if (responseStatus == OpenThermResponseStatus::SUCCESS) {
+          // Yes we have a connection, update statuses
+          Serial.println("Central Heating: " + String(ot.isCentralHeatingActive(response) ? "on" : "off"));
+          Serial.println("Hot Water: " + String(ot.isHotWaterActive(response) ? "on" : "off"));
+          Serial.println("Cooling: " + String(ot.isCoolingActive(response) ? "on" : "off"));
+          Serial.println("Flame: " + String(ot.isFlameOn(response) ? "on" : "off"));
+          Flame=ot.isFlameOn(response);
+          CentralHeating=ot.isCentralHeatingActive(response);
+          HotWater=ot.isHotWaterActive(response);
+          Cooling=ot.isCoolingActive(response);
+          Fault=ot.isFault(response);
+          Diagnostic=ot.isDiagnostic(response);
+    
+          // Communicate setpoints to Boiler
   
-        // handle MDNS
-        MDNS.update();
-
-        
+          // Execute the next command in the next call
+          OpenThermCommand = SetBoilerTemp;
+                  
+      } else if (responseStatus == OpenThermResponseStatus::NONE) {
+          Serial.println("Opentherm Error: OpenTherm is not initialized");
+      } else if (responseStatus == OpenThermResponseStatus::INVALID) {
+          Serial.println("Opentherm Error: Invalid response " + String(response, HEX));
+      } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
+          Serial.println("Opentherm Error: Response timeout");
+      }  else {
+          Serial.println("Opentherm Error: unknown error");
+      }
+      break;
+    }
+    
+    case SetBoilerTemp:
+    {
+      ot.setBoilerTemperature(boiler_SetPoint);
+      OpenThermCommand = SetDHWTemp;
+      break;
     }
 
-    //Handle incoming webrequests
-    server.handleClient(); 
+    case SetDHWTemp:
+    {
+       ot.setDHWSetpoint(dhw_SetPoint);
+      OpenThermCommand = GetBoilerTemp;
+      break;
+    }
 
+    case GetBoilerTemp:
+    {
+      boiler_Temperature = ot.getBoilerTemperature();
+      OpenThermCommand = GetDHWTemp;
+      break;
+    }
+
+    case GetDHWTemp:
+    {
+      dhw_Temperature = ot.getDHWTemperature();
+      OpenThermCommand = GetReturnTemp;
+      break;
+    }
+      
+    case GetReturnTemp:
+    {
+      return_Temperature = ot.getReturnTemperature();
+      OpenThermCommand = GetOutsideTemp;
+      break;
+    }
+      
+    case GetOutsideTemp:
+    {
+      outside_Temperature = ot.getOutsideTemperature();
+      OpenThermCommand = GetModulation;
+      break;
+    }
+      
+    case GetModulation:
+    {
+      modulation = ot.getModulation();
+      OpenThermCommand = GetPressure;
+      break;
+    }
+      
+    case GetPressure: 
+    {
+      pressure = ot.getPressure();
+      OpenThermCommand = GetFlowRate;
+      break;
+    }
+ 
+    case GetFlowRate:
+    {
+      flowrate = ot.getDHWFlowrate();
+      OpenThermCommand = GetFaultCode;
+      break;
+    }
+
+    case GetFaultCode:
+    {
+      FaultCode = ot.getFault();
+      OpenThermCommand=SetBoilerStatus;
+      break;
+    }
+  }
+}
+
+void loop()
+{
+  if (OTAUpdateInProgress) {
     // handle OTA
     ArduinoOTA.handle();
+  } else {
+    if (millis()-t_heartbeat>heartbeatTickInMillis) {
+      //reset tick time
+      t_heartbeat=millis();
+      if (millis()-t_last_command>domoticzTimeoutInMillis) {
+          // Domoticz was not there for a long time, so do nothing
+          Serial.print("."); // Just print a dot, so we can see the software in still running
+          digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we lost connection
 
+          // Switch off Heating since there is no domoticz to control it
+          enableCentralHeating=false;
+          boiler_SetPoint=0;
+      } else {
+          digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have connection
+      }
+
+      // handle MDNS
+      MDNS.update();
+    }
+
+    // handle openthem commands
+    handleOpenTherm();
+
+    //Handle incoming webrequests
+    server.handleClient();
+  } 
 } 
