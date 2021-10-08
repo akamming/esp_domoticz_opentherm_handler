@@ -36,7 +36,7 @@ const String host = "domesphelper";             // mdns hostname
 const float ThermostatTemperatureCalibration=0;  // set to a differenct value to zero is DS18B20 give a too high or low reading
 const char compile_date[] = __DATE__ " " __TIME__;
 
-enum OTCommand { SetBoilerStatus, SetBoilerTemp, SetDHWTemp, GetBoilerTemp,  GetDHWTemp, GetReturnTemp, GetOutsideTemp, GetModulation, GetPressure, GetFlowRate, GetFaultCode } OpenThermCommand ;
+enum OTCommand { SetBoilerStatus, SetBoilerTemp, SetDHWTemp, GetBoilerTemp,  GetDHWTemp, GetReturnTemp, GetOutsideTemp, GetModulation, GetPressure, GetFlowRate, GetFaultCode, GetThermostatTemp } OpenThermCommand ;
 
 // vars to manage boiler
 bool enableCentralHeating = false;
@@ -44,6 +44,8 @@ bool enableHotWater = true;
 bool enableCooling = false;
 float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
+
+float currentTemperature = 0;
 
 // return values from boiler
 float dhw_Temperature = 0;
@@ -227,8 +229,6 @@ String getSensors() { //Handler
     message +=",\n  \"FaultCode\": " + String(FaultCode);
 
     // Add Temp Sensor value
-    sensors.requestTemperatures(); // Send the command to get temperature readings 
-    float currentTemperature = sensors.getTempCByIndex(0);
     message +=",\n  \"ThermostatTemperature\": " + (String(currentTemperature+ThermostatTemperatureCalibration));
 
     return message;
@@ -459,18 +459,28 @@ void handleOpenTherm()
     case GetFaultCode:
     {
       FaultCode = ot.getFault();
+      OpenThermCommand=GetThermostatTemp;
+      break;
+    }
+
+    case GetThermostatTemp:
+    {
+      sensors.requestTemperatures(); // Send the command to get temperature readings 
+      currentTemperature = sensors.getTempCByIndex(0);
       OpenThermCommand=SetBoilerStatus;
       break;
     }
+
   }
 }
 
 void loop()
 {
-  if (OTAUpdateInProgress) {
-    // handle OTA
-    ArduinoOTA.handle();
-  } else {
+  // handle OTA
+  ArduinoOTA.handle();
+
+  // don't do anything if we are doing if OTA upgrade is in progress
+  if (!OTAUpdateInProgress) {
     if (millis()-t_heartbeat>heartbeatTickInMillis) {
       //reset tick time
       t_heartbeat=millis();
@@ -495,5 +505,5 @@ void loop()
 
     //Handle incoming webrequests
     server.handleClient();
-  } 
+  }
 } 
