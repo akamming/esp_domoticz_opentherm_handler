@@ -253,12 +253,13 @@ void handleGetInfo()
   json["flashsize"] = ESP.getFlashChipRealSize();
   json["resetreason"] = ESP.getResetReason();
   json["resetinfo"] = ESP.getResetInfo();
+  json["freeheap"] = ESP.getFreeHeap();
 
   long seconds=millis()/1000;
   int secs = seconds % 60;
   int mins = (seconds/60) % 60;
   int hrs = (seconds/3600) % 24;
-  int days = (seconds/(3600*24));
+  int days = (seconds/(3600*24)); 
   json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
 
   json.printTo(buf, sizeof(buf));
