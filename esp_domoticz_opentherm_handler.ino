@@ -237,9 +237,8 @@ String getSensors() { //Handler
 void handleGetInfo()
 {
   Serial.println("GetInfo");
-  StaticJsonBuffer<512> jsonBuffer;
+  StaticJsonDocument<512> json;
   char buf[512];
-  JsonObject& json = jsonBuffer.createObject();
   json["heap"] = ESP.getFreeHeap();
   json["sketchsize"] = ESP.getSketchSize();
   json["sketchspace"] = ESP.getFreeSketchSpace();
@@ -262,7 +261,7 @@ void handleGetInfo()
   int days = (seconds/(3600*24)); 
   json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
 
-  json.printTo(buf, sizeof(buf));
+  serializeJson(json, buf); 
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
