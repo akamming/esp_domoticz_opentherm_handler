@@ -21,7 +21,9 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
     - Install the following libraries (menu Tools / Manage Libraries in Arduino IDE)
         -  WhareHauoraWiFiManager by Tzapu
         -  OpenTherm by Ihor Melnyk
-    - Create a new sketch and copy the contents of the file esp_domoticz_opentherm_handler.ino into that sketch
+    - do a "git clone https://github.com/akamming/esp_domoticz_opentherm_handler"
+    - using arduino open the .ino file in the cloned dir
+    - adjust config.h for your config settings 
     - Open the board manager (menu Tools / Board / Board Manager)
     - Search for ESP8266 and click install, then close
     - Select Board type "LOLIN(WEMOS) D1 R2 & mini (menu Tools/Board)
