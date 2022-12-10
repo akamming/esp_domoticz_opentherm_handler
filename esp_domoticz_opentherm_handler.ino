@@ -680,14 +680,16 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
 void reconnect()
 {
-  if (!MQTT.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    if (MQTT.connect(host, mqttuser, mqttpass)) {
-      Serial.println("Connect succeeded");
-      PublishAllMQTTSensors();      
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(MQTT.state());
+  if (usemqtt) {
+    if (!MQTT.connected()) {
+      Serial.print("Attempting MQTT connection...");
+      if (MQTT.connect(host, mqttuser, mqttpass)) {
+        Serial.println("Connect succeeded");
+        PublishAllMQTTSensors();      
+      } else {
+        Serial.print("failed, rc=");
+        Serial.print(MQTT.state());
+      }
     }
   }
 }
