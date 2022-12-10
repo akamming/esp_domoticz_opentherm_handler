@@ -40,6 +40,8 @@ const char Boiler_Temperature_Name[] = "Boiler_Temperature";
 const char Thermostat_Temperature_Name[] = "Thermostat_Temperature";   
 const char Outside_Temperature_Name[] = "Outside_Temperature";   
 const char FlameActive_Name[] = "FlameActive";   
+const char FaultActive_Name[] = "FaultActive";   
+const char DiagnosticActive_Name[] = "DiagnosticActive";   
 const char CoolingActive_Name[] = "CoolingActive";   
 const char CentralHeatingActive_Name[] = "CentralHeatingActive";   
 const char HotWaterActive_Name[] = "HotWaterActive";  
@@ -47,6 +49,8 @@ const char EnableCooling_Name[] = "EnableCooling";
 const char EnableCentralHeating_Name[] = "EnableCentralHeating";   
 const char EnableHotWater_Name[] = "EnableHotWater";   
 const char Boiler_Setpoint_Name[] = "Boiler_Setpoint";
+const char DHW_Setpoint_Name[] = "DHW_Setpoint";
+const char Modulation_Name[] = "Modulation";
 
 // Current Temp on Thermostat
 float currentTemperature = 0;
@@ -77,11 +81,14 @@ bool mqtt_CentralHeating=true;
 bool mqtt_HotWater=true;
 bool mqtt_Cooling=true;
 bool mqtt_Flame=true;
-bool mqtt_modulation=100;
+bool mqtt_Fault=true;
+bool mqtt_Diagnostic=true;
+float mqtt_modulation=100;
 bool mqtt_enable_HotWater=false;
 bool mqtt_enable_CentralHeating=true;
 bool mqtt_enable_Cooling=true;
 float mqtt_boiler_setpoint=1;
+float mqtt_dhw_setpoint=0;
 
 // ot actions (main will loop through these actions in this order)
 enum OTCommand { SetBoilerStatus, 
@@ -432,6 +439,14 @@ void handleOpenTherm()
               UpdateMQTTSwitch(FlameActive_Name,Flame);
               mqtt_Flame=Flame;
             }
+            if (Fault!=mqtt_Fault){ // value changed
+              UpdateMQTTSwitch(FaultActive_Name,Fault);
+              mqtt_Fault=Fault;
+            }
+            if (Diagnostic!=mqtt_Diagnostic){ // value changed
+              UpdateMQTTSwitch(DiagnosticActive_Name,Diagnostic);
+              mqtt_Diagnostic=Diagnostic;
+            }
             if (enableCentralHeating!=mqtt_enable_CentralHeating) // value changed
             {
               UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
@@ -502,7 +517,16 @@ void handleOpenTherm()
 
     case SetDHWTemp:
     {
-       ot.setDHWSetpoint(dhw_SetPoint);
+      ot.setDHWSetpoint(dhw_SetPoint);
+
+      // check if we have to send MQTT message
+      if (MQTT.connected()) {
+        if ((dhw_SetPoint-mqtt_dhw_setpoint)>=0.1 or (dhw_SetPoint-mqtt_dhw_setpoint)<=-0.1){ // value changed
+          UpdateMQTTSetpoint(DHW_Setpoint_Name,dhw_SetPoint);
+          mqtt_dhw_setpoint=dhw_SetPoint;
+        }
+      }
+
       OpenThermCommand = GetBoilerTemp;
       break;
     }
@@ -562,6 +586,7 @@ void handleOpenTherm()
       // Check if we have to send to MQTT
       if (MQTT.connected()) {
         if (modulation!=mqtt_modulation){ // value changed
+          UpdateMQTTPercentageSensor(Modulation_Name,modulation);
           if (CentralHeating) {
             UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,modulation);
           }
@@ -669,6 +694,9 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
       // we have a match, log what we see..
       boiler_SetPoint=String(payloadstr).toFloat();
+    } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
+      // we have a match, log what we see..
+      dhw_SetPoint=String(payloadstr).toFloat();
     } else {
       MQTT.publish("log/topic",topicstr.c_str());
       MQTT.publish("log/payload",payloadstr);
@@ -786,6 +814,35 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
   MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
 }
 
+void PublishMQTTPercentageSensor(const char* uniquename)
+{
+  Serial.println("PublishMQTTPercentageSensor");
+  StaticJsonDocument<512> json;
+
+  // Create message
+  char conf[512];
+  json["value_template"] =  "{{ value_json.value }}";
+  json["device_class"] = "None";
+  json["unit_of_measurement"] = "%";
+  json["state_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
+  json["name"] = uniquename;
+  json["unique_id"] = uniquename;
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,true);
+}
+
+void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
+{
+  Serial.println("UpdateMQTTPercentageSensor");
+  char charVal[10];
+  dtostrf(percentage,4,1,charVal); 
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
+}
+
+
 void PublishMQTTSetpoint(const char* uniquename)
 {
   Serial.println("PublishMQTTSetpoint");
@@ -819,13 +876,16 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
 void PublishAllMQTTSensors()
 {
   Serial.println("PublishAllMQTTSensors()");
-  // Temperature Sensors
+  // Sensors
   PublishMQTTTemperatureSensor(Boiler_Temperature_Name);
   PublishMQTTTemperatureSensor(Thermostat_Temperature_Name);
   PublishMQTTTemperatureSensor(Outside_Temperature_Name);
+  PublishMQTTPercentageSensor(Modulation_Name);
 
   // On/off sensors telling state
   PublishMQTTSwitch(FlameActive_Name,false);
+  PublishMQTTSwitch(FaultActive_Name,false);
+  PublishMQTTSwitch(DiagnosticActive_Name,false);
   PublishMQTTSwitch(CoolingActive_Name,false);
   PublishMQTTDimmer(CentralHeatingActive_Name);
   PublishMQTTDimmer(HotWaterActive_Name);
@@ -838,6 +898,7 @@ void PublishAllMQTTSensors()
 
   // Publish setpoints
   PublishMQTTSetpoint(Boiler_Setpoint_Name);
+  PublishMQTTSetpoint(DHW_Setpoint_Name);
 }
 
 void loop()
