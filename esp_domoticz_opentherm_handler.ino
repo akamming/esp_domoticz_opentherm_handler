@@ -24,19 +24,9 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <OneWire.h>              // One Wire bus
 #include <DallasTemperature.h>    // temperature sensors
 #include <ArduinoOTA.h>           // OTA updates
-#include <ArduinoJson.h>
-
-// constants
-const int inPin = 4;                            // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
-const int outPin = 5;                           // pin number for opentherm adapter connection, 3 for Arduino, 5 for ESP8266 (D1), 22 for ESP32
-const int OneWireBus = 14;                      //Data wire is connected to 14 pin on the OpenTherm Shield
-const int domoticzTimeoutInMillis = 30 * 1000;  // if no command was sent in this period, the thermostat will assume domoticz is nog longer there 
-const int heartbeatTickInMillis = 1000;         // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
-const String host = "domesphelper";             // mdns hostname
-const float ThermostatTemperatureCalibration=0;  // set to a differenct value to zero is DS18B20 give a too high or low reading
-const char compile_date[] = __DATE__ " " __TIME__;
-
-enum OTCommand { SetBoilerStatus, SetBoilerTemp, SetDHWTemp, GetBoilerTemp,  GetDHWTemp, GetReturnTemp, GetOutsideTemp, GetModulation, GetPressure, GetFlowRate, GetFaultCode, GetThermostatTemp } OpenThermCommand ;
+#include <ArduinoJson.h>          // make JSON payloads
+#include <PubSubClient.h>         // MQTT library
+#include "config.h"                 // Set Configuration
 
 // vars to manage boiler
 bool enableCentralHeating = false;
@@ -45,6 +35,20 @@ bool enableCooling = false;
 float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
 
+// device names for mqtt autodiscovery
+const char Boiler_Temperature_Name[] = "Boiler_Temperature";   
+const char Thermostat_Temperature_Name[] = "Thermostat_Temperature";   
+const char Outside_Temperature_Name[] = "Outside_Temperature";   
+const char FlameActive_Name[] = "FlameActive";   
+const char CoolingActive_Name[] = "CoolingActive";   
+const char CentralHeatingActive_Name[] = "CentralHeatingActive";   
+const char HotWaterActive_Name[] = "HotWaterActive";  
+const char EnableCooling_Name[] = "EnableCooling";   
+const char EnableCentralHeating_Name[] = "EnableCentralHeating";   
+const char EnableHotWater_Name[] = "EnableHotWater";   
+const char Boiler_Setpoint_Name[] = "Boiler_Setpoint";
+
+// Current Temp on Thermostat
 float currentTemperature = 0;
 
 // return values from boiler
@@ -63,17 +67,51 @@ bool Flame = false;
 bool Fault = false;
 bool Diagnostic = false;
 unsigned char FaultCode=65;
-  
+
+
+// reported vars to mqtt
+float mqtt_boiler_Temperature=0;
+float mqtt_outside_Temperature=0;
+float mqtt_currentTemperature=0;
+bool mqtt_CentralHeating=true;
+bool mqtt_HotWater=true;
+bool mqtt_Cooling=true;
+bool mqtt_Flame=true;
+bool mqtt_modulation=100;
+bool mqtt_enable_HotWater=false;
+bool mqtt_enable_CentralHeating=true;
+bool mqtt_enable_Cooling=true;
+float mqtt_boiler_setpoint=1;
+
+// ot actions (main will loop through these actions in this order)
+enum OTCommand { SetBoilerStatus, 
+                 SetBoilerTemp, 
+                 SetDHWTemp, 
+                 GetBoilerTemp,  
+                 GetDHWTemp, 
+                 GetReturnTemp, 
+                 GetOutsideTemp, 
+                 GetModulation, 
+                 GetPressure, 
+                 GetFlowRate, 
+                 GetFaultCode, 
+                 GetThermostatTemp 
+               } OpenThermCommand ;
+
 // vars for program logic
-unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat timestamp
-unsigned long t_last_command=millis()-domoticzTimeoutInMillis; // last domoticz command timestamp
+const char compile_date[] = __DATE__ " " __TIME__;  // Make sure we can output compile date
+unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat timestamp, init on previous heartbeat, so processing start right away
+unsigned long t_last_command=millis()-domoticzTimeoutInMillis; // last domoticz command timestamp. init on previous timeout value, so processing start right away
+unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 bool OTAUpdateInProgress=false;
 
 // objects to be used by program
-ESP8266WebServer server(80);   //Web server object. Will be listening in port 80 (default for HTTP)
-OneWire oneWire(OneWireBus);  // OneWire Bus
-DallasTemperature sensors(&oneWire); // for the temp sensor 
-OpenTherm ot(inPin, outPin);
+ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
+OneWire oneWire(OneWireBus);  // for OneWire Bus
+DallasTemperature sensors(&oneWire); // for the temp sensor on one wire bus
+OpenTherm ot(inPin, outPin); // for communication with Opentherm adapter
+WiFiClient espClient;  // Needed for MQTT
+PubSubClient MQTT(espClient); // MQTT client
 
 
 void ICACHE_RAM_ATTR handleInterrupt() {
@@ -253,6 +291,12 @@ void handleGetInfo()
   json["resetreason"] = ESP.getResetReason();
   json["resetinfo"] = ESP.getResetInfo();
   json["freeheap"] = ESP.getFreeHeap();
+  if (MQTT.connected())
+  {
+    json["MQTTconnected"] = true;
+  } else {
+    json["MQTTconnected"] = false;
+  }
 
   long seconds=millis()/1000;
   int secs = seconds % 60;
@@ -274,6 +318,7 @@ void setup()
 
     // Handle Wifi connection by wifi manager
     WiFiManager wifiManager;
+    wifiManager.setHostname(host);
     wifiManager.autoConnect("Thermostat");
 
     if (MDNS.begin(host)) {
@@ -294,10 +339,10 @@ void setup()
     // ArduinoOTA.setPort(8266);
   
     // Hostname defaults to esp8266-[ChipID]
-    ArduinoOTA.setHostname(host.c_str());
+    ArduinoOTA.setHostname(host);
   
     // No authentication by default
-    ArduinoOTA.setPassword("domesphelper");
+    ArduinoOTA.setPassword(host);
   
     // Password can be set with it's md5 value as well
     // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
@@ -351,6 +396,11 @@ void setup()
 
     // Start OpenTherm
     ot.begin(handleInterrupt);
+
+    // MQTT
+    MQTT.setServer(mqttserver, mqttport); // server details
+    MQTT.setBufferSize(512); // discovery messages are longer than default max buffersize(!)
+    MQTT.setCallback(MQTTcallback); // listen to callbacks
 }
 
 void handleOpenTherm()
@@ -375,12 +425,52 @@ void handleOpenTherm()
           Cooling=ot.isCoolingActive(response);
           Fault=ot.isFault(response);
           Diagnostic=ot.isDiagnostic(response);
+
+          // Check if we have to send to MQTT
+          if (MQTT.connected()) {
+            if (Flame!=mqtt_Flame){ // value changed
+              UpdateMQTTSwitch(FlameActive_Name,Flame);
+              mqtt_Flame=Flame;
+            }
+            if (enableCentralHeating!=mqtt_enable_CentralHeating) // value changed
+            {
+              UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
+              mqtt_enable_CentralHeating=enableCentralHeating;
+            }
+            if (enableCooling!=mqtt_enable_Cooling) // value changed
+            {
+              UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
+              mqtt_enable_Cooling=enableCooling;
+            }
+            if (enableHotWater!=mqtt_enable_HotWater) // value changed
+            {
+              UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
+              mqtt_enable_HotWater=enableHotWater;
+            }
+            if (Cooling!=mqtt_Cooling){ // value changed
+              UpdateMQTTSwitch(CoolingActive_Name,Cooling);
+              mqtt_Cooling=Cooling;
+            }
+            if (CentralHeating!=mqtt_CentralHeating){ // value changed
+              if (CentralHeating) {
+                UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,modulation);
+              } else {
+                UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,0);
+              }
+              mqtt_CentralHeating=CentralHeating;
+            }
+            if (HotWater!=mqtt_HotWater){ // value changed
+              if (HotWater) {
+                UpdateMQTTDimmer(HotWaterActive_Name,HotWater,modulation);
+              } else {
+                UpdateMQTTDimmer(HotWaterActive_Name,HotWater,0);
+              }
+              mqtt_HotWater=HotWater;
+            }
+          }
     
-          // Communicate setpoints to Boiler
-  
           // Execute the next command in the next call
           OpenThermCommand = SetBoilerTemp;
-                  
       } else if (responseStatus == OpenThermResponseStatus::NONE) {
           Serial.println("Opentherm Error: OpenTherm is not initialized");
       } else if (responseStatus == OpenThermResponseStatus::INVALID) {
@@ -395,7 +485,17 @@ void handleOpenTherm()
     
     case SetBoilerTemp:
     {
+      // set setpoint
       ot.setBoilerTemperature(boiler_SetPoint);
+
+      // check if we have to send MQTT message
+      if (MQTT.connected()) {
+        if ((boiler_SetPoint-mqtt_boiler_setpoint)>=0.1 or (boiler_SetPoint-mqtt_boiler_setpoint)<=-0.1){ // value changed
+          UpdateMQTTSetpoint(Boiler_Setpoint_Name,boiler_SetPoint);
+          mqtt_boiler_setpoint=boiler_SetPoint;
+        }
+      }
+
       OpenThermCommand = SetDHWTemp;
       break;
     }
@@ -410,6 +510,16 @@ void handleOpenTherm()
     case GetBoilerTemp:
     {
       boiler_Temperature = ot.getBoilerTemperature();
+
+      // Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        float delta = mqtt_boiler_Temperature-boiler_Temperature;
+        if (delta<-0.1 or delta>0.1){ // value changed
+          UpdateMQTTTemperatureSensor(Boiler_Temperature_Name,boiler_Temperature);
+          mqtt_boiler_Temperature=boiler_Temperature;
+        }
+      }
+
       OpenThermCommand = GetDHWTemp;
       break;
     }
@@ -431,6 +541,16 @@ void handleOpenTherm()
     case GetOutsideTemp:
     {
       outside_Temperature = ot.getOutsideTemperature();
+      
+      // Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        float delta = mqtt_outside_Temperature-outside_Temperature;
+        if (delta<-0.1 or delta>0.1){ // value changed
+          UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
+          mqtt_outside_Temperature=outside_Temperature;
+        }
+      }
+
       OpenThermCommand = GetModulation;
       break;
     }
@@ -438,6 +558,20 @@ void handleOpenTherm()
     case GetModulation:
     {
       modulation = ot.getModulation();
+
+      // Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        if (modulation!=mqtt_modulation){ // value changed
+          if (CentralHeating) {
+            UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,modulation);
+          }
+          if (HotWater) {
+            UpdateMQTTDimmer(HotWaterActive_Name,HotWater,modulation);
+          }
+          mqtt_modulation=modulation;
+        }
+      }
+      
       OpenThermCommand = GetPressure;
       break;
     }
@@ -467,11 +601,241 @@ void handleOpenTherm()
     {
       sensors.requestTemperatures(); // Send the command to get temperature readings 
       currentTemperature = sensors.getTempCByIndex(0);
+
+      // Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        float delta = mqtt_currentTemperature-currentTemperature;
+        if (delta<-0.1 or delta>0.1){ // value changed
+          UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name,currentTemperature);
+          mqtt_currentTemperature=currentTemperature;
+        }
+      }
+
       OpenThermCommand=SetBoilerStatus;
+      
       break;
     }
 
   }
+}
+
+String CommandTopic(const char* DeviceName){
+  return String(mqttautodiscoverytopic)+String("/light/")+String(DeviceName)+String("/set");
+}
+
+String SetpointCommandTopic(const char* DeviceName){
+  return String(mqttautodiscoverytopic)+"/climate/"+String(DeviceName)+"/cmd_temp";
+}
+
+void MQTTcallback(char* topic, byte* payload, unsigned int length) {
+  // get vars from callback
+  String topicstr=String(topic);
+  char payloadstr[256];
+  strncpy(payloadstr,(char *)payload,length);
+  payloadstr[length]='\0';
+
+  // decode payload
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, payloadstr);
+
+
+  if (error) {
+    MQTT.publish("log/topic",topicstr.c_str());
+    MQTT.publish("log/payload",payloadstr);
+    MQTT.publish("log/length",String(length).c_str());
+    MQTT.publish("log/error","Deserialisation failed");
+  } else {
+    if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
+      // we have a match
+      if (String(doc["state"]).equals("ON")){
+        enableHotWater=true;
+      } else if (String(doc["state"]).equals("OFF")) {
+        enableHotWater=false;
+      }
+    } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
+      // we have a match
+      if (String(doc["state"]).equals("ON")){
+        enableCooling=true;
+      } else if (String(doc["state"]).equals("OFF")) {
+        enableCooling=false;
+      } 
+    } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
+      // we have a match
+      if (String(doc["state"]).equals("ON")){
+        enableCentralHeating=true;
+      } else if (String(doc["state"]).equals("OFF")) {
+        enableCentralHeating=false;
+      }
+    } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
+      // we have a match, log what we see..
+      boiler_SetPoint=String(payloadstr).toFloat();
+    } else {
+      MQTT.publish("log/topic",topicstr.c_str());
+      MQTT.publish("log/payload",payloadstr);
+      MQTT.publish("log/length",String(length).c_str());
+      MQTT.publish("log/command","unknown topic");
+    }
+  }
+}
+
+void reconnect()
+{
+  if (!MQTT.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    if (MQTT.connect(host, mqttuser, mqttpass)) {
+      Serial.println("Connect succeeded");
+      PublishAllMQTTSensors();      
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(MQTT.state());
+    }
+  }
+}
+
+void PublishMQTTDimmer(const char* uniquename)
+{
+  Serial.println("UpdateMQTTDimmer");
+  StaticJsonDocument<512> json;
+
+  // Construct JSON config message
+  json["name"] = uniquename;
+  json["unique_id"] = uniquename;
+  json["cmd_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/set";
+  json["stat_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state";
+  json["schema"] = "json";
+  json["brightness"] = true;
+  char conf[512];
+  serializeJson(json, conf);  // conf now contains the json
+
+  // Publish config message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,true);
+
+}
+
+void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
+{
+  Serial.println("UpdateMQTTDimmer");
+  StaticJsonDocument<512> json;
+
+  // Construct JSON config message
+  json["state"]=Value ? "ON" : "OFF";
+  json["brightness"]=int(Mod*255/100);
+  char state[128];
+  serializeJson(json, state);  // state now contains the json
+
+  // publish state message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state").c_str(),state,true);
+}
+
+void PublishMQTTSwitch(const char* uniquename, bool controllable)
+{
+  Serial.println("PublishMQTTSwitch");
+  StaticJsonDocument<512> json;
+
+  // Construct JSON config message
+  json["name"] = uniquename;
+  json["unique_id"] = uniquename;
+  json["cmd_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/set";
+  json["stat_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state";
+  char conf[512];
+  serializeJson(json, conf);  // conf now contains the json
+
+  // Publish config message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,true);
+
+  // subscribe if need to listen to commands
+  if (controllable) {
+    MQTT.subscribe((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/set").c_str());
+  }
+}
+
+void UpdateMQTTSwitch(const char* uniquename, bool Value)
+{
+  Serial.println("UpdateMQTTSwitch");
+  // publish state message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",true);
+}
+
+void PublishMQTTTemperatureSensor(const char* uniquename)
+{
+  Serial.println("PublishMQTTTemperatureSensor");
+  StaticJsonDocument<512> json;
+
+  // Create message
+  char conf[512];
+  json["value_template"] =  "{{ value_json.value }}";
+  json["device_class"] = "temperature";
+  json["unit_of_measurement"] = "°C";
+  json["state_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
+  json["name"] = uniquename;
+  json["unique_id"] = uniquename;
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,true);
+}
+
+void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
+{
+  Serial.println("UpdateMQTTTemperatureSensor");
+  char charVal[10];
+  dtostrf(temperature,4,1,charVal); 
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
+}
+
+void PublishMQTTSetpoint(const char* uniquename)
+{
+  Serial.println("PublishMQTTSetpoint");
+  StaticJsonDocument<512> json;
+
+  // Create message
+  char conf[512];
+  json["name"] = uniquename;
+  json["unique_id"] = uniquename;
+  json["temp_cmd_t"] = String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/cmd_temp";
+  json["temp_stat_t"] = String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/state";
+  json["temp_stat_tpl"] = "{{value_json.seltemp}}";
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/config").c_str(),conf,true);
+  MQTT.subscribe((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
+}
+
+void UpdateMQTTSetpoint(const char* uniquename, float temperature)
+{
+  Serial.println("UpdateMQTTSetpoint");
+  char charVal[10];
+  dtostrf(temperature,4,1,charVal); 
+  MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/state").c_str(),charVal,true);
+}
+
+
+
+
+void PublishAllMQTTSensors()
+{
+  Serial.println("PublishAllMQTTSensors()");
+  // Temperature Sensors
+  PublishMQTTTemperatureSensor(Boiler_Temperature_Name);
+  PublishMQTTTemperatureSensor(Thermostat_Temperature_Name);
+  PublishMQTTTemperatureSensor(Outside_Temperature_Name);
+
+  // On/off sensors telling state
+  PublishMQTTSwitch(FlameActive_Name,false);
+  PublishMQTTSwitch(CoolingActive_Name,false);
+  PublishMQTTDimmer(CentralHeatingActive_Name);
+  PublishMQTTDimmer(HotWaterActive_Name);
+  t_last_mqtt_discovery=millis();
+
+  // Switches to control the boiler
+  PublishMQTTSwitch(EnableCentralHeating_Name,true);
+  PublishMQTTSwitch(EnableCooling_Name,true);
+  PublishMQTTSwitch(EnableHotWater_Name,true);
+
+  // Publish setpoints
+  PublishMQTTSetpoint(Boiler_Setpoint_Name);
 }
 
 void loop()
@@ -484,6 +848,19 @@ void loop()
     if (millis()-t_heartbeat>heartbeatTickInMillis) {
       //reset tick time
       t_heartbeat=millis();
+
+      // (Re)connect MQTT
+      if (!MQTT.connected()) {
+        // We are no connected, so try to reconnect
+        reconnect();
+      } else {
+        // we are connected, check if we have to resend discovery info
+        if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis)
+        {
+          PublishAllMQTTSensors();
+        }
+      }
+      
       if (millis()-t_last_command>domoticzTimeoutInMillis) {
           // Domoticz was not there for a long time, so do nothing
           Serial.print("."); // Just print a dot, so we can see the software in still running
@@ -505,5 +882,9 @@ void loop()
 
     //Handle incoming webrequests
     server.handleClient();
+
+    // handle MQTT
+    MQTT.loop();
+
   }
 } 
