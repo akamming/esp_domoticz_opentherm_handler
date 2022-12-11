@@ -152,6 +152,9 @@ void handleGetSensors() {
 void handleCommand() {
   String Statustext="Unknown Command";
 
+  // we received a command, so someone is comunicating
+  t_last_command=millis();
+
   // blink the LED, so we can see a command was sent
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off , to indicate we are executing a command
 
@@ -167,7 +170,6 @@ void handleCommand() {
     Serial.println("Setting dhw temp to "+server.arg("DHWTemperature"));
     dhw_SetPoint=server.arg("DHWTemperature").toFloat();
     Statustext="OK";
-    t_last_command=millis();
   }
 
   // Set Boiler Temp
@@ -175,7 +177,6 @@ void handleCommand() {
     Serial.println("Setting boiler temp to "+server.arg("BoilerTemperature"));
     boiler_SetPoint=server.arg("BoilerTemperature").toFloat();
     Statustext="OK";
-    t_last_command=millis();
   }
 
   // Enable/Disable Cooling
@@ -645,14 +646,18 @@ void handleOpenTherm()
 }
 
 String CommandTopic(const char* DeviceName){
-  return String(mqttautodiscoverytopic)+String("/light/")+String(DeviceName)+String("/set");
+  return String(host)+String("/light/")+String(DeviceName)+String("/set");
 }
 
 String SetpointCommandTopic(const char* DeviceName){
-  return String(mqttautodiscoverytopic)+"/climate/"+String(DeviceName)+"/cmd_temp";
+  return String(host)+"/climate/"+String(DeviceName)+"/cmd_temp";
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
+
+  // we received a callback, so someone is comunicating
+  t_last_command=millis();
+  
   // get vars from callback
   String topicstr=String(topic);
   char payloadstr[256];
@@ -730,8 +735,8 @@ void PublishMQTTDimmer(const char* uniquename)
   // Construct JSON config message
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
-  json["cmd_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/set";
-  json["stat_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state";
+  json["cmd_t"] = String(host)+"/light/"+String(uniquename)+"/set";
+  json["stat_t"] = String(host)+"/light/"+String(uniquename)+"/state";
   json["schema"] = "json";
   json["brightness"] = true;
   char conf[512];
@@ -754,7 +759,7 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
   serializeJson(json, state);  // state now contains the json
 
   // publish state message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state").c_str(),state,true);
+  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),state,true);
 }
 
 void PublishMQTTSwitch(const char* uniquename, bool controllable)
@@ -765,8 +770,8 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
   // Construct JSON config message
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
-  json["cmd_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/set";
-  json["stat_t"] = String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state";
+  json["cmd_t"] = String(host)+"/light/"+String(uniquename)+"/set";
+  json["stat_t"] = String(host)+"/light/"+String(uniquename)+"/state";
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
 
@@ -775,7 +780,7 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
 
   // subscribe if need to listen to commands
   if (controllable) {
-    MQTT.subscribe((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/set").c_str());
+    MQTT.subscribe((String(host)+"/light/"+String(uniquename)+"/set").c_str());
   }
 }
 
@@ -783,7 +788,7 @@ void UpdateMQTTSwitch(const char* uniquename, bool Value)
 {
   Serial.println("UpdateMQTTSwitch");
   // publish state message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",true);
+  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",true);
 }
 
 void PublishMQTTTemperatureSensor(const char* uniquename)
@@ -796,8 +801,8 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "temperature";
   json["unit_of_measurement"] = "°C";
-  json["state_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
   serializeJson(json, conf);  // buf now contains the json 
@@ -811,7 +816,7 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
   Serial.println("UpdateMQTTTemperatureSensor");
   char charVal[10];
   dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
+  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
 }
 
 void PublishMQTTPercentageSensor(const char* uniquename)
@@ -824,8 +829,8 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "None";
   json["unit_of_measurement"] = "%";
-  json["state_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
   serializeJson(json, conf);  // buf now contains the json 
@@ -839,7 +844,7 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
   Serial.println("UpdateMQTTPercentageSensor");
   char charVal[10];
   dtostrf(percentage,4,1,charVal); 
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
+  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
 }
 
 
@@ -852,14 +857,14 @@ void PublishMQTTSetpoint(const char* uniquename)
   char conf[512];
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
-  json["temp_cmd_t"] = String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/cmd_temp";
-  json["temp_stat_t"] = String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/state";
+  json["temp_cmd_t"] = String(host)+"/climate/"+String(uniquename)+"/cmd_temp";
+  json["temp_stat_t"] = String(host)+"/climate/"+String(uniquename)+"/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
   MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/config").c_str(),conf,true);
-  MQTT.subscribe((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
+  MQTT.subscribe((String(host)+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
 }
 
 void UpdateMQTTSetpoint(const char* uniquename, float temperature)
@@ -867,7 +872,7 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
   Serial.println("UpdateMQTTSetpoint");
   char charVal[10];
   dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/state").c_str(),charVal,true);
+  MQTT.publish((String(host)+"/climate/"+String(uniquename)+"/state").c_str(),charVal,true);
 }
 
 
@@ -929,8 +934,9 @@ void loop()
           Serial.print("."); // Just print a dot, so we can see the software in still running
           digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we lost connection
 
-          // Switch off Heating since there is no domoticz to control it
+          // Switch off Heating and Cooling since there is noone controlling it
           enableCentralHeating=false;
+          enableCooling=false;
           boiler_SetPoint=0;
       } else {
           digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have connection
