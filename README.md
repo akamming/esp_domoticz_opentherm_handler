@@ -23,7 +23,7 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
         -  OpenTherm by Ihor Melnyk
     - do a "git clone https://github.com/akamming/esp_domoticz_opentherm_handler"
     - using arduino open the .ino file in the cloned dir
-    - adjust config.h for your config settings 
+    - adjust config.h for your config settings. Make sure to set mqtt to true and enter your mqtt settings correctly to make it work with latest domoticz python plugin. (also enable mqtt autodiscovery on your domoticz device)
     - Open the board manager (menu Tools / Board / Board Manager)
     - Search for ESP8266 and click install, then close
     - Select Board type "LOLIN(WEMOS) D1 R2 & mini (menu Tools/Board)
