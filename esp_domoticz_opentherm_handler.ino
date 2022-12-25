@@ -99,7 +99,6 @@ enum OTCommand { SetBoilerStatus,
                  GetReturnTemp, 
                  GetOutsideTemp, 
                  GetPressure, 
-                 GetFlowRate, 
                  GetFaultCode, 
                  GetThermostatTemp 
                } OpenThermCommand ;
@@ -270,7 +269,6 @@ String getSensors() { //Handler
     message +=",\n  \"OutsideTemperature\": " + String(outside_Temperature);
     message +=",\n  \"Modulation\": " + String(modulation);
     message +=",\n  \"Pressure\": " + String(pressure);
-    message +=",\n  \"Flowrate\": " + String(flowrate);
     message +=",\n  \"FaultCode\": " + String(FaultCode);
 
     // Add Temp Sensor value
@@ -602,17 +600,10 @@ void handleOpenTherm()
     case GetPressure: 
     {
       pressure = ot.getPressure();
-      OpenThermCommand = GetFlowRate;
-      break;
-    }
- 
-    case GetFlowRate:
-    {
-      flowrate = ot.getDHWFlowrate();
       OpenThermCommand = GetFaultCode;
       break;
     }
-
+ 
     case GetFaultCode:
     {
       FaultCode = ot.getFault();
