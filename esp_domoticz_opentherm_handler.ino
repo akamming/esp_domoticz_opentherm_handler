@@ -316,6 +316,19 @@ void handleGetInfo()
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
+void handleNotFound()
+{
+  // create 404 message if no file was found for this URI
+  char message[1000];
+  sprintf(message,"File Not Found\n\nURI: %s\nMethod: %s\nArguments %d\n",server.uri().c_str(), server.method() == HTTP_GET ? "GET" : "POST",server.args());
+  for (uint8_t i = 0; i < server.args(); i++)
+  {
+    char buf[100];
+    sprintf(buf," %s=%s\n",server.argName(i).c_str(),server.arg(i).c_str());
+    strcat (message,buf);
+  }
+  server.send(404, "text/plain", message);
+}
 
 void setup()
 {
@@ -340,6 +353,7 @@ void setup()
     server.on("/GetSensors",handleGetSensors);
     server.on("/info", handleGetInfo);
     server.on("/command", handleCommand);   //Associate the handler function to the path
+    server.onNotFound(handleNotFound);
 
     // Initialize OTA
     // Port defaults to 8266
