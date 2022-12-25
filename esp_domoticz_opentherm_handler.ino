@@ -743,7 +743,7 @@ void PublishMQTTDimmer(const char* uniquename)
   serializeJson(json, conf);  // conf now contains the json
 
   // Publish config message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,true);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 
 }
 
@@ -759,7 +759,7 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
   serializeJson(json, state);  // state now contains the json
 
   // publish state message
-  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),state,true);
+  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
 void PublishMQTTSwitch(const char* uniquename, bool controllable)
@@ -776,7 +776,7 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
   serializeJson(json, conf);  // conf now contains the json
 
   // Publish config message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,true);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 
   // subscribe if need to listen to commands
   if (controllable) {
@@ -788,7 +788,7 @@ void UpdateMQTTSwitch(const char* uniquename, bool Value)
 {
   Serial.println("UpdateMQTTSwitch");
   // publish state message
-  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",true);
+  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence);
 }
 
 void PublishMQTTTemperatureSensor(const char* uniquename)
@@ -808,7 +808,7 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,true);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 }
 
 void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
@@ -816,7 +816,7 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
   Serial.println("UpdateMQTTTemperatureSensor");
   char charVal[10];
   dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
+  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 void PublishMQTTPercentageSensor(const char* uniquename)
@@ -836,7 +836,7 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,true);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 }
 
 void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
@@ -844,7 +844,7 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
   Serial.println("UpdateMQTTPercentageSensor");
   char charVal[10];
   dtostrf(percentage,4,1,charVal); 
-  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,true);
+  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 
@@ -863,7 +863,7 @@ void PublishMQTTSetpoint(const char* uniquename)
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/config").c_str(),conf,true);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
   MQTT.subscribe((String(host)+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
 }
 
@@ -872,7 +872,7 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
   Serial.println("UpdateMQTTSetpoint");
   char charVal[10];
   dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((String(host)+"/climate/"+String(uniquename)+"/state").c_str(),charVal,true);
+  MQTT.publish((String(host)+"/climate/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 

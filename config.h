@@ -9,6 +9,7 @@ const int heartbeatTickInMillis = 1000;             // has to be max 1000, Opent
 const int MQTTDiscoveryHeartbeatInMillis = 10*60*1000;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
 const char host[] = "domesphelper";                 // mdns hostname
 const bool usemqtt = false;                         // Set to True if you want to use MQTT
+const bool mqttpersistence = false;                  // Set to True if you want persistence messages 
 const char mqttserver[] = "ip adress";              // MQTT Server Adress
 const int mqttport = 1883;                           // MQTT Server Port
 const char mqttuser[] = "user";                     // MQTT Username
