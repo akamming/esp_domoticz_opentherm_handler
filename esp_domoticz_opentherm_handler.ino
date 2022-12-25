@@ -98,7 +98,6 @@ enum OTCommand { SetBoilerStatus,
                  GetDHWTemp, 
                  GetReturnTemp, 
                  GetOutsideTemp, 
-                 GetModulation, 
                  GetPressure, 
                  GetFlowRate, 
                  GetFaultCode, 
@@ -422,71 +421,77 @@ void handleOpenTherm()
       unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
       responseStatus = ot.getLastResponseStatus();
       if (responseStatus == OpenThermResponseStatus::SUCCESS) {
-          // Yes we have a connection, update statuses
-          Serial.println("Central Heating: " + String(ot.isCentralHeatingActive(response) ? "on" : "off"));
-          Serial.println("Hot Water: " + String(ot.isHotWaterActive(response) ? "on" : "off"));
-          Serial.println("Cooling: " + String(ot.isCoolingActive(response) ? "on" : "off"));
-          Serial.println("Flame: " + String(ot.isFlameOn(response) ? "on" : "off"));
-          Flame=ot.isFlameOn(response);
-          CentralHeating=ot.isCentralHeatingActive(response);
-          HotWater=ot.isHotWaterActive(response);
-          Cooling=ot.isCoolingActive(response);
-          Fault=ot.isFault(response);
-          Diagnostic=ot.isDiagnostic(response);
+        // Yes we have a connection, update statuses
+        Serial.println("Central Heating: " + String(ot.isCentralHeatingActive(response) ? "on" : "off"));
+        Serial.println("Hot Water: " + String(ot.isHotWaterActive(response) ? "on" : "off"));
+        Serial.println("Cooling: " + String(ot.isCoolingActive(response) ? "on" : "off"));
+        Serial.println("Flame: " + String(ot.isFlameOn(response) ? "on" : "off"));
+        Flame=ot.isFlameOn(response);
+        CentralHeating=ot.isCentralHeatingActive(response);
+        HotWater=ot.isHotWaterActive(response);
+        Cooling=ot.isCoolingActive(response);
+        Fault=ot.isFault(response);
+        Diagnostic=ot.isDiagnostic(response);
 
-          // Check if we have to send to MQTT
-          if (MQTT.connected()) {
-            if (Flame!=mqtt_Flame){ // value changed
-              UpdateMQTTSwitch(FlameActive_Name,Flame);
-              mqtt_Flame=Flame;
-            }
-            if (Fault!=mqtt_Fault){ // value changed
-              UpdateMQTTSwitch(FaultActive_Name,Fault);
-              mqtt_Fault=Fault;
-            }
-            if (Diagnostic!=mqtt_Diagnostic){ // value changed
-              UpdateMQTTSwitch(DiagnosticActive_Name,Diagnostic);
-              mqtt_Diagnostic=Diagnostic;
-            }
-            if (enableCentralHeating!=mqtt_enable_CentralHeating) // value changed
-            {
-              UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
-              mqtt_enable_CentralHeating=enableCentralHeating;
-            }
-            if (enableCooling!=mqtt_enable_Cooling) // value changed
-            {
-              UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
-              mqtt_enable_Cooling=enableCooling;
-            }
-            if (enableHotWater!=mqtt_enable_HotWater) // value changed
-            {
-              UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
-              mqtt_enable_HotWater=enableHotWater;
-            }
-            if (Cooling!=mqtt_Cooling){ // value changed
-              UpdateMQTTSwitch(CoolingActive_Name,Cooling);
-              mqtt_Cooling=Cooling;
-            }
-            if (CentralHeating!=mqtt_CentralHeating){ // value changed
-              if (CentralHeating) {
-                UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,modulation);
-              } else {
-                UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,0);
-              }
-              mqtt_CentralHeating=CentralHeating;
-            }
-            if (HotWater!=mqtt_HotWater){ // value changed
-              if (HotWater) {
-                UpdateMQTTDimmer(HotWaterActive_Name,HotWater,modulation);
-              } else {
-                UpdateMQTTDimmer(HotWaterActive_Name,HotWater,0);
-              }
-              mqtt_HotWater=HotWater;
-            }
+        // modulation is reported on the switches, so make sure we have modulation value as well
+        modulation = ot.getModulation();
+
+        // Check if we have to send to MQTT
+        if (MQTT.connected()) {
+          if (Flame!=mqtt_Flame){ // value changed
+            UpdateMQTTSwitch(FlameActive_Name,Flame);
+            mqtt_Flame=Flame;
           }
-    
-          // Execute the next command in the next call
-          OpenThermCommand = SetBoilerTemp;
+          if (Fault!=mqtt_Fault){ // value changed
+            UpdateMQTTSwitch(FaultActive_Name,Fault);
+            mqtt_Fault=Fault;
+          }
+          if (Diagnostic!=mqtt_Diagnostic){ // value changed
+            UpdateMQTTSwitch(DiagnosticActive_Name,Diagnostic);
+            mqtt_Diagnostic=Diagnostic;
+          }
+          if (enableCentralHeating!=mqtt_enable_CentralHeating) // value changed
+          {
+            UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
+            mqtt_enable_CentralHeating=enableCentralHeating;
+          }
+          if (enableCooling!=mqtt_enable_Cooling) // value changed
+          {
+            UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
+            mqtt_enable_Cooling=enableCooling;
+          }
+          if (enableHotWater!=mqtt_enable_HotWater) // value changed
+          {
+            UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
+            mqtt_enable_HotWater=enableHotWater;
+          }
+          if (Cooling!=mqtt_Cooling){ // value changed
+            UpdateMQTTSwitch(CoolingActive_Name,Cooling);
+            mqtt_Cooling=Cooling;
+          }
+          if (CentralHeating!=mqtt_CentralHeating or modulation!=mqtt_modulation){ // Update switch when on/off or modulation changed
+            if (CentralHeating) {
+              UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,modulation);
+            } else {
+              UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,0);
+            }
+            mqtt_CentralHeating=CentralHeating;
+          }
+          if (HotWater!=mqtt_HotWater or modulation!=mqtt_modulation){ // Update switch when on/off or modulation changed
+            if (HotWater) {
+              UpdateMQTTDimmer(HotWaterActive_Name,HotWater,modulation);
+            } else {
+              UpdateMQTTDimmer(HotWaterActive_Name,HotWater,0);
+            }
+            mqtt_HotWater=HotWater;
+          }
+          if (modulation!=mqtt_modulation){ // value changed
+            UpdateMQTTPercentageSensor(Modulation_Name,modulation);
+            mqtt_modulation=modulation; // remember mqtt modulation value
+          }
+        }
+        // Execute the next command in the next call
+        OpenThermCommand = SetBoilerTemp;
       } else if (responseStatus == OpenThermResponseStatus::NONE) {
           Serial.println("Opentherm Error: OpenTherm is not initialized");
       } else if (responseStatus == OpenThermResponseStatus::INVALID) {
@@ -576,28 +581,6 @@ void handleOpenTherm()
         }
       }
 
-      OpenThermCommand = GetModulation;
-      break;
-    }
-      
-    case GetModulation:
-    {
-      modulation = ot.getModulation();
-
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        if (modulation!=mqtt_modulation){ // value changed
-          UpdateMQTTPercentageSensor(Modulation_Name,modulation);
-          if (CentralHeating) {
-            UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,modulation);
-          }
-          if (HotWater) {
-            UpdateMQTTDimmer(HotWaterActive_Name,HotWater,modulation);
-          }
-          mqtt_modulation=modulation;
-        }
-      }
-      
       OpenThermCommand = GetPressure;
       break;
     }
