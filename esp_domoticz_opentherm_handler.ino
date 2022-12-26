@@ -37,6 +37,8 @@ float dhw_SetPoint = 65;
 
 // device names for mqtt autodiscovery
 const char Boiler_Temperature_Name[] = "Boiler_Temperature";   
+const char DHW_Temperature_Name[] = "DHW_Temperature";   
+const char Return_Temperature_Name[] = "Return_Temperature";   
 const char Thermostat_Temperature_Name[] = "Thermostat_Temperature";   
 const char Outside_Temperature_Name[] = "Outside_Temperature";   
 const char FlameActive_Name[] = "FlameActive";   
@@ -76,16 +78,18 @@ unsigned char FaultCode=65;
 
 
 // reported vars to mqtt, make sure all are initialized on unexpected values, so they are sent the 1st time
-float mqtt_boiler_Temperature=0;
-float mqtt_outside_Temperature=0;
-float mqtt_currentTemperature=0;
+float mqtt_boiler_Temperature=100;
+float mqtt_dhw_Temperature=100;
+float mqtt_return_Temperature=100;
+float mqtt_outside_Temperature=100;
+float mqtt_currentTemperature=100;
 bool mqtt_CentralHeating=true;
 bool mqtt_HotWater=true;
 bool mqtt_Cooling=true;
 bool mqtt_Flame=true;
 bool mqtt_Fault=true;
 bool mqtt_Diagnostic=true;
-float mqtt_modulation=100;
+float mqtt_modulation=101;
 bool mqtt_enable_HotWater=false;
 bool mqtt_enable_CentralHeating=true;
 bool mqtt_enable_Cooling=true;
@@ -573,6 +577,16 @@ void handleOpenTherm()
     case GetDHWTemp:
     {
       dhw_Temperature = ot.getDHWTemperature();
+
+      // Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        float delta = mqtt_dhw_Temperature-dhw_Temperature;
+        if (delta<-0.1 or delta>0.1){ // value changed
+          UpdateMQTTTemperatureSensor(DHW_Temperature_Name,dhw_Temperature);
+          mqtt_dhw_Temperature=dhw_Temperature;
+        }
+      }
+
       OpenThermCommand = GetReturnTemp;
       break;
     }
@@ -580,6 +594,16 @@ void handleOpenTherm()
     case GetReturnTemp:
     {
       return_Temperature = ot.getReturnTemperature();
+
+      // Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        float delta = mqtt_return_Temperature-return_Temperature;
+        if (delta<-0.1 or delta>0.1){ // value changed
+          UpdateMQTTTemperatureSensor(Return_Temperature_Name,return_Temperature);
+          mqtt_return_Temperature=return_Temperature;
+        }
+      }
+
       OpenThermCommand = GetOutsideTemp;
       break;
     }
@@ -951,6 +975,8 @@ void PublishAllMQTTSensors()
   Serial.println("PublishAllMQTTSensors()");
   // Sensors
   PublishMQTTTemperatureSensor(Boiler_Temperature_Name);
+  PublishMQTTTemperatureSensor(DHW_Temperature_Name);
+  PublishMQTTTemperatureSensor(Return_Temperature_Name);
   PublishMQTTTemperatureSensor(Thermostat_Temperature_Name);
   PublishMQTTTemperatureSensor(Outside_Temperature_Name);
   PublishMQTTPressureSensor(Pressure_Name);
