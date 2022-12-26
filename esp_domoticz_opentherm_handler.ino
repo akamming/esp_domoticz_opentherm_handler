@@ -892,7 +892,7 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   // Create message
   char conf[512];
   json["value_template"] =  "{{ value_json.value }}";
-  json["device_class"] = "None";
+  json["device_class"] = "power_factor";
   json["unit_of_measurement"] = "%";
   json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
