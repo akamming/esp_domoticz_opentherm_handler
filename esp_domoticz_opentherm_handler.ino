@@ -52,6 +52,7 @@ const char Boiler_Setpoint_Name[] = "Boiler_Setpoint";
 const char DHW_Setpoint_Name[] = "DHW_Setpoint";
 const char Modulation_Name[] = "Modulation";
 const char Pressure_Name[] = "Pressure";
+const char FaultCode_Name[] = "Faultcode";
 
 // Current Temp on Thermostat
 float currentTemperature = 0;
@@ -91,6 +92,7 @@ bool mqtt_enable_Cooling=true;
 float mqtt_boiler_setpoint=1;
 float mqtt_dhw_setpoint=0;
 float mqtt_pressure=3; 
+unsigned char mqtt_FaultCode=65;
 
 // ot actions (main will loop through these actions in this order)
 enum OTCommand { SetBoilerStatus, 
@@ -619,6 +621,16 @@ void handleOpenTherm()
     case GetFaultCode:
     {
       FaultCode = ot.getFault();
+
+      // Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        if (FaultCode!=mqtt_FaultCode){ // value changed
+          UpdateMQTTFaultCodeSensor(FaultCode_Name,FaultCode);
+          mqtt_FaultCode=FaultCode;
+        }
+      }
+
+      
       OpenThermCommand=GetThermostatTemp;
       break;
     }
@@ -876,6 +888,33 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
   MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
+void PublishMQTTFaultCodeSensor(const char* uniquename)
+{
+  Serial.println("PublishMQTTFaultCodeSensor");
+  StaticJsonDocument<512> json;
+
+  // Create message
+  char conf[512];
+  json["value_template"] =  "{{ value_json.value }}";
+  json["device_class"] = "None";
+  json["unit_of_measurement"] = "";
+  json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["name"] = uniquename;
+  json["unique_id"] = uniquename;
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+}
+
+void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
+{
+  Serial.println("UpdateMQTTFaultCodeSensor");
+  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),String(FaultCode).c_str(),mqttpersistence);
+}
+
+
 
 void PublishMQTTSetpoint(const char* uniquename)
 {
@@ -916,6 +955,7 @@ void PublishAllMQTTSensors()
   PublishMQTTTemperatureSensor(Outside_Temperature_Name);
   PublishMQTTPressureSensor(Pressure_Name);
   PublishMQTTPercentageSensor(Modulation_Name);
+  PublishMQTTFaultCodeSensor(FaultCode_Name);
 
   // On/off sensors telling state
   PublishMQTTSwitch(FlameActive_Name,false);
