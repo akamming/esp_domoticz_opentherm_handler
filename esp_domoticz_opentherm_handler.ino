@@ -790,7 +790,11 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
 
   // Construct JSON config message
   json["state"]=Value ? "ON" : "OFF";
-  json["brightness"]=int(Mod*255/100);
+  if (Value and Mod==0) { // Workaround for homekit not being able to show dimmer with value on and brightness 0
+    json["brightness"]=3;     
+  } else {
+    json["brightness"]=int(Mod*255/100);
+  }
   char state[128];
   serializeJson(json, state);  // state now contains the json
 
