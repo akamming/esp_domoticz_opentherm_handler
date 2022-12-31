@@ -1,0 +1,131 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=300">
+    <title>DomesphelperInstellingen</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body onload="loadSettings();">
+
+    <div class="header">DomEspHelper Settings</div>
+
+    <div class="outer_frame">
+        <p>GPIO Config</p><br />
+        OT Input     <input type="number" class="pin_input" id="inpin" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
+        OT Output    <input type="number" class="pin_input" id="outpin" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
+        DS18B20 <input type="number" class="pin_input" id="temppin" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
+    </div>
+
+    <div class="outer_frame">
+        <p>MQTT Config</p>
+        <label><input type="checkbox" name="mqttenabled" id="mqttenabled">MQTT Enabled</label><br /><br />
+        Server <input type="text" class="hn_input" id="mqttserver" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Port <input type="number" class="port_input" id="mqttport" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <label><input type="checkbox" name="retained" id="retained">Retained Messages</label><br />
+        <div class="buttondiv">
+            <button class="colorbutton" onclick="saveSettings()">Save</button>
+        </div>
+    </div>
+
+        <div class="outer_frame">
+            <p>Beheer</p>
+            <div class="buttondiv">
+                <button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
+                <button class="colorbutton" onclick="reset()">Restart without saving</button>
+                <button class="colorbutton" onclick="resetWifiCredentials()">Reset WiFi Config & Restart</button>
+                <button class="colorbutton" onclick="factoryReset()">Back to Factory Settings</button>
+            </div>
+        </div>
+
+        <script>
+
+            function loadConfig()
+            {
+                var xhttp = new XMLHttpRequest();
+                xhttp.onreadystatechange = function()
+                {
+                    if(xhttp.readyState == 4 && xhttp.status == 200)
+                    {
+                        console.log("received " + xhttp.responseText);
+                        const json = JSON.parse(xhttp.responseText);
+                        document.getElementById('inpin').value = json.inpin;
+                        document.getElementById('outpin').value = json.outpin;
+                        document.getElementById('temppin').value = json.temppin;
+
+                        document.getElementById('mqttenabled').checked = json.usemqtt;
+                        document.getElementById('mqttserver').value = json.mqttserver;
+                        document.getElementById('mqttport').value = json.mqttport;
+                        document.getElementById('mqttuser').value = json.mqttuser;
+                        document.getElementById('mqttpass').value = json.mqttpass;
+                        document.getElementById('mqttretained').checked= json.retained;
+                    }
+                };
+                xhttp.open("GET", "http://" + location.hostname + "/getconfig", true);
+                xhttp.send();
+            }
+
+
+            function isValidIP(ip)
+            {
+                var s = ip.split('.');
+                if(s.length != 4) return false;
+                for(var i=0; i<3; i++)
+                {
+                    if(s[i] == '') return false;
+                    if(isNaN(s[i])) return false;
+                    var n = parseInt(s[i]);
+                    if(n < 0 || n > 255) return false;
+                }
+                return true;
+            }
+
+            function saveSettings()
+            {
+                var server = document.getElementById('ntpserver').value;
+                var hostname = document.getElementById('hostname').value;
+                if(!isValidIP(server))
+                {
+                    alert("Invalid IP Adres!");
+                    return;
+                }
+
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("GET", "http://" + location.hostname + "/setntpserver?ip=" + server, true);
+                xhttp.send();
+
+                var xhttp2 = new XMLHttpRequest();
+                xhttp2.open("GET", "http://" + location.hostname + "/sethostname?value=" + hostname, true);
+                xhttp2.send();
+            }
+
+            function reset()
+            {
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("GET", "http://" + location.hostname + "/reset", true);
+                xhttp.send();
+            }
+
+            function resetWifiCredentials()
+            {
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("GET", "http://" + location.hostname + "/resetwificredentials", true);
+                xhttp.send();
+            }
+
+            function factoryReset()
+            {
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("GET", "http://" + location.hostname + "/factoryreset", true);
+                xhttp.send();
+            }
+
+            function loadSettings()
+            {
+                loadConfig();
+            }
+
+        </script>
+</body>
+</html>

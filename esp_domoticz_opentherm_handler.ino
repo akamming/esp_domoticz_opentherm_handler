@@ -9,8 +9,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 -OT1/OT2 = Boiler X1/X2
 -VCC = 5V or 3.3V
 -GND = GND
--IN  = Arduino (3) / ESP8266 (5) Output Pin
--OUT = Arduino (2) / ESP8266 (4) Input Pin
+-IN  = Arduino (3) / ESP8266 (5g) Input Pin
 */
 
 
@@ -27,6 +26,8 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <ArduinoJson.h>          // make JSON payloads
 #include <PubSubClient.h>         // MQTT library
 #include "config.h"                 // Set Configuration
+// #include <SPIFFS.h>               // Filesystem
+
 
 // vars to manage boiler
 bool enableCentralHeating = false;
@@ -310,6 +311,7 @@ void handleGetInfo()
   } else {
     json["MQTTconnected"] = false;
   }
+  json["mqttstate"] = MQTT.state();
 
   long seconds=millis()/1000;
   int secs = seconds % 60;
@@ -322,22 +324,113 @@ void handleGetInfo()
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
+void handleGetConfig()
+{
+  Serial.println("GetConfig");
+  StaticJsonDocument<512> json;
+  char buf[512];
+
+  // gpio config
+  json["inpin"] = inPin;
+  json["outpin"] = outPin;
+  json["temppin"] = OneWireBus;
+
+  // mqtt config
+  json["usemqtt"] = usemqtt;
+  json["mqttserver"] = mqttserver;
+  json["mqttport"] = mqttport;
+  json["mqttuser"] = mqttuser;
+  json["mqttpass"] = "*****"; // This is the only not allowed password, password will only be saved if it is not 5 stars
+  json["mqttretained"] = mqttpersistence;  
+
+  // Add some General status info 
+  if (MQTT.connected())
+  {
+    json["MQTTconnected"] = true;
+  } else {
+    json["MQTTconnected"] = false;
+  }
+  json["MQTTState"] = MQTT.state();
+
+  json["heap"] = ESP.getFreeHeap();
+  long seconds=millis()/1000;
+  int secs = seconds % 60;
+  int mins = (seconds/60) % 60;
+  int hrs = (seconds/3600) % 24;
+  int days = (seconds/(3600*24)); 
+  json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
+
+  serializeJson(json, buf); 
+  server.send(200, "application/json", buf);       //Response to the HTTP request
+}
+
+bool endsWith(const char* what, const char* withwhat)
+{
+    int l1 = strlen(withwhat);
+    int l2 = strlen(what);
+    if (l1 > l2)
+        return 0;
+
+    return strcmp(withwhat, what + (l2 - l1)) == 0;
+}
+
+
+bool serveFile(const char url[])
+{
+  Serial.printf("serveFile(): %s\n\rE",url);
+
+  char path[50];
+  
+  if (url[strlen(url)-1]=='/') {
+    sprintf (path,"%sindex.html",url);
+  } else {
+    sprintf(path,"%s",url);
+  }
+  if (SPIFFS.exists(path))
+  {
+    File file = SPIFFS.open(path, "r");
+    if (server.hasArg("download")) server.streamFile(file, "application/octet-stream");
+    else if (endsWith(path,".htm") or endsWith(path,".html")) server.streamFile(file, "text/html");
+    else if (endsWith(path,".css") ) server.streamFile(file, "text/css");
+    else if (endsWith(path,".png") ) server.streamFile(file, "image/png");
+    else if (endsWith(path,".gif") ) server.streamFile(file, "image/gif");
+    else if (endsWith(path,".jpg") ) server.streamFile(file, "image/jpeg");
+    else if (endsWith(path,".ico") ) server.streamFile(file, "image/x-icon");
+    else if (endsWith(path,".xml") ) server.streamFile(file, "text/xml");
+    else if (endsWith(path,".pdf") ) server.streamFile(file, "application./x-pdf");
+    else if (endsWith(path,".zip") ) server.streamFile(file, "application./x-zip");
+    else if (endsWith(path,".gz") ) server.streamFile(file, "application./x-gzip");
+    else server.streamFile(file, "text/plain");
+    file.close();
+    return true;
+  }
+  return false;
+}
+
+
 void handleNotFound()
 {
-  // create 404 message if no file was found for this URI
-  char message[1000];
-  sprintf(message,"File Not Found\n\nURI: %s\nMethod: %s\nArguments %d\n",server.uri().c_str(), server.method() == HTTP_GET ? "GET" : "POST",server.args());
-  for (uint8_t i = 0; i < server.args(); i++)
+  // first, try to serve the requested file from flash
+  if (!serveFile(server.uri().c_str()))
   {
-    char buf[100];
-    sprintf(buf," %s=%s\n",server.argName(i).c_str(),server.arg(i).c_str());
-    strcat (message,buf);
+    // create 404 message if no file was found for this URI
+    char message[1000];
+    sprintf(message,"File Not Found\n\nURI: %s\nMethod: %s\nArguments %d\n",server.uri().c_str(), server.method() == HTTP_GET ? "GET" : "POST",server.args());
+    for (uint8_t i = 0; i < server.args(); i++)
+    {
+      char buf[100];
+      sprintf(buf," %s=%s\n",server.argName(i).c_str(),server.arg(i).c_str());
+      strcat (message,buf);
+    }
+    server.send(404, "text/plain", message);
   }
-  server.send(404, "text/plain", message);
 }
 
 void setup()
 {
+    // Read config
+    SPIFFS.begin();
+
     // start Serial port
     Serial.begin(115200);
     Serial.println("\nDomEspHelper, compile date "+String(compile_date));
@@ -358,7 +451,8 @@ void setup()
     server.on("/ResetWifiCredentials", handleResetWifiCredentials);
     server.on("/GetSensors",handleGetSensors);
     server.on("/info", handleGetInfo);
-    server.on("/command", handleCommand);   //Associate the handler function to the path
+    server.on("/getconfig", handleGetConfig);
+    server.on("/command", handleCommand);   
     server.onNotFound(handleNotFound);
 
     // Initialize OTA
@@ -369,7 +463,7 @@ void setup()
     ArduinoOTA.setHostname(host);
   
     // No authentication by default
-    ArduinoOTA.setPassword(host);
+    // ArduinoOTA.setPassword(host); // Disable for data upload
   
     // Password can be set with it's md5 value as well
     // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
