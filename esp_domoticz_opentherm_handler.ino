@@ -364,6 +364,32 @@ void handleGetConfig()
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
+void handleSaveConfig() {
+  Serial.println("handleSaveConfig");
+  String Message;
+  
+  // for Debugging purposes
+  Serial.println("Handling Command: Number of args received: "+server.args());
+  for (int i = 0; i < server.args(); i++) {
+    Serial.println ("Argument "+String(i)+" -> "+server.argName(i)+": "+server.arg(i));
+  } 
+
+  // try to deserialize
+  StaticJsonDocument<1000> json;
+  DeserializationError error = deserializeJson(json, server.arg("plain"));
+  if (error) {
+    Message=String("deserializeJson() failed: ")+error.f_str();
+    server.send(500, "text/plain", Message.c_str());
+    return;
+  } else {
+    mqttserver=json["mqttserver"].as<String>();
+    Message="mqttserver was set to "+mqttserver;
+    server.send(200, "text/plain", Message.c_str());
+  }
+
+}
+
+
 bool endsWith(const char* what, const char* withwhat)
 {
     int l1 = strlen(withwhat);
@@ -485,6 +511,7 @@ void setup()
   server.on("/GetSensors",handleGetSensors);
   server.on("/info", handleGetInfo);
   server.on("/getconfig", handleGetConfig);
+  server.on("/saveconfig", handleSaveConfig);
   server.on("/command", handleCommand);   
   server.onNotFound(handleNotFound);
 
