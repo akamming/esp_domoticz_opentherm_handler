@@ -375,17 +375,36 @@ void handleSaveConfig() {
   } 
 
   // try to deserialize
-  StaticJsonDocument<1000> json;
+  StaticJsonDocument<1024> json;
   DeserializationError error = deserializeJson(json, server.arg("plain"));
   if (error) {
-    Message=String("deserializeJson() failed: ")+error.f_str();
+    Message=String("Invalid JSON: ")+error.f_str();
     server.send(500, "text/plain", Message.c_str());
     return;
   } else {
-    mqttserver=json["mqttserver"].as<String>();
-    Message="mqttserver was set to "+mqttserver;
-    server.send(200, "text/plain", Message.c_str());
+    //save the custom parameters to FS
+    Serial.println("saving config");
+
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+      server.send(500, "text/plain", "failed to open config file for writing");
+      return;
+    } else {
+      serializeJson(json, configFile);
+      configFile.close();
+
+      // dump to response as well
+      serializeJson(json, Message);
+      server.send(200, "text/plain", Message.c_str());
+      delay(500); // wait for server send to finish
+      ESP.restart(); // restart
+      
+      return;
+      //end save
+    }
   }
+
+  
 
 }
 
