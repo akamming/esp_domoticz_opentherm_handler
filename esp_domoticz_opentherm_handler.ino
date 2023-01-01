@@ -428,100 +428,100 @@ void handleNotFound()
 
 void setup()
 {
-    // Read config
-    SPIFFS.begin();
+  // start Serial port for logging purposes
+  Serial.begin(115200);
+  Serial.println("\nDomEspHelper, compile date "+String(compile_date));
 
-    // start Serial port
-    Serial.begin(115200);
-    Serial.println("\nDomEspHelper, compile date "+String(compile_date));
+  SPIFFS.begin();
 
-    // Handle Wifi connection by wifi manager
-    WiFiManager wifiManager;
-    wifiManager.setHostname(host);
-    wifiManager.autoConnect("Thermostat");
+  
+  // Handle Wifi connection by wifi manager
+  WiFiManager wifiManager;
+  wifiManager.setHostname(host.c_str());
+  wifiManager.autoConnect("Thermostat");
 
-    if (MDNS.begin(host)) {
-      Serial.println("MDNS responder started");
+  if (MDNS.begin(host.c_str())) {
+    Serial.println("MDNS responder started");
+  }
+  // Log IP adress
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());  //Print the local IP to access the server
+
+  // Register commands on webserver
+  server.on("/ResetWifiCredentials", handleResetWifiCredentials);
+  server.on("/GetSensors",handleGetSensors);
+  server.on("/info", handleGetInfo);
+  server.on("/getconfig", handleGetConfig);
+  server.on("/command", handleCommand);   
+  server.onNotFound(handleNotFound);
+
+  // Initialize OTA
+  // Port defaults to 8266
+  // ArduinoOTA.setPort(8266);
+
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname(host.c_str());
+
+  // No authentication by default
+  // ArduinoOTA.setPassword(host); // Disable for data upload
+
+  // Password can be set with it's md5 value as well
+  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
+  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
+
+  ArduinoOTA.onStart([]() {
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      Serial.println("OTA: Start updating sketch...");
+    } else { // U_FS
+      Serial.println("OTA: Start updating filesystem...");
     }
-    // Log IP adress
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());  //Print the local IP to access the server
+    OTAUpdateInProgress=true;
+  });
 
-    // Register commands on webserver
-    server.on("/ResetWifiCredentials", handleResetWifiCredentials);
-    server.on("/GetSensors",handleGetSensors);
-    server.on("/info", handleGetInfo);
-    server.on("/getconfig", handleGetConfig);
-    server.on("/command", handleCommand);   
-    server.onNotFound(handleNotFound);
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+    OTAUpdateInProgress=false;
+  });
 
-    // Initialize OTA
-    // Port defaults to 8266
-    // ArduinoOTA.setPort(8266);
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
+  });
   
-    // Hostname defaults to esp8266-[ChipID]
-    ArduinoOTA.setHostname(host);
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("OTA: Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("OTA: Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("OTA: Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("OTA: Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("OTA: Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("OTA: End Failed");
+    }
+    OTAUpdateInProgress=false;
+  });
   
-    // No authentication by default
-    // ArduinoOTA.setPassword(host); // Disable for data upload
+  ArduinoOTA.begin();
   
-    // Password can be set with it's md5 value as well
-    // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-    // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
+  //Start the server
+  server.begin();   
+  Serial.println("Opentherm Helper is waiting for commands");   
 
-    ArduinoOTA.onStart([]() {
-      if (ArduinoOTA.getCommand() == U_FLASH) {
-        Serial.println("OTA: Start updating sketch...");
-      } else { // U_FS
-        Serial.println("OTA: Start updating filesystem...");
-      }
-      OTAUpdateInProgress=true;
-    });
+  //Init DS18B20 sensor
+  sensors.begin();
 
-    ArduinoOTA.onEnd([]() {
-      Serial.println("\nEnd");
-      OTAUpdateInProgress=false;
-    });
+  // Init builtin led
+  pinMode(LED_BUILTIN, OUTPUT);
 
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-      Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
-    });
-    
-    ArduinoOTA.onError([](ota_error_t error) {
-      Serial.printf("OTA: Error[%u]: ", error);
-      if (error == OTA_AUTH_ERROR) {
-        Serial.println("OTA: Auth Failed");
-      } else if (error == OTA_BEGIN_ERROR) {
-        Serial.println("OTA: Begin Failed");
-      } else if (error == OTA_CONNECT_ERROR) {
-        Serial.println("OTA: Connect Failed");
-      } else if (error == OTA_RECEIVE_ERROR) {
-        Serial.println("OTA: Receive Failed");
-      } else if (error == OTA_END_ERROR) {
-        Serial.println("OTA: End Failed");
-      }
-      OTAUpdateInProgress=false;
-    });
-    
-    ArduinoOTA.begin();
-    
-    //Start the server
-    server.begin();   
-    Serial.println("Opentherm Helper is waiting for commands");   
+  // Start OpenTherm
+  ot.begin(handleInterrupt);
 
-    //Init DS18B20 sensor
-    sensors.begin();
-
-    // Init builtin led
-    pinMode(LED_BUILTIN, OUTPUT);
-
-    // Start OpenTherm
-    ot.begin(handleInterrupt);
-
-    // MQTT
-    MQTT.setServer(mqttserver, mqttport); // server details
-    MQTT.setBufferSize(512); // discovery messages are longer than default max buffersize(!)
-    MQTT.setCallback(MQTTcallback); // listen to callbacks
+  // MQTT
+  MQTT.setServer(mqttserver.c_str(), mqttport); // server details
+  MQTT.setBufferSize(512); // discovery messages are longer than default max buffersize(!)
+  MQTT.setCallback(MQTTcallback); // listen to callbacks
 }
 
 void handleOpenTherm()
@@ -846,7 +846,7 @@ void reconnect()
   if (usemqtt) {
     if (!MQTT.connected()) {
       Serial.print("Attempting MQTT connection...");
-      if (MQTT.connect(host, mqttuser, mqttpass)) {
+      if (MQTT.connect(host.c_str(), mqttuser.c_str(), mqttpass.c_str())) {
         Serial.println("Connect succeeded");
         PublishAllMQTTSensors();      
       } else {
@@ -865,8 +865,8 @@ void PublishMQTTDimmer(const char* uniquename)
   // Construct JSON config message
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
-  json["cmd_t"] = String(host)+"/light/"+String(uniquename)+"/set";
-  json["stat_t"] = String(host)+"/light/"+String(uniquename)+"/state";
+  json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
+  json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
   json["schema"] = "json";
   json["brightness"] = true;
   char conf[512];
@@ -893,7 +893,7 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
   serializeJson(json, state);  // state now contains the json
 
   // publish state message
-  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
+  MQTT.publish((host+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
 void PublishMQTTSwitch(const char* uniquename, bool controllable)
@@ -904,8 +904,8 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
   // Construct JSON config message
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
-  json["cmd_t"] = String(host)+"/light/"+String(uniquename)+"/set";
-  json["stat_t"] = String(host)+"/light/"+String(uniquename)+"/state";
+  json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
+  json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
 
@@ -914,7 +914,7 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
 
   // subscribe if need to listen to commands
   if (controllable) {
-    MQTT.subscribe((String(host)+"/light/"+String(uniquename)+"/set").c_str());
+    MQTT.subscribe((host+"/light/"+String(uniquename)+"/set").c_str());
   }
 }
 
@@ -922,7 +922,7 @@ void UpdateMQTTSwitch(const char* uniquename, bool Value)
 {
   Serial.println("UpdateMQTTSwitch");
   // publish state message
-  MQTT.publish((String(host)+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence);
+  MQTT.publish((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence);
 }
 
 void PublishMQTTTemperatureSensor(const char* uniquename)
@@ -935,8 +935,8 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "temperature";
   json["unit_of_measurement"] = "°C";
-  json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
   serializeJson(json, conf);  // buf now contains the json 
@@ -950,7 +950,7 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
   Serial.println("UpdateMQTTTemperatureSensor");
   char charVal[10];
   dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 void PublishMQTTPressureSensor(const char* uniquename)
@@ -963,8 +963,8 @@ void PublishMQTTPressureSensor(const char* uniquename)
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "pressure";
   json["unit_of_measurement"] = "bar";
-  json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
   serializeJson(json, conf);  // buf now contains the json 
@@ -978,7 +978,7 @@ void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
   Serial.println("UpdateMQTTPressureSensor");
   char charVal[10];
   dtostrf(pressure,4,1,charVal); 
-  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 
@@ -992,8 +992,8 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "power_factor";
   json["unit_of_measurement"] = "%";
-  json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
   serializeJson(json, conf);  // buf now contains the json 
@@ -1007,7 +1007,7 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
   Serial.println("UpdateMQTTPercentageSensor");
   char charVal[10];
   dtostrf(percentage,4,1,charVal); 
-  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 void PublishMQTTFaultCodeSensor(const char* uniquename)
@@ -1020,8 +1020,8 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "None";
   json["unit_of_measurement"] = "";
-  json["state_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = String(host)+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
   serializeJson(json, conf);  // buf now contains the json 
@@ -1033,7 +1033,7 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 {
   Serial.println("UpdateMQTTFaultCodeSensor");
-  MQTT.publish((String(host)+"/sensor/"+String(uniquename)+"/state").c_str(),String(FaultCode).c_str(),mqttpersistence);
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),String(FaultCode).c_str(),mqttpersistence);
 }
 
 
@@ -1047,14 +1047,14 @@ void PublishMQTTSetpoint(const char* uniquename)
   char conf[512];
   json["name"] = uniquename;
   json["unique_id"] = uniquename;
-  json["temp_cmd_t"] = String(host)+"/climate/"+String(uniquename)+"/cmd_temp";
-  json["temp_stat_t"] = String(host)+"/climate/"+String(uniquename)+"/state";
+  json["temp_cmd_t"] = host+"/climate/"+String(uniquename)+"/cmd_temp";
+  json["temp_stat_t"] = host+"/climate/"+String(uniquename)+"/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
   MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
-  MQTT.subscribe((String(host)+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
+  MQTT.subscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
 }
 
 void UpdateMQTTSetpoint(const char* uniquename, float temperature)
@@ -1062,7 +1062,7 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
   Serial.println("UpdateMQTTSetpoint");
   char charVal[10];
   dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((String(host)+"/climate/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  MQTT.publish((host+"/climate/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 
@@ -1128,10 +1128,10 @@ void loop()
           Serial.print("."); // Just print a dot, so we can see the software in still running
           digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we lost connection
 
-          // Switch off Heating and Cooling since there is noone controlling it
+          // Switch off Heating and Cooling since there is no one controlling it
           enableCentralHeating=false;
           enableCooling=false;
-          boiler_SetPoint=0;
+          boiler_SetPoint=10;
       } else {
           digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have connection
       }
