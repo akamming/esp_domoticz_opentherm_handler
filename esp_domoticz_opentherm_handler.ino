@@ -414,15 +414,42 @@ void handleNotFound()
   if (!serveFile(server.uri().c_str()))
   {
     // create 404 message if no file was found for this URI
-    char message[1000];
-    sprintf(message,"File Not Found\n\nURI: %s\nMethod: %s\nArguments %d\n",server.uri().c_str(), server.method() == HTTP_GET ? "GET" : "POST",server.args());
+    String message = "File Not Found\n\nURI: "+server.uri() + "\nMethod: "+ ( server.method() == HTTP_GET ? "GET" : "POST" ) + "\nArguments "+server.args()+"\n";
+    
     for (uint8_t i = 0; i < server.args(); i++)
     {
-      char buf[100];
-      sprintf(buf," %s=%s\n",server.argName(i).c_str(),server.arg(i).c_str());
-      strcat (message,buf);
+      message += server.argName(i)+"="+server.arg(i)+"\n";
     }
-    server.send(404, "text/plain", message);
+    
+    server.send(404, "text/plain", message.c_str());
+  }
+}
+
+void readConfig()
+{
+  if (SPIFFS.exists("/config.json")) {
+    //file exists, reading and loading
+    Serial.println("reading config file");
+    File configFile = SPIFFS.open("/config.json", "r");
+    if (configFile) {
+      Serial.println("opened config file");
+      size_t size = configFile.size();
+      // Allocate a buffer to store contents of the file.
+      std::unique_ptr<char[]> buf(new char[size]);
+
+      configFile.readBytes(buf.get(), size);
+
+      DynamicJsonDocument json(1024);
+      auto deserializeError = deserializeJson(json, buf.get());
+      serializeJson(json, Serial);
+      if ( ! deserializeError ) {
+        Serial.println("\nparsed json");
+        mqttserver=json["mqttserver"].as<String>();
+      } else {
+        Serial.println("failed to load json config");
+      }
+      configFile.close();
+    }
   }
 }
 
@@ -432,8 +459,14 @@ void setup()
   Serial.begin(115200);
   Serial.println("\nDomEspHelper, compile date "+String(compile_date));
 
-  SPIFFS.begin();
-
+  //read configuration from FS json
+  if (SPIFFS.begin()) {
+    Serial.println("mounted file system");
+    readConfig();
+  } else {
+    Serial.println("failed to mount FS");
+  }
+  //end read
   
   // Handle Wifi connection by wifi manager
   WiFiManager wifiManager;

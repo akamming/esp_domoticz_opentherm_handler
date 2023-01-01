@@ -23,10 +23,7 @@
         Port <input type="number" class="port_input" id="mqttport" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
         Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
         Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
-        <label><input type="checkbox" name="retained" id="retained">Retained Messages</label><br />
-        <div class="buttondiv">
-            <button class="colorbutton" onclick="saveSettings()">Save</button>
-        </div>
+        <label><input type="checkbox" name="retained" id="mqttretained">Retained Messages</label><br />
     </div>
 
         <div class="outer_frame">
@@ -50,13 +47,13 @@
                     {
                         console.log("received " + xhttp.responseText);
                         const json = JSON.parse(xhttp.responseText);
-                        document.getElementById('inpin').value = json.inpin;
-                        document.getElementById('outpin').value = json.outpin;
-                        document.getElementById('temppin').value = json.temppin;
+                        document.getElementById('inpin').value = +json.inpin;
+                        document.getElementById('outpin').value = +json.outpin;
+                        document.getElementById('temppin').value = +json.temppin;
 
                         document.getElementById('mqttenabled').checked = json.usemqtt;
                         document.getElementById('mqttserver').value = json.mqttserver;
-                        document.getElementById('mqttport').value = json.mqttport;
+                        document.getElementById('mqttport').value = +json.mqttport;
                         document.getElementById('mqttuser').value = json.mqttuser;
                         document.getElementById('mqttpass').value = json.mqttpass;
                         document.getElementById('mqttretained').checked= json.retained;
@@ -83,21 +80,37 @@
 
             function saveSettings()
             {
-                var server = document.getElementById('ntpserver').value;
-                var hostname = document.getElementById('hostname').value;
-                if(!isValidIP(server))
-                {
+                var server = document.getElementById('mqttserver').value;
+                if (!isValidIP(server)) {
                     alert("Invalid IP Adres!");
                     return;
+                } else {
+                    // Sending and receiving data in JSON format using POST method
+                    var xhttp = new XMLHttpRequest();
+                    xhttp.open("POST", "http://" + location.hostname + "/saveconfig", true);
+                    xhttp.setRequestHeader("Content-Type", "application/json");
+                    xhttp.onreadystatechange = function () {
+                        if (xhttp.readyState === 4 && xhttp.status === 200) {
+                            alert("New Config sent, device is rebooting, refresh the page after about 10 secs");
+                        } else {
+                            if (xhttp.readyState === 4) {
+                                alert("some error sending the config (" + xhttp.status + ")");
+                            }
+                        }
+                    };
+                    var obj = new Object();
+                    obj.inpin= +document.getElementById('inpin').value;
+                    obj.outpin = +document.getElementById('outpin').value;
+                    obj.temppin = +document.getElementById('temppin').value;
+                    obj.usemqtt = document.getElementById('mqttenabled').checked;
+                    obj.mqttserver = document.getElementById('mqttserver').value;
+                    obj.mqttport = +document.getElementById('mqttport').value;
+                    obj.mqttuser = document.getElementById('mqttuser').value;
+                    obj.mqttpass = document.getElementById('mqttpass').value;
+                    obj.mqttretained = document.getElementById('mqttretained').checked;
+                    var data = JSON.stringify(obj);
+                    xhttp.send(data);
                 }
-
-                var xhttp = new XMLHttpRequest();
-                xhttp.open("GET", "http://" + location.hostname + "/setntpserver?ip=" + server, true);
-                xhttp.send();
-
-                var xhttp2 = new XMLHttpRequest();
-                xhttp2.open("GET", "http://" + location.hostname + "/sethostname?value=" + hostname, true);
-                xhttp2.send();
             }
 
             function reset()
