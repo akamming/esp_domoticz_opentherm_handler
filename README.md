@@ -23,7 +23,7 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
         -  OpenTherm by Ihor Melnyk
     - do a "git clone https://github.com/akamming/esp_domoticz_opentherm_handler"
     - using arduino open the .ino file in the cloned dir
-    - adjust config.h for your config settings. Make sure to set mqtt to true and enter your mqtt settings correctly to make it work with latest domoticz python plugin. (also enable mqtt autodiscovery on your domoticz device)
+    - adjust config.h for your default config settings. 
     - Open the board manager (menu Tools / Board / Board Manager)
     - Search for ESP8266 and click install, then close
     - Select Board type "LOLIN(WEMOS) D1 R2 & mini (menu Tools/Board)
@@ -41,13 +41,8 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
       - or force this by opening a browser and entering the URL: "http://domesphelper/ResetWifiCredentials" 
 
  ### Other Settings
-Default config is hard coded and ok for typical domoticz install and the Wemos D1 mini and openherm adatper connected via opentherm shield built using default instuctions for thermostat (http://ihormelnyk.com/opentherm_thermostat. However you can change the default config by changing the following variables in the source code
-- inPin and outPin: the pins to which the OpenTherm adapter is connected
-- OneWireBus: The pin to which the temp sensor is connected (a DS18B20)
-- DomoticzTimeoutInMillis: The number of seconds the device must stay active after the last http command (to prevent the thermostat sending command to your Boiler when domoticz is inactive)
-- host: The hostname which is advertized
-- ThermostatTemperatureCalibration: if the DS18B20 reports too high or too low values you can correct it using this setting
-
+- After Wifi connection: Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser and configure your device. Set mqtt to enabled and enter your mqtt settings correctly to make it work with latest domoticz python plugin. 
+- also enable mqtt autodiscovery on your domoticz or Home Assistant application and your devices will appear.
 
 ## Supported commands
 - http://domesphelper/ResetWifiCredentials will clear wifi credentials and reset the device, making the wifimanager portal to re-appear

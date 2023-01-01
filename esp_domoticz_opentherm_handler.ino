@@ -390,6 +390,11 @@ void handleSaveConfig() {
       server.send(500, "text/plain", "failed to open config file for writing");
       return;
     } else {
+      // if password was not changed: leave old password in file
+      if (json["mqttpass"]=="*****") {
+        json["mqttpass"]=mqttpass;
+      }
+      
       serializeJson(json, configFile);
       configFile.close();
 
@@ -489,7 +494,15 @@ void readConfig()
       serializeJson(json, Serial);
       if ( ! deserializeError ) {
         Serial.println("\nparsed json");
+        usemqtt=json["usemqtt"];
         mqttserver=json["mqttserver"].as<String>();
+        mqttport=json["mqttport"];
+        mqttuser=json["mqttuser"].as<String>();
+        mqttpass=json["mqttpass"].as<String>();
+        mqttpersistence=json["mqttretained"];
+        inPin=json["inpin"];
+        outPin=json["outpin"];
+        OneWireBus=json["temppin"];
       } else {
         Serial.println("failed to load json config");
       }
