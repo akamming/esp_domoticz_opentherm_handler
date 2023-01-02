@@ -424,12 +424,18 @@ void handleRemoveConfig() {
   } else {
     server.send(500, "text/plain", "No confile file present to remove");
   }
-
-  
   return;
 }
 
+void handleReset() {
+  Serial.println("handleReset");
+  
+  server.send(200, "text/plain", "Device Reset");
+  delay(500); // wait for server send to finish
+  ESP.restart(); // restart
 
+  return;
+}
 
 bool endsWith(const char* what, const char* withwhat)
 {
@@ -562,6 +568,7 @@ void setup()
   server.on("/getconfig", handleGetConfig);
   server.on("/saveconfig", handleSaveConfig);
   server.on("/removeconfig", handleRemoveConfig);
+  server.on("/reset", handleReset);
   server.on("/command", handleCommand);   
   server.onNotFound(handleNotFound);
 

@@ -118,6 +118,16 @@
             {
                 var xhttp = new XMLHttpRequest();
                 xhttp.open("GET", "http://" + location.hostname + "/reset", true);
+                xhttp.onreadystatechange = function () {
+                    if (xhttp.readyState === 4 && xhttp.status === 200) {
+                        alert("device is rebooting, refresh the page after about 10 secs");
+                        // window.location.reload();
+                    } else {
+                        if (xhttp.readyState === 4) {
+                            alert("some error resetting the device (" + xhttp.status + ")");
+                        }
+                    }
+                };
                 xhttp.send();
             }
 
