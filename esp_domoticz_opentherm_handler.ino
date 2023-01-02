@@ -150,6 +150,8 @@ void handleResetWifiCredentials() {
   while (1) {}
 }
 
+
+
 void handleGetSensors() {
   Serial.println("Getting the sensors");
   SendHTTP("GetSensors","OK");
@@ -385,7 +387,7 @@ void handleSaveConfig() {
     //save the custom parameters to FS
     Serial.println("saving config");
 
-    File configFile = SPIFFS.open("/config.json", "w");
+    File configFile = SPIFFS.open(CONFIGFILE, "w");
     if (!configFile) {
       server.send(500, "text/plain", "failed to open config file for writing");
       return;
@@ -408,10 +410,25 @@ void handleSaveConfig() {
       //end save
     }
   }
+}
+
+void handleRemoveConfig() {
+  Serial.println("handleRemoveConfig");
+  
+  if (SPIFFS.exists(CONFIGFILE)) {
+    Serial.println("Config file existst, removing configfile");
+    SPIFFS.remove(CONFIGFILE);
+    server.send(200, "text/plain", "Config file removed");
+    delay(500); // wait for server send to finish
+    ESP.restart(); // restart
+  } else {
+    server.send(500, "text/plain", "No confile file present to remove");
+  }
 
   
-
+  return;
 }
+
 
 
 bool endsWith(const char* what, const char* withwhat)
@@ -477,10 +494,10 @@ void handleNotFound()
 
 void readConfig()
 {
-  if (SPIFFS.exists("/config.json")) {
+  if (SPIFFS.exists(CONFIGFILE)) {
     //file exists, reading and loading
     Serial.println("reading config file");
-    File configFile = SPIFFS.open("/config.json", "r");
+    File configFile = SPIFFS.open(CONFIGFILE, "r");
     if (configFile) {
       Serial.println("opened config file");
       size_t size = configFile.size();
@@ -544,6 +561,7 @@ void setup()
   server.on("/info", handleGetInfo);
   server.on("/getconfig", handleGetConfig);
   server.on("/saveconfig", handleSaveConfig);
+  server.on("/removeconfig", handleRemoveConfig);
   server.on("/command", handleCommand);   
   server.onNotFound(handleNotFound);
 
