@@ -16,6 +16,7 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
 - Connect your Wemos D1 to the USB of your laptop/pc
 - A new com port should now be available on your system. If not, install CH340 drivers (just google on it and you will find them) 
 - Install Arduino IDE (https://www.arduino.cc/en/software)
+- Install Arduino-esp8266fs-plugin (https://github.com/esp8266/arduino-esp8266fs-plugin)
 - Within IDE, 
     - Add the url https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the settings (menu File, Settings, "more boardmanager urls")
     - Install the following libraries (menu Tools / Manage Libraries in Arduino IDE)
@@ -23,12 +24,13 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
         -  OpenTherm by Ihor Melnyk
     - do a "git clone https://github.com/akamming/esp_domoticz_opentherm_handler"
     - using arduino open the .ino file in the cloned dir
-    - adjust config.h for your default config settings. 
+    - OPTIONAL: adjust config.h for your default config settings. (can be overruled, using the GUI)
     - Open the board manager (menu Tools / Board / Board Manager)
     - Search for ESP8266 and click install, then close
     - Select Board type "LOLIN(WEMOS) D1 R2 & mini (menu Tools/Board)
     - Select the com Port to which your wemos is connected (menu Tools / Port)
     - Upload the firmware to your Wemos (menu Sketch / Upload)
+    - Upload the data to your Wemos (menu Tools / ESP8266 Sketch Data Upload)
 
  ## Configuration
  ### Wifi config 
