@@ -422,7 +422,7 @@ void handleRemoveConfig() {
     delay(500); // wait for server send to finish
     ESP.restart(); // restart
   } else {
-    server.send(500, "text/plain", "No confile file present to remove");
+    server.send(200, "text/plain", "No confile file present to remove");
   }
   return;
 }

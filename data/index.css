@@ -57,13 +57,17 @@ p
     width: 4em;
 }
 
-
-
 .header
 {
     font-size: 24px;
     text-align: center;
     color: white;
+}
+
+.uptime_input {
+    border: 0px;
+    width: 240px;
+    text-align: left;
 }
 
 .hn_input
@@ -78,7 +82,6 @@ p
     width: 50px;
     text-align: left;
 }
-
 
 .pin_input {
     border: 0px;
