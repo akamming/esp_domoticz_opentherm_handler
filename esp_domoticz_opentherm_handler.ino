@@ -118,6 +118,7 @@ unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat time
 unsigned long t_last_command=millis()-domoticzTimeoutInMillis; // last domoticz command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 bool OTAUpdateInProgress=false;
+bool ReceivingCommands=false;
 
 // objects to be used by program
 ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
@@ -261,6 +262,9 @@ String getSensors() { //Handler
   } else {
       message += "\"Unknown Status\"";
   }
+
+  // Report if we are receiving commands
+  message += ",\n  \"ReceivingCommands\": " + String(ReceivingCommands ? "true" : "false");
   
   // Add MQTT Connection status 
   message += ",\n  \"MQTTconnected\": " + String(MQTT.connected() ? "true" : "false");
@@ -1259,8 +1263,10 @@ void loop()
           enableCentralHeating=false;
           enableCooling=false;
           boiler_SetPoint=10;
+          ReceivingCommands=false;
       } else {
           digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have connection
+          ReceivingCommands=true;
       }
 
       // handle MDNS
