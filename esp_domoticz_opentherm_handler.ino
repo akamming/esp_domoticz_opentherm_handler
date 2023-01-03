@@ -234,58 +234,67 @@ void handleCommand() {
 
 String getSensors() { //Handler
 
-    String message;
+  String message;
 
-    // Add Compile Date
-    message += ",\n  \"CompileDate\": \"" + String(compile_date) + "\"";
- 
-    // Add Status
-    message += ",\n  \"OpenThermStatus\":";
-    if (responseStatus == OpenThermResponseStatus::SUCCESS) {
-        message += "\"OK\"";
+  // Add Compile Date
+  message = ",\n  \"CompileDate\": \"" + String(compile_date) + "\"";
 
- 
-    } else if (responseStatus == OpenThermResponseStatus::NONE) {
-        message += "\"OpenTherm is not initialized\"";
-    } else if (responseStatus == OpenThermResponseStatus::INVALID) {
-        message += "\"Invalid response\"";
-    } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
-        message += "\"Response timeout, is the boiler connected?\"";
-    } else {
-        message += "\"Unknown Status\"";
-    }
-    
+  // Add uptime
+  long seconds=millis()/1000;
+  int secs = seconds % 60;
+  int mins = (seconds/60) % 60;
+  int hrs = (seconds/3600) % 24;
+  int days = (seconds/(3600*24)); 
+  message += ",\n  \"uptime\": \"" + String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds" + "\"";
 
+  // Add Opentherm Status
+  message += ",\n  \"OpenThermStatus\":";
+  if (responseStatus == OpenThermResponseStatus::SUCCESS) {
+      message += "\"OK\"";
 
-    // Add BoilerManagementVars
-    message += ",\n  \"EnableCentralHeating\": " + String(enableCentralHeating ? "\"on\"" : "\"off\"");
-    message += ",\n  \"EnableHotWater\": " + String(enableHotWater ? "\"on\"" : "\"off\"");
-    message += ",\n  \"EnableCooling\": " + String(enableCooling ? "\"on\"" : "\"off\"");
-    message +=",\n  \"BoilerSetpoint\": " + (String(boiler_SetPoint));
-    message +=",\n  \"DHWSetpoint\": " + (String(dhw_SetPoint));
+  } else if (responseStatus == OpenThermResponseStatus::NONE) {
+      message += "\"OpenTherm is not initialized\"";
+  } else if (responseStatus == OpenThermResponseStatus::INVALID) {
+      message += "\"Invalid response\"";
+  } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
+      message += "\"Response timeout, is the boiler connected?\"";
+  } else {
+      message += "\"Unknown Status\"";
+  }
+  
+  // Add MQTT Connection status 
+  message += ",\n  \"MQTTconnected\": " + String(MQTT.connected() ? "true" : "false");
+  message += ",\n  \"MQTTstate\": " + String(MQTT.state());
 
-    
-    // Add BoilerStatus
-    message += ",\n  \"CentralHeating\": " + String(CentralHeating ? "\"on\"" : "\"off\"");
-    message += ",\n  \"HotWater\": " + String(HotWater ? "\"on\"" : "\"off\"");
-    message += ",\n  \"Cooling\": " + String(Cooling ? "\"on\"" : "\"off\"");
-    message += ",\n  \"Flame\": " + String(Flame ? "\"on\"" : "\"off\"");
-    message += ",\n  \"Fault\": " + String(Fault ? "\"on\"" : "\"off\"");
-    message += ",\n  \"Diagnostic\": " + String(Diagnostic ? "\"on\"" : "\"off\"");
+  // Add BoilerManagementVars
+  message += ",\n  \"EnableCentralHeating\": " + String(enableCentralHeating ? "\"on\"" : "\"off\"");
+  message += ",\n  \"EnableHotWater\": " + String(enableHotWater ? "\"on\"" : "\"off\"");
+  message += ",\n  \"EnableCooling\": " + String(enableCooling ? "\"on\"" : "\"off\"");
+  message +=",\n  \"BoilerSetpoint\": " + (String(boiler_SetPoint));
+  message +=",\n  \"DHWSetpoint\": " + (String(dhw_SetPoint));
 
-     // Add boiler sensors
-    message +=",\n  \"BoilerTemperature\": " + (String)boiler_Temperature;
-    message +=",\n  \"DhwTemperature\": " + String(dhw_Temperature);    
-    message +=",\n  \"ReturnTemperature\": " + String(return_Temperature);
-    message +=",\n  \"OutsideTemperature\": " + String(outside_Temperature);
-    message +=",\n  \"Modulation\": " + String(modulation);
-    message +=",\n  \"Pressure\": " + String(pressure);
-    message +=",\n  \"FaultCode\": " + String(FaultCode);
+  
+  // Add BoilerStatus
+  message += ",\n  \"CentralHeating\": " + String(CentralHeating ? "\"on\"" : "\"off\"");
+  message += ",\n  \"HotWater\": " + String(HotWater ? "\"on\"" : "\"off\"");
+  message += ",\n  \"Cooling\": " + String(Cooling ? "\"on\"" : "\"off\"");
+  message += ",\n  \"Flame\": " + String(Flame ? "\"on\"" : "\"off\"");
+  message += ",\n  \"Fault\": " + String(Fault ? "\"on\"" : "\"off\"");
+  message += ",\n  \"Diagnostic\": " + String(Diagnostic ? "\"on\"" : "\"off\"");
 
-    // Add Temp Sensor value
-    message +=",\n  \"ThermostatTemperature\": " + (String(currentTemperature+ThermostatTemperatureCalibration));
+   // Add boiler sensors
+  message +=",\n  \"BoilerTemperature\": " + (String)boiler_Temperature;
+  message +=",\n  \"DhwTemperature\": " + String(dhw_Temperature);    
+  message +=",\n  \"ReturnTemperature\": " + String(return_Temperature);
+  message +=",\n  \"OutsideTemperature\": " + String(outside_Temperature);
+  message +=",\n  \"Modulation\": " + String(modulation);
+  message +=",\n  \"Pressure\": " + String(pressure);
+  message +=",\n  \"FaultCode\": " + String(FaultCode);
 
-    return message;
+  // Add Temp Sensor value
+  message +=",\n  \"ThermostatTemperature\": " + (String(currentTemperature+ThermostatTemperatureCalibration));
+
+  return message;
 }
 
 void handleGetInfo()

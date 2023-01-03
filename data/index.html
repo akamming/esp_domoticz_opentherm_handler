@@ -10,10 +10,27 @@
     <div class="header">DomEspHelper Settings</div>
 
     <div class="outer_frame">
-        <p>Current Status</p><br />
-        <label><input type="checkbox" name="mqttconnected" id="mqttconnected" disabled>MQTTConnected</label><br />
-        MQTT state <input type="number" class="pin_input" id="mqttstate" size="10" disabled><br />
-        uptime <input type="text" class="uptime_input" id="uptime" size="10" disabled><br />
+        <p>Connection Status</p><br />
+        MQTT<br />
+        <label><input type="checkbox" name="mqttconnected" id="mqttconnected" disabled>Connected</label>
+        <br />MQTT state <input type="number" class="pin_input" id="mqttstate" size="10" disabled><br /><br />
+        <input type="text" class="uptime_input" id="uptime" size="10" disabled><br />
+    </div>
+
+    <div class="outer_frame">
+        <p>Opentherm Status <input type="text" class="hn_input" id="otstatus" size="10" disabled></p>
+        <br />General<br />
+        <label><input type="checkbox" name="flame" id="flame" disabled>flame</label><label><input type="checkbox" name="fault" id="fault" disabled>fault</label><label><input type="checkbox" name="diagnostic" id="diagnostic" disabled>diagnostic</label><br />
+        Modulation <input type="number" class="temp_input" id="modulation" size="10" disabled> Fcode <input type="number" class="temp_input" id="statuscode" size="10" disabled><br />
+        <br />Enable<br />
+        <label><input type="checkbox" name="enableheating" id="enableheating" disabled>heating</label><label><input type="checkbox" name="enablecooling" id="enablecooling" disabled>cooling</label><label><input type="checkbox" name="enablehotwater" id="enablehotwater" disabled>hotwater</label><br />
+        <br />Actual<br />
+        <label><input type="checkbox" name="heating" id="heating" disabled>heating</label><label><input type="checkbox" name="cooling" id="cooling" disabled>cooling</label><label><input type="checkbox" name="hotwater" id="hotwater" disabled>hotwater</label><br />
+        <br />Temperatures<br />
+        Thermostat <input type="number" class="temp_input" id="thermostattemperature" size="10" disabled> Outside <input type="number" class="temp_input" id="outsidetemperature" size="10" disabled><br />
+        Heating SP <input type="number" class="temp_input" id="boilersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="boilertemperature" size="10" disabled><br />
+        Hotwater SP <input type="number" class="temp_input" id="hotwatersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="hotwatertemperature" size="10" disabled><br />
+
     </div>
 
     <div class="outer_frame">
@@ -24,8 +41,8 @@
     </div>
 
     <div class="outer_frame">
-        <p>MQTT Config</p>
-        <label><input type="checkbox" name="mqttenabled" id="mqttenabled">MQTT Enabled</label><br /><br />
+        <p>MQTT Config</p><br />
+        <label><input type="checkbox" name="mqttenabled" id="mqttenabled">Enabled</label><br />
         Server <input type="text" class="hn_input" id="mqttserver" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
         Port <input type="number" class="port_input" id="mqttport" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)"><br />
@@ -44,21 +61,68 @@
     </div>
 
     <script>
+        function Boolean(Value) {
+            if (Value.toLowerCase() === "on") {
+                return true
+            } else {
+                return false
+            }
+        }
+
+        function loadSensors() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    // console.log("received " + xhttp.responseText);
+                    const json = JSON.parse(xhttp.responseText);
+
+                    document.getElementById('otstatus').value = json.OpenThermStatus;
+
+                    document.getElementById('flame').checked = Boolean(json.Flame);
+                    document.getElementById('fault').checked = Boolean(json.Fault);
+                    document.getElementById('diagnostic').checked = Boolean(json.Diagnostic);
+
+                    document.getElementById('enableheating').checked = Boolean(json.EnableCentralHeating);
+                    document.getElementById('enablecooling').checked = Boolean(json.EnableCooling);
+                    document.getElementById('enablehotwater').checked = Boolean(json.EnableHotWater);
+
+                    document.getElementById('heating').checked = Boolean(json.CentralHeating);
+                    document.getElementById('cooling').checked = Boolean(json.Cooling);
+                    document.getElementById('hotwater').checked = Boolean(json.HotWater);
+
+                    document.getElementById('boilersetpoint').value = json.BoilerSetpoint;
+                    document.getElementById('boilertemperature').value = json.BoilerTemperature;
+                    document.getElementById('hotwatersetpoint').value = json.DHWSetpoint;
+                    document.getElementById('hotwatertemperature').value = json.DhwTemperature;
+                    document.getElementById('thermostattemperature').value = json.ThermostatTemperature;
+                    document.getElementById('outsidetemperature').value = json.OutsideTemperature;
+                    document.getElementById('otstatus').value = json.OpenThermStatus;
+                    document.getElementById('modulation').value = json.Modulation;
+                    document.getElementById('statuscode').value = json.FaultCode;
+
+                    document.getElementById('mqttconnected').checked = json.MQTTconnected;
+                    document.getElementById('mqttstate').value = json.MQTTstate;
+                    document.getElementById('uptime').value = json.uptime;
+                }
+            };
+            xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
+            xhttp.send();
+            setTimeout(loadSensors, 5000);
+        }
 
         function loadConfig() {
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (xhttp.readyState == 4 && xhttp.status == 200) {
-                    console.log("received " + xhttp.responseText);
+                    // console.log("received " + xhttp.responseText);
                     const json = JSON.parse(xhttp.responseText);
-                    document.getElementById('mqttconnected').checked = json.MQTTconnected;
-                    document.getElementById('mqttstate').value = json.MQTTState;
-                    document.getElementById('uptime').value = json.uptime;
 
+                    // get gpio config
                     document.getElementById('inpin').value = +json.inpin;
                     document.getElementById('outpin').value = +json.outpin;
                     document.getElementById('temppin').value = +json.temppin;
 
+                    // get mqtt config
                     document.getElementById('mqttenabled').checked = json.usemqtt;
                     document.getElementById('mqttserver').value = json.mqttserver;
                     document.getElementById('mqttport').value = +json.mqttport;
@@ -70,7 +134,6 @@
             xhttp.open("GET", "http://" + location.hostname + "/getconfig", true);
             xhttp.send();
         }
-
 
         function isValidIP(ip) {
             var s = ip.split('.');
@@ -166,6 +229,7 @@
 
         function loadSettings() {
             loadConfig();
+            loadSensors();
         }
 
     </script>

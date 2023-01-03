@@ -89,6 +89,12 @@ p
     text-align: left;
 }
 
+.temp_input {
+    border: 0px;
+    width: 50px;
+    text-align: left;
+}
+
 .user_input {
     border: 0px;
     width: 80px;
