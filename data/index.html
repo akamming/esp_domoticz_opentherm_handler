@@ -158,7 +158,6 @@
                 xhttp.onreadystatechange = function () {
                     if (xhttp.readyState === 4 && xhttp.status === 200) {
                         alert("New Config sent, device is rebooting");
-                        loadConfig();
                     } else {
                         if (xhttp.readyState === 4) {
                             alert("some error sending the config (" + xhttp.status + ")");

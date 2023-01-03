@@ -410,8 +410,9 @@ void handleSaveConfig() {
       configFile.close();
 
       // dump to response as well
-      serializeJson(json, Message);
-      server.send(200, "text/plain", Message.c_str());
+      // serializeJson(json, Message);
+      // server.send(200, "text/plain", Message.c_str());
+      server.send(200, "text/plain", "New Config Saved");
       delay(500); // wait for server send to finish
       ESP.restart(); // restart
       
