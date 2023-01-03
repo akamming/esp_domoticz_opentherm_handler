@@ -1,6 +1,5 @@
-body
-{
-    background: #A0A0A0;
+body {
+    background: #95a4f0;
     font-family: HelveticaNeue-UltraLight, Helvetica, sans-serif;
 }
 
@@ -8,12 +7,13 @@ p
 {
     margin: 0px;
     padding: 0px;
+    color: white;
 }
 
-.colorbutton
-{
+.colorbutton {
     font-family: HelveticaNeue-UltraLight, Helvetica, sans-serif;
     font-size: 18px;
+    font-weight: bold;
     border: 1px solid black;
     width: 250px;
     height: 35px;
@@ -21,6 +21,7 @@ p
     background: #FFFFFF;
     margin-top: 5px;
     margin-bottom: 5px;
+    color: black;
 }
 
 .buttondiv
@@ -28,16 +29,16 @@ p
     text-align: center;
 }
 
-.outer_frame
-{
+.outer_frame {
     border-radius: 5px;
-    /*border: 1px solid black;*/
+    border: 1px solid black;
     padding: 5px;
     width: 260px;
     margin: 0 auto;
     margin-top: 20px;
-    background: #909090;
+    background: #4b67f2;
     text-align: center;
+    color: lightgrey;
 }
 
 .duration
@@ -57,11 +58,11 @@ p
     width: 4em;
 }
 
-.header
-{
+.header {
     font-size: 24px;
     text-align: center;
-    color: white;
+    color: black;
+    font-weight: bold;
 }
 
 .uptime_input {
