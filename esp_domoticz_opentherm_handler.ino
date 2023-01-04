@@ -655,6 +655,12 @@ void setup()
   MQTT.setCallback(MQTTcallback); // listen to callbacks
 }
 
+// not defined  in opentherm lib, so declaring local
+float getOutsideTemperature() {
+  unsigned long response = ot.sendRequest(ot.buildRequest(OpenThermRequestType::READ, OpenThermMessageID::Toutside, 0));
+  return ot.isValidResponse(response) ? ot.getFloat(response) : 0;
+}
+
 void handleOpenTherm()
 {
   
@@ -835,7 +841,7 @@ void handleOpenTherm()
       
     case GetOutsideTemp:
     {
-      outside_Temperature = ot.getOutsideTemperature();
+      outside_Temperature = getOutsideTemperature();
       
       // Check if we have to send to MQTT
       if (MQTT.connected()) {
