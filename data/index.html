@@ -10,11 +10,10 @@
     <div class="header">ESP OpenTherm Control</div>
 
     <div class="outer_frame">
-        <p>Connection Status</p><br />
-        MQTT<br />
-        <label><input type="checkbox" name="mqttconnected" id="mqttconnected" disabled>Connected</label>
-        <br />MQTT state <input type="number" class="pin_input" id="mqttstate" size="10" disabled><br /><br />
-        <input type="text" class="uptime_input" id="uptime" size="10" disabled><br />
+        <p>General Status</p><br />
+        <label><input type="checkbox" name="mqttconnected" id="mqttconnected" disabled>MQTT Connected</label>, state <input type="number" class="pin_input" id="mqttstate" size="10" disabled><br />
+        <label><input type="checkbox" name="receivingcommands" id="receivingcommands" disabled>Receiving Commands</label><br/><br/>
+        Uptime<br/><input type="text" class="uptime_input" id="uptime" size="10" disabled><br />
     </div>
 
     <div class="outer_frame">
@@ -99,6 +98,7 @@
                     document.getElementById('statuscode').value = json.FaultCode;
 
                     document.getElementById('mqttconnected').checked = json.MQTTconnected;
+                    document.getElementById('receivingcommands').checked = json.ReceivingCommands;
                     document.getElementById('mqttstate').value = json.MQTTstate;
                     document.getElementById('uptime').value = json.uptime;
                 }
