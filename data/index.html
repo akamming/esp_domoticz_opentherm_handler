@@ -17,7 +17,10 @@
     </div>
 
     <div class="outer_frame">
-        <p>Opentherm Status <input type="text" class="hn_input" id="otstatus" size="10" disabled></p>
+        <p>Opentherm Status <input type="text" class="hn_input" id="otstatus" size="10" disabled></p><br />
+        Remote Controlled by <input type="text" class="port_input" id="controlledby" size="10" disabled><br />
+        Take Control: <label class="switch"><input type="checkbox" id="takecontrol" onchange="ontakecontrolchanged()"><span class="slider round"></span></label>
+        <br />
         <br />General<br />
         <label><input type="checkbox" name="flame" id="flame" disabled>flame</label><label><input type="checkbox" name="fault" id="fault" disabled>fault</label><label><input type="checkbox" name="diagnostic" id="diagnostic" disabled>diagnostic</label><br />
         Modulation <input type="range" class="temp_input" id="modulation" min="0" max="100" size="10" disabled> Fcode <input type="number" class="temp_input" id="statuscode" size="10" disabled><br />
@@ -58,11 +61,32 @@
     </div>
 
     <script>
+        function ontakecontrolchanged() {
+            NewValue = true;
+            if (document.getElementById('takecontrol').checked) {
+                NewValue = false;
+            }
+            // takecontrol was set to yes
+            document.getElementById("enableheating").disabled = NewValue;
+            document.getElementById("enablecooling").disabled = NewValue;
+            document.getElementById("enablehotwater").disabled = NewValue;
+            document.getElementById("boilersetpoint").disabled = NewValue;
+            document.getElementById("hotwatersetpoint").disabled = NewValue;
+        }
+
         function Boolean(Value) {
             if (Value.toLowerCase() === "on") {
                 return true
             } else {
                 return false
+            }
+        }
+
+        function BooleanToString(Value) {
+            if (Value == true) {
+                return "On";
+            } else {
+                return "Off";
             }
         }
 
@@ -103,7 +127,21 @@
                     document.getElementById('uptime').value = json.uptime;
                 }
             };
-            xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
+            if (document.getElementById('takecontrol').checked == false) {
+                console.log("Takecontrol was not checked");
+                xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
+            } else {
+                console.log("Take control code to be implemented");
+                xhttp.open("GET",
+                    "http://" + location.hostname +
+                    "/command?DHWTemperature=" + document.getElementById('hotwatersetpoint').value +
+                    "&BoilerTemperature=" + document.getElementById('boilersetpoint').value +
+                    "&Cooling=" + BooleanToString(document.getElementById('enablecooling').checked) +
+                    "&CentralHeating=" + BooleanToString(document.getElementById('enableheating').checked) +
+                    "&HotWater=" + BooleanToString(document.getElementById('enablehotwater').checked),
+                    true
+                );
+            }
             xhttp.send();
             setTimeout(loadSensors, 5000);
         }
