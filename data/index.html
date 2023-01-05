@@ -11,17 +11,17 @@
 
     <div class="outer_frame">
         <p>General Status</p><br />
-        <label><input type="checkbox" name="mqttconnected" id="mqttconnected" disabled>MQTT Connected</label>, state <input type="number" class="pin_input" id="mqttstate" size="10" disabled><br />
-        <label><input type="checkbox" name="receivingcommands" id="receivingcommands" disabled>Receiving Commands</label><br/><br/>
-        Uptime<br/><input type="text" class="uptime_input" id="uptime" size="10" disabled><br />
+        <label><input type="checkbox" name="mqttconnected" id="mqttconnected" disabled>MQTT Connected</label>, state <input type="number" class="pin_input" id="mqttstate" size="10" disabled><br /><br />
+        Controlled by <input type="text" class="port_input" id="controlledby" size="10" disabled><br />   
+        <br />
+        Uptime<br /><input type="text" class="uptime_input" id="uptime" size="10" disabled><br />
     </div>
 
     <div class="outer_frame">
         <p>Opentherm Status <input type="text" class="hn_input" id="otstatus" size="10" disabled></p><br />
-        Remote Controlled by <input type="text" class="port_input" id="controlledby" size="10" disabled><br />
         Take Control: <label class="switch"><input type="checkbox" id="takecontrol" onchange="ontakecontrolchanged()"><span class="slider round"></span></label>
-        <br />
-        <br />General<br />
+        <br /><br />
+        General<br />
         <label><input type="checkbox" name="flame" id="flame" disabled>flame</label><label><input type="checkbox" name="fault" id="fault" disabled>fault</label><label><input type="checkbox" name="diagnostic" id="diagnostic" disabled>diagnostic</label><br />
         Modulation <input type="range" class="temp_input" id="modulation" min="0" max="100" size="10" disabled> Fcode <input type="number" class="temp_input" id="statuscode" size="10" disabled><br />
         <br />Enable<br />
@@ -66,7 +66,7 @@
             if (document.getElementById('takecontrol').checked) {
                 NewValue = false;
             }
-            // takecontrol was set to yes
+            // adapt fields
             document.getElementById("enableheating").disabled = NewValue;
             document.getElementById("enablecooling").disabled = NewValue;
             document.getElementById("enablehotwater").disabled = NewValue;
@@ -96,21 +96,16 @@
                 if (xhttp.readyState == 4 && xhttp.status == 200) {
                     // console.log("received " + xhttp.responseText);
                     const json = JSON.parse(xhttp.responseText);
-
                     document.getElementById('otstatus').value = json.OpenThermStatus;
-
                     document.getElementById('flame').checked = Boolean(json.Flame);
                     document.getElementById('fault').checked = Boolean(json.Fault);
                     document.getElementById('diagnostic').checked = Boolean(json.Diagnostic);
-
                     document.getElementById('enableheating').checked = Boolean(json.EnableCentralHeating);
                     document.getElementById('enablecooling').checked = Boolean(json.EnableCooling);
                     document.getElementById('enablehotwater').checked = Boolean(json.EnableHotWater);
-
                     document.getElementById('heating').checked = Boolean(json.CentralHeating);
                     document.getElementById('cooling').checked = Boolean(json.Cooling);
                     document.getElementById('hotwater').checked = Boolean(json.HotWater);
-
                     document.getElementById('boilersetpoint').value = json.BoilerSetpoint;
                     document.getElementById('boilertemperature').value = json.BoilerTemperature;
                     document.getElementById('hotwatersetpoint').value = json.DHWSetpoint;
@@ -120,18 +115,15 @@
                     document.getElementById('otstatus').value = json.OpenThermStatus;
                     document.getElementById('modulation').value = json.Modulation;
                     document.getElementById('statuscode').value = json.FaultCode;
-
+                    document.getElementById('controlledby').value = json.ControlledBy;
                     document.getElementById('mqttconnected').checked = json.MQTTconnected;
-                    document.getElementById('receivingcommands').checked = json.ReceivingCommands;
                     document.getElementById('mqttstate').value = json.MQTTstate;
                     document.getElementById('uptime').value = json.uptime;
                 }
             };
             if (document.getElementById('takecontrol').checked == false) {
-                console.log("Takecontrol was not checked");
                 xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
             } else {
-                console.log("Take control code to be implemented");
                 xhttp.open("GET",
                     "http://" + location.hostname +
                     "/command?DHWTemperature=" + document.getElementById('hotwatersetpoint').value +

@@ -115,10 +115,10 @@ enum OTCommand { SetBoilerStatus,
 // vars for program logic
 const char compile_date[] = __DATE__ " " __TIME__;  // Make sure we can output compile date
 unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat timestamp, init on previous heartbeat, so processing start right away
-unsigned long t_last_command=millis()-domoticzTimeoutInMillis; // last domoticz command timestamp. init on previous timeout value, so processing start right away
+unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT command timestamp. init on previous timeout value, so processing start right away
+unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 bool OTAUpdateInProgress=false;
-bool ReceivingCommands=false;
 
 // objects to be used by program
 ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
@@ -156,14 +156,13 @@ void handleResetWifiCredentials() {
 void handleGetSensors() {
   Serial.println("Getting the sensors");
   SendHTTP("GetSensors","OK");
-  t_last_command=millis();
 }
 
 void handleCommand() {
   String Statustext="Unknown Command";
 
   // we received a command, so someone is comunicating
-  t_last_command=millis();
+  t_last_http_command=millis();
 
   // blink the LED, so we can see a command was sent
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off , to indicate we are executing a command
@@ -191,7 +190,6 @@ void handleCommand() {
 
   // Enable/Disable Cooling
   if (server.arg("Cooling")!="") {
-    t_last_command=millis();
     Statustext="OK";
     if (server.arg("Cooling").equalsIgnoreCase("On")) {
       Serial.println("Enabling Cooling");
@@ -204,7 +202,6 @@ void handleCommand() {
 
   // Enable/Disable Central Heating
   if (server.arg("CentralHeating")!="") {
-    t_last_command=millis();
     Statustext="OK";
     if (server.arg("CentralHeating").equalsIgnoreCase("On")) {
       Serial.println("Enabling Central Heating");
@@ -217,7 +214,6 @@ void handleCommand() {
 
   // Enable/Disable HotWater
   if (server.arg("HotWater")!="") {
-    t_last_command=millis();
     Statustext="OK";
     if (server.arg("HotWater").equalsIgnoreCase("On")) {
       Serial.println("Enabling Domestic Hot Water");
@@ -264,7 +260,13 @@ String getSensors() { //Handler
   }
 
   // Report if we are receiving commands
-  message += ",\n  \"ReceivingCommands\": " + String(ReceivingCommands ? "true" : "false");
+  if (millis()-t_last_http_command<HTTPTimeoutInMillis) {
+    message += ",\n  \"ControlledBy\": \"HTTP\""; // HTTP overrules MQTT so check HTTP 1st
+  } else if (millis()-t_last_mqtt_command<MQTTTimeoutInMillis) {
+    message += ",\n  \"ControlledBy\": \"MQTT\""; // then check if MQTT command was given
+  } else {
+    message += ",\n  \"ControlledBy\": \"None\""; // no commands given lately
+  }
   
   // Add MQTT Connection status 
   message += ",\n  \"MQTTconnected\": " + String(MQTT.connected() ? "true" : "false");
@@ -921,61 +923,62 @@ String SetpointCommandTopic(const char* DeviceName){
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
+  // we received a mqtt callback, so someone is comunicating
+  t_last_mqtt_command=millis();
 
-  // we received a callback, so someone is comunicating
-  t_last_command=millis();
+  if (millis()-t_last_http_command>HTTPTimeoutInMillis) { // only execute mqtt commands if not commanded by http
+    // get vars from callback
+    String topicstr=String(topic);
+    char payloadstr[256];
+    strncpy(payloadstr,(char *)payload,length);
+    payloadstr[length]='\0';
   
-  // get vars from callback
-  String topicstr=String(topic);
-  char payloadstr[256];
-  strncpy(payloadstr,(char *)payload,length);
-  payloadstr[length]='\0';
-
-  // decode payload
-  StaticJsonDocument<256> doc;
-  DeserializationError error = deserializeJson(doc, payloadstr);
-
-
-  if (error) {
-    MQTT.publish("log/topic",topicstr.c_str());
-    MQTT.publish("log/payload",payloadstr);
-    MQTT.publish("log/length",String(length).c_str());
-    MQTT.publish("log/error","Deserialisation failed");
-  } else {
-    if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
-      // we have a match
-      if (String(doc["state"]).equals("ON")){
-        enableHotWater=true;
-      } else if (String(doc["state"]).equals("OFF")) {
-        enableHotWater=false;
-      }
-    } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
-      // we have a match
-      if (String(doc["state"]).equals("ON")){
-        enableCooling=true;
-      } else if (String(doc["state"]).equals("OFF")) {
-        enableCooling=false;
-      } 
-    } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
-      // we have a match
-      if (String(doc["state"]).equals("ON")){
-        enableCentralHeating=true;
-      } else if (String(doc["state"]).equals("OFF")) {
-        enableCentralHeating=false;
-      }
-    } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
-      // we have a match, log what we see..
-      boiler_SetPoint=String(payloadstr).toFloat();
-    } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
-      // we have a match, log what we see..
-      dhw_SetPoint=String(payloadstr).toFloat();
-    } else {
+    // decode payload
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, payloadstr);
+  
+    if (error) {
       MQTT.publish("log/topic",topicstr.c_str());
       MQTT.publish("log/payload",payloadstr);
       MQTT.publish("log/length",String(length).c_str());
-      MQTT.publish("log/command","unknown topic");
+      MQTT.publish("log/error","Deserialisation failed");
+    } else {
+      if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
+        // we have a match
+        if (String(doc["state"]).equals("ON")){
+          enableHotWater=true;
+        } else if (String(doc["state"]).equals("OFF")) {
+          enableHotWater=false;
+        }
+      } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
+        // we have a match
+        if (String(doc["state"]).equals("ON")){
+          enableCooling=true;
+        } else if (String(doc["state"]).equals("OFF")) {
+          enableCooling=false;
+        } 
+      } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
+        // we have a match
+        if (String(doc["state"]).equals("ON")){
+          enableCentralHeating=true;
+        } else if (String(doc["state"]).equals("OFF")) {
+          enableCentralHeating=false;
+        }
+      } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
+        // we have a match, log what we see..
+        boiler_SetPoint=String(payloadstr).toFloat();
+      } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
+        // we have a match, log what we see..
+        dhw_SetPoint=String(payloadstr).toFloat();
+      } else {
+        MQTT.publish("log/topic",topicstr.c_str());
+        MQTT.publish("log/payload",payloadstr);
+        MQTT.publish("log/length",String(length).c_str());
+        MQTT.publish("log/command","unknown topic");
+      }
     }
   }
+
 }
 
 void reconnect()
@@ -1260,19 +1263,17 @@ void loop()
         }
       }
       
-      if (millis()-t_last_command>domoticzTimeoutInMillis) {
-          // Domoticz was not there for a long time, so do nothing
+      if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis) {
+          // No commands given for too long a time, so do nothing
           Serial.print("."); // Just print a dot, so we can see the software in still running
-          digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off, to indicate we lost connection
+          digitalWrite(LED_BUILTIN, HIGH);    // switch the LED off, to indicate we lost connection
 
           // Switch off Heating and Cooling since there is no one controlling it
           enableCentralHeating=false;
           enableCooling=false;
           boiler_SetPoint=10;
-          ReceivingCommands=false;
       } else {
-          digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we have connection
-          ReceivingCommands=true;
+          digitalWrite(LED_BUILTIN, LOW);    // switch the LED on , to indicate we have connection
       }
 
       // handle MDNS
