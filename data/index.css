@@ -96,6 +96,13 @@ p
     text-align: left;
 }
 
+.modulation_input {
+    border: 0px;
+    width: 150px;
+    text-align: left;
+}
+
+
 .user_input {
     border: 0px;
     width: 80px;

@@ -6,7 +6,7 @@ Please look at https://github.com/akamming/Domoticz_Thermostate_Plugin on how to
 ## Functionality
 Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm_library:
 - The firmware sets up a connection with the boiler
-- And then boiler can be controlled using HTTP, MQTT or the builtin UI (can be reached on http://domesphelper or http://<IP adress of device> )
+- And then boiler can be controlled using HTTP, MQTT or the builtin UI (http://domesphelper or http://IP_adress_of_device)
 
 ### Supported HTTP commands:
 Controlling the boiler commands:
@@ -17,7 +17,7 @@ Controlling the boiler commands:
     - Cooling=<on|off> will enable or disable heating
     - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
     - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
-  e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
+    - e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
 
 Managing the device (are used by the UI):
@@ -29,11 +29,14 @@ Managing the device (are used by the UI):
 - http://domesphelper/reset reboots the device
 
 ## support MQTT commands
+The following device are created using MQTT autodiscovery in domoticz and home assistant
 - An EnableHotWater device: Set to ON if your heating/cooling system should produce warm water when needed
 - An EnableCooling device: Set to ON if your heating/cooling system start cooling when needed
 - An EnableCentralHeating device: Set to ON if your heating/cooling system 
 - A Boiler setpoint device: Set the temperature to which you want the heating/cooling system to heat or cool
 - A HotWater Setpoint device: (if supported by your boiler): The to be temperature of the hot water reserve in your heating/cooling system
+- Several sensors containing the state of the heating/cooling system
+
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
 
 ## Installation
@@ -44,7 +47,7 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
 - Install Arduino IDE (https://www.arduino.cc/en/software)
 - Install Arduino-esp8266fs-plugin (https://github.com/esp8266/arduino-esp8266fs-plugin)
 - Within Arduino IDE, 
-    - Add the url https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the settings (menu File, Settings, "more boardmanager urls")
+    - Add support of your ESP8266 board by adding https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the Arduino board management settings (menu File, Settings, "more boardmanager urls")
     - Install the following libraries if they are not present on your system (menu Tools / Manage Libraries in Arduino IDE): 
         - WiFiManager by Tzapu
         - OpenTherm by Ihor Melnyk
@@ -57,7 +60,7 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
     - OPTIONAL: adjust config.h for your default config settings. 
     - Open the board manager (menu Tools / Board / Board Manager)
     - Search for ESP8266 and click install, then close
-    - Select Board type "LOLIN(WEMOS) D1 R2 & mini (menu Tools/Board)
+    - Select your Board type, "LOLIN(WEMOS) D1 R2 & mini" if you use a Wemos D1 but in principle any ESP8266 board should work (menu Tools/Board)
     - Select the com Port to which your wemos is connected (menu Tools / Port)
     - Upload the firmware to your Wemos (menu Sketch / Upload)
     - Upload the data to your Wemos (menu Tools / ESP8266 Sketch Data Upload)
@@ -70,8 +73,8 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
       - follow instructions to connect the ESP to correct WiFi network
 
  ### Other Settings & Controlling heating/cooling manually
-- After Wifi connection: Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser and configure your device. 
+- (After you've setup the wifi connection, see above) 
+- Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser  
 - Configure at least MQTT settings if you want to be able to control using Domoticz or Home Assistant (in that case also enable MQTT autodiscovery in Domoticz and/or Home Assistant)
-- the link also allows you to see the value of the sensors and/or control the device using this UI
-  
+- or use this link to see the value of the sensors and/or control the device using this UI (in the latter: Hit the "take control button". Warning: MQTT commands won't work as long as this webpage is still active, so make sure to reset the take control switch or close the webpage again)  
   
