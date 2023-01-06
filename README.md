@@ -41,7 +41,7 @@ NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will
 
 ## Installation
 Installation is simple, but for newbies i esp8266 here's the detailed explanation:
-- Connect your OpenTherm adapter to the Wemos D1 mini, according to http://ihormelnyk.com/opentherm_adapter. 
+- Connect your OpenTherm adapter to the Wemos D1 mini and the boiler, according to http://ihormelnyk.com/opentherm_adapter. 
 - Connect your Wemos D1 to the USB of your laptop/pc
 - A new com port should now be available on your system. If not, install CH340 drivers (https://www.wemos.cc/en/latest/ch340_driver.html) 
 - Install Arduino IDE (https://www.arduino.cc/en/software)
