@@ -4,27 +4,57 @@ custom made EPS8266 firmware for OpenTherm Adapter (http://ihormelnyk.com/openth
 Please look at https://github.com/akamming/Domoticz_Thermostate_Plugin on how to use this firmware
 
 ## Functionality
-Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
+Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm_library:
 - The firmware sets up a connection with the boiler
-- The firmware remembers the settings for "Heating enabled", "hot water enabled", "cooling enabled", "DHW setpoint" and "Boiler setpoint"
-- And will send these settings to the boiler in a continuous loop
-- The settings can be changed by giving HTTP commands
-- In the reply of every command, the current value of the settings, along with several sensors in the boiler which can be read by the opentherm library are returned
+- And then boiler can be controlled using HTTP, MQTT or the builtin UI (can be reached on http://domesphelper or http://<IP adress of device> )
 
-### Installation
+### Supported HTTP commands:
+Controlling the boiler commands:
+- http://domesphelper/GetSensors will return a JSON formatted status of all sensors
+- http://domesphelper/command allows you to control the boiler (response also gives JSON formatted status of alle sensors):
+    - HotWater=<on|off>  will enable or disable DHT
+    - CentralHeating=<on|off> will enable or disable Central Heating
+    - Cooling=<on|off> will enable or disable heating
+    - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
+    - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
+  e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
+NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
+
+Managing the device (are used by the UI):
+- http://domesphelper/info gives a lot of technical info on the device
+- http://domesphelper/getconfig retrieves the configuration file (e.g. with MQTT settings)
+- http://domesphelper/saveconfig stores the configuration file (e.g. with MQTT settings) and reboot
+- http://domesphelper/removeconfig deleters the config
+- http://domesphelper/ResetWifiCredentials will clear wifi credentials and reboots the device, making the wifimanager portal to re-appear so you can add new WIFI connection settings
+- http://domesphelper/reset reboots the device
+
+## support MQTT commands
+- An EnableHotWater device: Set to ON if your heating/cooling system should produce warm water when needed
+- An EnableCooling device: Set to ON if your heating/cooling system start cooling when needed
+- An EnableCentralHeating device: Set to ON if your heating/cooling system 
+- A Boiler setpoint device: Set the temperature to which you want the heating/cooling system to heat or cool
+- A HotWater Setpoint device: (if supported by your boiler): The to be temperature of the hot water reserve in your heating/cooling system
+NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
+
+## Installation
+Installation is simple, but for newbies i esp8266 here's the detailed explanation:
 - Connect your OpenTherm adapter to the Wemos D1 mini, according to http://ihormelnyk.com/opentherm_adapter. 
 - Connect your Wemos D1 to the USB of your laptop/pc
-- A new com port should now be available on your system. If not, install CH340 drivers (just google on it and you will find them) 
+- A new com port should now be available on your system. If not, install CH340 drivers (https://www.wemos.cc/en/latest/ch340_driver.html) 
 - Install Arduino IDE (https://www.arduino.cc/en/software)
 - Install Arduino-esp8266fs-plugin (https://github.com/esp8266/arduino-esp8266fs-plugin)
-- Within IDE, 
+- Within Arduino IDE, 
     - Add the url https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the settings (menu File, Settings, "more boardmanager urls")
-    - Install the following libraries (menu Tools / Manage Libraries in Arduino IDE)
-        -  WhareHauoraWiFiManager by Tzapu
-        -  OpenTherm by Ihor Melnyk
+    - Install the following libraries if they are not present on your system (menu Tools / Manage Libraries in Arduino IDE): 
+        - WiFiManager by Tzapu
+        - OpenTherm by Ihor Melnyk
+        - ArduinoJson (be Benoit Blanchon)
+        - DallasTemperature (by Miles Burton)
+        - OneWire (by Paul Stoffregen)
+        - PubSubClient (by Nick O'Leary)
     - do a "git clone https://github.com/akamming/esp_domoticz_opentherm_handler"
     - using arduino open the .ino file in the cloned dir
-    - OPTIONAL: adjust config.h for your default config settings. (can be overruled, using the GUI)
+    - OPTIONAL: adjust config.h for your default config settings. 
     - Open the board manager (menu Tools / Board / Board Manager)
     - Search for ESP8266 and click install, then close
     - Select Board type "LOLIN(WEMOS) D1 R2 & mini (menu Tools/Board)
@@ -38,23 +68,10 @@ Basically a HTTP wrapper around https://github.com/ihormelnyk/opentherm_library:
       - connect with a device to WiFi Access Point "Thermostat"
       - browse to http://192.168.4.1
       - follow instructions to connect the ESP to correct WiFi network
- - If you want to reset the wificredentials, either
-      - make sure the wemos cannot connect to configured network, and the config portal will appear automatically
-      - or force this by opening a browser and entering the URL: "http://domesphelper/ResetWifiCredentials" 
 
- ### Other Settings
-- After Wifi connection: Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser and configure your device. Set mqtt to enabled and enter your mqtt settings correctly to make it work with latest domoticz python plugin. 
-- also enable mqtt autodiscovery on your domoticz or Home Assistant application and your devices will appear.
-
-## Supported commands
-- http://domesphelper/ResetWifiCredentials will clear wifi credentials and reset the device, making the wifimanager portal to re-appear
-- http://domesphelper/GetSensors will give the status + all sensors
-- http://domesphelper/command enables to give commands, where the http variables are the commands:
-    - HotWater=<on|off>  will enable or disable DHT
-    - CentralHeating=<on|off> will enable or disable Central Heating
-    - Cooling=<on|off> will enable or disable heating
-    - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
-    - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
-  e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
+ ### Other Settings & Controlling heating/cooling manually
+- After Wifi connection: Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser and configure your device. 
+- Configure at least MQTT settings if you want to be able to control using Domoticz or Home Assistant (in that case also enable MQTT autodiscovery in Domoticz and/or Home Assistant)
+- the link also allows you to see the value of the sensors and/or control the device using this UI
   
   
