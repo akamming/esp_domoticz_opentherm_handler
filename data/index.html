@@ -21,9 +21,9 @@
         <p>Opentherm Status <input type="text" class="hn_input" id="otstatus" size="10" disabled></p><br />
         Take Control: <label class="switch"><input type="checkbox" id="takecontrol" onchange="ontakecontrolchanged()"><span class="slider round"></span></label>
         <br /><br />
-        General<br />
+        General (<input type="number" class="temp_input" id="statuscode" size="10" disabled>)<br />
         <label><input type="checkbox" name="flame" id="flame" disabled>flame</label><label><input type="checkbox" name="fault" id="fault" disabled>fault</label><label><input type="checkbox" name="diagnostic" id="diagnostic" disabled>diagnostic</label><br />
-        Modulation <input type="range" class="temp_input" id="modulation" min="0" max="100" size="10" disabled> Fcode <input type="number" class="temp_input" id="statuscode" size="10" disabled><br />
+        Modulation <input type="range" class="modulation_input" id="modulation" min="0" max="100" size="10"  disabled><br />
         <br />Enable<br />
         <label><input type="checkbox" name="enableheating" id="enableheating" disabled>heating</label><label><input type="checkbox" name="enablecooling" id="enablecooling" disabled>cooling</label><label><input type="checkbox" name="enablehotwater" id="enablehotwater" disabled>hotwater</label><br />
         <br />Actual<br />
