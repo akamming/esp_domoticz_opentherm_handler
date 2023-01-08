@@ -108,6 +108,7 @@ enum OTCommand { SetBoilerStatus,
                  GetReturnTemp, 
                  GetOutsideTemp, 
                  GetPressure, 
+                 GetFlowRate,
                  GetFaultCode, 
                  GetThermostatTemp 
                } OpenThermCommand ;
@@ -295,6 +296,7 @@ String getSensors() { //Handler
   message +=",\n  \"OutsideTemperature\": " + String(outside_Temperature);
   message +=",\n  \"Modulation\": " + String(modulation);
   message +=",\n  \"Pressure\": " + String(pressure);
+  message +=",\n  \"Flowrate\": " + String(flowrate);
   message +=",\n  \"FaultCode\": " + String(FaultCode);
 
   // Add Temp Sensor value
@@ -663,6 +665,11 @@ float getOutsideTemperature() {
   return ot.isValidResponse(response) ? ot.getFloat(response) : 0;
 }
 
+float getDHWFlowrate() {
+  unsigned long response = ot.sendRequest(ot.buildRequest(OpenThermMessageType::READ_DATA, OpenThermMessageID::DHWFlowRate, 0));
+  return ot.isValidResponse(response) ? ot.getFloat(response) : 0;
+}
+
 void handleOpenTherm()
 {
   
@@ -870,6 +877,23 @@ void handleOpenTherm()
           mqtt_pressure=pressure;
         }
       }
+
+      OpenThermCommand = GetFlowRate;
+      break;
+    }
+
+    case GetFlowRate: 
+    {
+      flowrate = getDHWFlowrate();
+
+      /* Check if we have to send to MQTT
+      if (MQTT.connected()) {
+        float delta = mqtt_flowrate-flowrate;
+        if (delta<-0.01 or delta>0.01){ // value changed
+          UpdateMQTTPressureSensor(Pressure_Name,pressure);
+          mqtt_pressure=pressure;
+        }
+      } */
 
       OpenThermCommand = GetFaultCode;
       break;
