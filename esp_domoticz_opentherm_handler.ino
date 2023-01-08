@@ -358,6 +358,7 @@ void handleGetConfig()
   json["usemqtt"] = usemqtt;
   json["mqttserver"] = mqttserver;
   json["mqttport"] = mqttport;
+  json["usemqttauthentication"] = usemqttauthentication;
   json["mqttuser"] = mqttuser;
   json["mqttpass"] = "*****"; // This is the only not allowed password, password will only be saved if it is not 5 stars
   json["mqttretained"] = mqttpersistence;  
@@ -536,6 +537,7 @@ void readConfig()
       if ( ! deserializeError ) {
         Serial.println("\nparsed json");
         usemqtt=json["usemqtt"];
+        usemqttauthentication=json["usemqttauthentication"];
         mqttserver=json["mqttserver"].as<String>();
         mqttport=json["mqttport"];
         mqttuser=json["mqttuser"].as<String>();
@@ -1010,7 +1012,13 @@ void reconnect()
   if (usemqtt) {
     if (!MQTT.connected()) {
       Serial.print("Attempting MQTT connection...");
-      if (MQTT.connect(host.c_str(), mqttuser.c_str(), mqttpass.c_str())) {
+      bool mqttconnected;
+      if (usemqttauthentication) {
+        mqttconnected = MQTT.connect(host.c_str(), mqttuser.c_str(), mqttpass.c_str());
+      } else {
+        mqttconnected = MQTT.connect(host.c_str());
+      }
+      if (mqttconnected) {
         Serial.println("Connect succeeded");
         PublishAllMQTTSensors();      
       } else {

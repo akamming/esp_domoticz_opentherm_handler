@@ -15,10 +15,11 @@ String mqttautodiscoverytopic = "homeassistant";  // On what topic are the MQTT 
 int inPin = 4;                                    // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
 int outPin = 5;                                   // pin number for opentherm adapter connection, 3 for Arduino, 5 for ESP8266 (D1), 22 for ESP32
 int OneWireBus = 14;                              // Data wire is connected to 14 pin on the OpenTherm Shield (Temperature sensor)
-bool usemqtt = true;                              // Set to True if you want to use MQTT
+bool usemqtt = false;                              // Set to True if you want to use MQTT
 bool mqttpersistence = false;                     // Set to True if you want persistence messages (true ensures devices are recognized right away after reboot of home automation tool, but then you cannot delete the devices anymore (will keep reappearing)
                                                   //             false causes devices only to work after discovery messages are sent (see MQTT descovery heatbeat)
 String mqttserver = "";                           // MQTT Server Adress
 int mqttport = 1883;                              // MQTT Server Port
+bool usemqttauthentication = false;                // Use MQTT Authentication
 String mqttuser = "";                             // MQTT Username
 String mqttpass = "";                             // MQTT Password
