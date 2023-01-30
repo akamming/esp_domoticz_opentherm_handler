@@ -1036,7 +1036,7 @@ void PublishMQTTDimmer(const char* uniquename)
 
   // Construct JSON config message
   json["name"] = uniquename;
-  json["unique_id"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
   json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
   json["schema"] = "json";
@@ -1045,7 +1045,7 @@ void PublishMQTTDimmer(const char* uniquename)
   serializeJson(json, conf);  // conf now contains the json
 
   // Publish config message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 
 }
 
@@ -1075,14 +1075,14 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
 
   // Construct JSON config message
   json["name"] = uniquename;
-  json["unique_id"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
   json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
 
   // Publish config message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 
   // subscribe if need to listen to commands
   if (controllable) {
@@ -1110,11 +1110,11 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
-  json["unique_id"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 }
 
 void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
@@ -1138,11 +1138,11 @@ void PublishMQTTPressureSensor(const char* uniquename)
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
-  json["unique_id"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 }
 
 void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
@@ -1167,11 +1167,11 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
-  json["unique_id"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 }
 
 void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
@@ -1195,11 +1195,11 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
-  json["unique_id"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 }
 
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
@@ -1218,14 +1218,14 @@ void PublishMQTTSetpoint(const char* uniquename)
   // Create message
   char conf[512];
   json["name"] = uniquename;
-  json["unique_id"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
   json["temp_cmd_t"] = host+"/climate/"+String(uniquename)+"/cmd_temp";
   json["temp_stat_t"] = host+"/climate/"+String(uniquename)+"/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
-  MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
   MQTT.subscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
 }
 
