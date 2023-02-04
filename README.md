@@ -1,12 +1,12 @@
 # esp_domoticz_opentherm_handler
-custom made EPS8266 firmware for OpenTherm Adapter (http://ihormelnyk.com/opentherm_adapter) for domoticz weather dependent heating plugin (https://github.com/akamming/Domoticz_Thermostate_Plugin)
-
-Please look at https://github.com/akamming/Domoticz_Thermostate_Plugin on how to use this firmware
+custom made EPS8266 firmware for OpenTherm Adapter (http://ihormelnyk.com/opentherm_adapter). Connects to Home Assistant and Domoticz using MQTT autodiscovery, but can also be controled with HTTP or the builtin UI
 
 ## Functionality
 Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm_library:
 - The firmware sets up a connection with the boiler
 - And then boiler can be controlled using HTTP, MQTT or the builtin UI (http://domesphelper or http://IP_adress_of_device)
+- Autodiscovery supported, so easy integration for Domoticz and/or Home Assistant
+- Made to work perfectly for domoticz weather dependent heating plugin (https://github.com/akamming/Domoticz_Thermostate_Plugin)
 
 ### Supported HTTP commands:
 Controlling the boiler commands:
