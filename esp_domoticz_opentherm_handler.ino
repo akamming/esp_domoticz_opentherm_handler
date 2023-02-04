@@ -1154,9 +1154,14 @@ void PublishMQTTPressureSensor(const char* uniquename)
 void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
 {
   Serial.println("UpdateMQTTPressureSensor");
-  char charVal[10];
-  dtostrf(pressure,4,1,charVal); 
-  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  // Create message
+  char state[128];
+  StaticJsonDocument<128> json;
+  json["value"] =  pressure;
+  serializeJson(json, state);  // buf now contains the json 
+  // char charVal[10];
+  // dtostrf(pressure,4,1,charVal); 
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
 
@@ -1203,7 +1208,7 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   // Create message
   char conf[512];
   json["value_template"] =  "{{ value_json.value }}";
-  json["device_class"] = "None";
+  // json["device_class"] = "None";
   json["unit_of_measurement"] = "";
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
@@ -1218,7 +1223,13 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 {
   Serial.println("UpdateMQTTFaultCodeSensor");
-  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),String(FaultCode).c_str(),mqttpersistence);
+    // Create message
+  char state[128];
+  StaticJsonDocument<128> json;
+  json["value"] =  FaultCode;
+  serializeJson(json, state);  // buf now contains the json 
+
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
 
