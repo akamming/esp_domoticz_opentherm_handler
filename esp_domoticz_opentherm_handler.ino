@@ -1120,9 +1120,15 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
 void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
 {
   Serial.println("UpdateMQTTTemperatureSensor");
-  char charVal[10];
-  dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  StaticJsonDocument<128> json;
+
+  // Create message
+  char state[128];
+  json["value"] =  temperature;
+  serializeJson(json, state);  // buf now contains the json 
+  // char charVal[10];
+  // dtostrf(temperature,4,1,charVal); 
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
 void PublishMQTTPressureSensor(const char* uniquename)
@@ -1177,9 +1183,16 @@ void PublishMQTTPercentageSensor(const char* uniquename)
 void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
 {
   Serial.println("UpdateMQTTPercentageSensor");
-  char charVal[10];
-  dtostrf(percentage,4,1,charVal); 
-  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  // char charVal[10];
+  // dtostrf(percentage,4,1,charVal); 
+   StaticJsonDocument<128> json;
+
+  // Create message
+  char data[128];
+  json["value"]=percentage;
+  serializeJson(json,data);
+ 
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence);
 }
 
 void PublishMQTTFaultCodeSensor(const char* uniquename)
@@ -1232,9 +1245,19 @@ void PublishMQTTSetpoint(const char* uniquename)
 void UpdateMQTTSetpoint(const char* uniquename, float temperature)
 {
   Serial.println("UpdateMQTTSetpoint");
-  char charVal[10];
-  dtostrf(temperature,4,1,charVal); 
-  MQTT.publish((host+"/climate/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
+  // char charVal[10];
+  // dtostrf(temperature,4,1,charVal);
+  StaticJsonDocument<128> json;
+
+  // Construct JSON config message
+  json["seltemp"] = temperature;
+
+  char value[128];
+  serializeJson(json, value);  // conf now contains the json
+
+  MQTT.publish((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence);
+
+  // MQTT.publish((host+"/climate/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 
