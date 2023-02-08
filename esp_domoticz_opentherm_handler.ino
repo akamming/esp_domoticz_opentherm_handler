@@ -657,7 +657,7 @@ void setup()
 
   // MQTT
   MQTT.setServer(mqttserver.c_str(), mqttport); // server details
-  MQTT.setBufferSize(512); // discovery messages are longer than default max buffersize(!)
+  MQTT.setBufferSize(1024); // discovery messages are longer than default max buffersize(!)
   MQTT.setCallback(MQTTcallback); // listen to callbacks
 }
 
@@ -1041,6 +1041,16 @@ void PublishMQTTDimmer(const char* uniquename)
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
   json["schema"] = "json";
   json["brightness"] = true;
+
+  JsonObject dev = json.createNestedObject("dev");
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
 
@@ -1078,6 +1088,17 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
   json["unique_id"] = host+"_"+uniquename;
   json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
+
+  JsonObject dev = json.createNestedObject("dev");
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
+
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
 
@@ -1100,10 +1121,10 @@ void UpdateMQTTSwitch(const char* uniquename, bool Value)
 void PublishMQTTTemperatureSensor(const char* uniquename)
 {
   Serial.println("PublishMQTTTemperatureSensor");
-  StaticJsonDocument<512> json;
+  StaticJsonDocument<768> json;
 
   // Create message
-  char conf[512];
+  char conf[768];
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "temperature";
   json["unit_of_measurement"] = "°C";
@@ -1111,6 +1132,16 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
+
+  JsonObject dev = json.createNestedObject("dev");
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
@@ -1145,6 +1176,16 @@ void PublishMQTTPressureSensor(const char* uniquename)
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
+
+  JsonObject dev = json.createNestedObject("dev");
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
@@ -1179,6 +1220,16 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
+
+  JsonObject dev = json.createNestedObject("dev");
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
@@ -1214,6 +1265,16 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
+
+  JsonObject dev = json.createNestedObject("dev");
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
