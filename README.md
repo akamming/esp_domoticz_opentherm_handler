@@ -44,7 +44,7 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
 - Connect your OpenTherm adapter to the Wemos D1 mini and the boiler, according to http://ihormelnyk.com/opentherm_adapter. 
 - Connect your Wemos D1 to the USB of your laptop/pc
 - A new com port should now be available on your system. If not, install CH340 drivers (https://www.wemos.cc/en/latest/ch340_driver.html) 
-- Install Arduino IDE (https://www.arduino.cc/en/software)
+- Install Arduino IDE (https://www.arduino.cc/en/software). Use the legacy version (1.8 or lower, cause 2.0 does not yet support plugins which you will need for uploading sketch data)
 - Install Arduino-esp8266fs-plugin (https://github.com/esp8266/arduino-esp8266fs-plugin)
 - Within Arduino IDE, 
     - Add support of your ESP8266 board by adding https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the Arduino board management settings (menu File, Settings, "more boardmanager urls")
