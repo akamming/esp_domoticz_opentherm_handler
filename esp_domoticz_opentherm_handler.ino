@@ -246,12 +246,6 @@ String getSensors() { //Handler
   message = ",\n  \"CompileDate\": \"" + String(compile_date) + "\"";
 
   // Add uptime
-  // long seconds=millis()/1000;
-  // int secs = seconds % 60;
-  // int mins = (seconds/60) % 60;
-  // int hrs = (seconds/3600) % 24;
-  // int days = (seconds/(3600*24)); 
-  // message += ",\n  \"uptime\": \"" + String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds" + "\"";
   message += ",\n  \"uptime\": \"" + String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" mins & "+String(s)+" secs"+"\"";
 
   // Add Opentherm Status
@@ -340,13 +334,6 @@ void handleGetInfo()
     json["MQTTconnected"] = false;
   }
   json["mqttstate"] = MQTT.state();
-
-  // long seconds=millis()/1000;
-  // int secs = seconds % 60;
-  // int mins = (seconds/60) % 60;
-  // int hrs = (seconds/3600) % 24;
-  // int days = (seconds/(3600*24)); 
-  // json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
   json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
   
   serializeJson(json, buf); 
@@ -383,12 +370,6 @@ void handleGetConfig()
   json["MQTTState"] = MQTT.state();
 
   json["heap"] = ESP.getFreeHeap();
-  // long seconds=millis()/1000;
-  // int secs = seconds % 60;
-  // int mins = (seconds/60) % 60;
-  // int hrs = (seconds/3600) % 24;
-  // int days = (seconds/(3600*24)); 
-  // json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
   json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
 
   serializeJson(json, buf); 
