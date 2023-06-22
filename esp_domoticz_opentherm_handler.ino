@@ -77,6 +77,14 @@ bool Fault = false;
 bool Diagnostic = false;
 unsigned char FaultCode=65;
 
+// uptime
+unsigned long previousMillis = 0; // remember last millis value
+int y = 0 ;
+int d = 0;
+int h = 0;
+int m = 0;
+int s = 0;
+int ms = 0;
 
 // reported vars to mqtt, make sure all are initialized on unexpected values, so they are sent the 1st time
 float mqtt_boiler_Temperature=100;
@@ -238,12 +246,13 @@ String getSensors() { //Handler
   message = ",\n  \"CompileDate\": \"" + String(compile_date) + "\"";
 
   // Add uptime
-  long seconds=millis()/1000;
-  int secs = seconds % 60;
-  int mins = (seconds/60) % 60;
-  int hrs = (seconds/3600) % 24;
-  int days = (seconds/(3600*24)); 
-  message += ",\n  \"uptime\": \"" + String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds" + "\"";
+  // long seconds=millis()/1000;
+  // int secs = seconds % 60;
+  // int mins = (seconds/60) % 60;
+  // int hrs = (seconds/3600) % 24;
+  // int days = (seconds/(3600*24)); 
+  // message += ",\n  \"uptime\": \"" + String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds" + "\"";
+  message += ",\n  \"uptime\": \"" + String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" mins & "+String(s)+" secs"+"\"";
 
   // Add Opentherm Status
   message += ",\n  \"OpenThermStatus\":";
@@ -332,13 +341,14 @@ void handleGetInfo()
   }
   json["mqttstate"] = MQTT.state();
 
-  long seconds=millis()/1000;
-  int secs = seconds % 60;
-  int mins = (seconds/60) % 60;
-  int hrs = (seconds/3600) % 24;
-  int days = (seconds/(3600*24)); 
-  json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
-
+  // long seconds=millis()/1000;
+  // int secs = seconds % 60;
+  // int mins = (seconds/60) % 60;
+  // int hrs = (seconds/3600) % 24;
+  // int days = (seconds/(3600*24)); 
+  // json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
+  json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
+  
   serializeJson(json, buf); 
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
@@ -373,12 +383,13 @@ void handleGetConfig()
   json["MQTTState"] = MQTT.state();
 
   json["heap"] = ESP.getFreeHeap();
-  long seconds=millis()/1000;
-  int secs = seconds % 60;
-  int mins = (seconds/60) % 60;
-  int hrs = (seconds/3600) % 24;
-  int days = (seconds/(3600*24)); 
-  json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
+  // long seconds=millis()/1000;
+  // int secs = seconds % 60;
+  // int mins = (seconds/60) % 60;
+  // int hrs = (seconds/3600) % 24;
+  // int days = (seconds/(3600*24)); 
+  // json["uptime"] = String(days)+" days, "+String(hrs)+" hours, "+String(mins)+" minutes, "+String(secs)+" seconds";
+  json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
 
   serializeJson(json, buf); 
   server.send(200, "application/json", buf);       //Response to the HTTP request
@@ -1371,6 +1382,35 @@ void loop()
 {
   // handle OTA
   ArduinoOTA.handle();
+
+  // update Uptime
+  ms+=(unsigned long)(millis()-previousMillis);
+  if (ms>= 1000)
+  {
+    ms -= 1000;
+    s++;
+    if (s > 59)
+    {
+      s = 0;
+      m++;
+      if (m > 59)
+      {
+        m = 0;
+        h++;
+        if (h > 23) 
+        {
+          h = 0;
+          d++;
+          if (d>364)
+          {
+            y++;
+          }
+        }
+      }
+    }
+  }
+  previousMillis=millis();
+
 
   // don't do anything if we are doing if OTA upgrade is in progress
   if (!OTAUpdateInProgress) {
