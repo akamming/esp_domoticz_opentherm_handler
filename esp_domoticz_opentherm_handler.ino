@@ -20,8 +20,8 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <ESP8266mDNS.h>          // To respond on hostname as well
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
-#include <OneWire.h>              // One Wire bus
-#include <DallasTemperature.h>    // temperature sensors
+#include <OneWire.h>              // One Wire bus  by Jim Studt
+#include <DallasTemperature.h>    // temperature sensors by mile burton
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
 #include <PubSubClient.h>         // MQTT library
@@ -564,6 +564,7 @@ void setup()
   // Handle Wifi connection by wifi manager
   WiFiManager wifiManager;
   wifiManager.setHostname(host.c_str());
+  wifiManager.setConnectTimeout(180);
   wifiManager.autoConnect("Thermostat");
 
   if (MDNS.begin(host.c_str())) {
@@ -592,7 +593,7 @@ void setup()
   ArduinoOTA.setHostname(host.c_str());
 
   // No authentication by default
-  // ArduinoOTA.setPassword(host); // Disable for data upload
+  ArduinoOTA.setPassword(host.c_str()); // Disable for data upload
 
   // Password can be set with it's md5 value as well
   // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
