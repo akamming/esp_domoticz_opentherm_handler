@@ -1300,6 +1300,16 @@ void PublishMQTTSetpoint(const char* uniquename)
   json["temp_cmd_t"] = host+"/climate/"+String(uniquename)+"/cmd_temp";
   json["temp_stat_t"] = host+"/climate/"+String(uniquename)+"/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
+
+  JsonObject dev = json["dev"].to<JsonObject>();
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
   serializeJson(json, conf);  // buf now contains the json 
 
   // publsh the Message
