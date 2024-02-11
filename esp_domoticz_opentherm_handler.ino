@@ -138,7 +138,7 @@ WiFiClient espClient;  // Needed for MQTT
 PubSubClient MQTT(espClient); // MQTT client
 
 
-void ICACHE_RAM_ATTR handleInterrupt() {
+void IRAM_ATTR handleInterrupt() {
     ot.handleInterrupt();
 }
 
