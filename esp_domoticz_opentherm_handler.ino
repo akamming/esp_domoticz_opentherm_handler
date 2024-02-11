@@ -26,7 +26,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <ArduinoJson.h>          // make JSON payloads
 #include <PubSubClient.h>         // MQTT library
 #include "config.h"                 // Set Configuration
-// #include <SPIFFS.h>               // Filesystem
+#include <LittleFS.h>               // Filesystem
 
 
 // vars to manage boiler
@@ -397,7 +397,7 @@ void handleSaveConfig() {
     //save the custom parameters to FS
     Serial.println("saving config");
 
-    File configFile = SPIFFS.open(CONFIGFILE, "w");
+    File configFile = LittleFS.open(CONFIGFILE, "w");
     if (!configFile) {
       server.send(500, "text/plain", "failed to open config file for writing");
       return;
@@ -426,9 +426,9 @@ void handleSaveConfig() {
 void handleRemoveConfig() {
   Serial.println("handleRemoveConfig");
   
-  if (SPIFFS.exists(CONFIGFILE)) {
+  if (LittleFS.exists(CONFIGFILE)) {
     Serial.println("Config file existst, removing configfile");
-    SPIFFS.remove(CONFIGFILE);
+    LittleFS.remove(CONFIGFILE);
     server.send(200, "text/plain", "Config file removed");
     delay(500); // wait for server send to finish
     ESP.restart(); // restart
@@ -470,9 +470,9 @@ bool serveFile(const char url[])
   } else {
     sprintf(path,"%s",url);
   }
-  if (SPIFFS.exists(path))
+  if (LittleFS.exists(path))
   {
-    File file = SPIFFS.open(path, "r");
+    File file = LittleFS.open(path, "r");
     if (server.hasArg("download")) server.streamFile(file, "application/octet-stream");
     else if (endsWith(path,".htm") or endsWith(path,".html")) server.streamFile(file, "text/html");
     else if (endsWith(path,".css") ) server.streamFile(file, "text/css");
@@ -511,10 +511,10 @@ void handleNotFound()
 
 void readConfig()
 {
-  if (SPIFFS.exists(CONFIGFILE)) {
+  if (LittleFS.exists(CONFIGFILE)) {
     //file exists, reading and loading
     Serial.println("reading config file");
-    File configFile = SPIFFS.open(CONFIGFILE, "r");
+    File configFile = LittleFS.open(CONFIGFILE, "r");
     if (configFile) {
       Serial.println("opened config file");
       size_t size = configFile.size();
@@ -553,7 +553,7 @@ void setup()
   Serial.println("\nDomEspHelper, compile date "+String(compile_date));
 
   //read configuration from FS json
-  if (SPIFFS.begin()) {
+  if (LittleFS.begin()) {
     Serial.println("mounted file system");
     readConfig();
   } else {

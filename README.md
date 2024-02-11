@@ -45,7 +45,7 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
 - Connect your Wemos D1 to the USB of your laptop/pc
 - A new com port should now be available on your system. If not, install CH340 drivers (https://www.wemos.cc/en/latest/ch340_driver.html) 
 - Install Arduino IDE (https://www.arduino.cc/en/software). Use the legacy version (1.8 or lower, cause 2.0 does not yet support plugins which you will need for uploading sketch data)
-- Install Arduino-esp8266fs-plugin (https://github.com/esp8266/arduino-esp8266fs-plugin)
+- Install Arduino-esp8266littlefs-plugin (https://github.com/earlephilhower/arduino-esp8266littlefs-plugin)
 - Within Arduino IDE, 
     - Add support of your ESP8266 board by adding https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the Arduino board management settings (menu File, Settings, "more boardmanager urls")
     - Install the following libraries if they are not present on your system (menu Tools / Manage Libraries in Arduino IDE): 
@@ -63,7 +63,7 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
     - Select your Board type, "LOLIN(WEMOS) D1 R2 & mini" if you use a Wemos D1 but in principle any ESP8266 board should work (menu Tools/Board)
     - Select the com Port to which your wemos is connected (menu Tools / Port)
     - Upload the firmware to your Wemos (menu Sketch / Upload)
-    - Upload the data to your Wemos (menu Tools / ESP8266 Sketch Data Upload)
+    - Upload the data to your Wemos (menu Tools / ESP8266 LittleFS Data Upload)
 
  ## Configuration
  ### Wifi config 
