@@ -311,7 +311,7 @@ String getSensors() { //Handler
 void handleGetInfo()
 {
   Serial.println("GetInfo");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
   char buf[512];
   json["heap"] = ESP.getFreeHeap();
   json["sketchsize"] = ESP.getSketchSize();
@@ -343,7 +343,7 @@ void handleGetInfo()
 void handleGetConfig()
 {
   Serial.println("GetConfig");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
   char buf[512];
 
   // gpio config
@@ -387,7 +387,7 @@ void handleSaveConfig() {
   } 
 
   // try to deserialize
-  StaticJsonDocument<1024> json;
+  JsonDocument json;
   DeserializationError error = deserializeJson(json, server.arg("plain"));
   if (error) {
     Message=String("Invalid JSON: ")+error.f_str();
@@ -523,7 +523,7 @@ void readConfig()
 
       configFile.readBytes(buf.get(), size);
 
-      DynamicJsonDocument json(1024);
+      JsonDocument json;
       auto deserializeError = deserializeJson(json, buf.get());
       serializeJson(json, Serial);
       if ( ! deserializeError ) {
@@ -593,7 +593,7 @@ void setup()
   ArduinoOTA.setHostname(host.c_str());
 
   // No authentication by default
-  ArduinoOTA.setPassword(host.c_str()); // Disable for data upload
+  // ArduinoOTA.setPassword(host.c_str()); // Disable for data upload
 
   // Password can be set with it's md5 value as well
   // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
@@ -953,7 +953,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     payloadstr[length]='\0';
   
     // decode payload
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payloadstr);
   
     if (error) {
@@ -1025,7 +1025,7 @@ void reconnect()
 void PublishMQTTDimmer(const char* uniquename)
 {
   Serial.println("UpdateMQTTDimmer");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
 
   // Construct JSON config message
   json["name"] = uniquename;
@@ -1035,7 +1035,7 @@ void PublishMQTTDimmer(const char* uniquename)
   json["schema"] = "json";
   json["brightness"] = true;
 
-  JsonObject dev = json.createNestedObject("dev");
+  JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
   MAC.replace(":", "");
   dev["ids"] = MAC;
@@ -1055,7 +1055,7 @@ void PublishMQTTDimmer(const char* uniquename)
 void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
 {
   Serial.println("UpdateMQTTDimmer");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
 
   // Construct JSON config message
   json["state"]=Value ? "ON" : "OFF";
@@ -1074,7 +1074,7 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
 void PublishMQTTSwitch(const char* uniquename, bool controllable)
 {
   Serial.println("PublishMQTTSwitch");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
 
   // Construct JSON config message
   json["name"] = uniquename;
@@ -1082,7 +1082,7 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
   json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
 
-  JsonObject dev = json.createNestedObject("dev");
+  JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
   MAC.replace(":", "");
   dev["ids"] = MAC;
@@ -1114,7 +1114,7 @@ void UpdateMQTTSwitch(const char* uniquename, bool Value)
 void PublishMQTTTemperatureSensor(const char* uniquename)
 {
   Serial.println("PublishMQTTTemperatureSensor");
-  StaticJsonDocument<768> json;
+  JsonDocument json;
 
   // Create message
   char conf[768];
@@ -1126,7 +1126,7 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json.createNestedObject("dev");
+  JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
   MAC.replace(":", "");
   dev["ids"] = MAC;
@@ -1144,7 +1144,7 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
 void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
 {
   Serial.println("UpdateMQTTTemperatureSensor");
-  StaticJsonDocument<128> json;
+  JsonDocument json;
 
   // Create message
   char state[128];
@@ -1158,7 +1158,7 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
 void PublishMQTTPressureSensor(const char* uniquename)
 {
   Serial.println("PublishMQTTPressureSensor");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
 
   // Create message
   char conf[512];
@@ -1170,7 +1170,7 @@ void PublishMQTTPressureSensor(const char* uniquename)
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json.createNestedObject("dev");
+  JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
   MAC.replace(":", "");
   dev["ids"] = MAC;
@@ -1190,7 +1190,7 @@ void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
   Serial.println("UpdateMQTTPressureSensor");
   // Create message
   char state[128];
-  StaticJsonDocument<128> json;
+  JsonDocument json;
   json["value"] =  pressure;
   serializeJson(json, state);  // buf now contains the json 
   // char charVal[10];
@@ -1202,7 +1202,7 @@ void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
 void PublishMQTTPercentageSensor(const char* uniquename)
 {
   Serial.println("PublishMQTTPercentageSensor");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
 
   // Create message
   char conf[512];
@@ -1214,7 +1214,7 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json.createNestedObject("dev");
+  JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
   MAC.replace(":", "");
   dev["ids"] = MAC;
@@ -1234,7 +1234,7 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
   Serial.println("UpdateMQTTPercentageSensor");
   // char charVal[10];
   // dtostrf(percentage,4,1,charVal); 
-   StaticJsonDocument<128> json;
+   JsonDocument json;
 
   // Create message
   char data[128];
@@ -1247,7 +1247,7 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
 void PublishMQTTFaultCodeSensor(const char* uniquename)
 {
   Serial.println("PublishMQTTFaultCodeSensor");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
 
   // Create message
   char conf[512];
@@ -1259,7 +1259,7 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json.createNestedObject("dev");
+  JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
   MAC.replace(":", "");
   dev["ids"] = MAC;
@@ -1279,7 +1279,7 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
   Serial.println("UpdateMQTTFaultCodeSensor");
     // Create message
   char state[128];
-  StaticJsonDocument<128> json;
+  JsonDocument json;
   json["value"] =  FaultCode;
   serializeJson(json, state);  // buf now contains the json 
 
@@ -1291,7 +1291,7 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 void PublishMQTTSetpoint(const char* uniquename)
 {
   Serial.println("PublishMQTTSetpoint");
-  StaticJsonDocument<512> json;
+  JsonDocument json;
 
   // Create message
   char conf[512];
@@ -1312,7 +1312,7 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
   Serial.println("UpdateMQTTSetpoint");
   // char charVal[10];
   // dtostrf(temperature,4,1,charVal);
-  StaticJsonDocument<128> json;
+  JsonDocument json;
 
   // Construct JSON config message
   json["seltemp"] = temperature;
