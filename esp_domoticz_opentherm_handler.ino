@@ -941,6 +941,13 @@ String SetpointCommandTopic(const char* DeviceName){
   return String(host)+"/climate/"+String(DeviceName)+"/cmd_temp";
 }
 
+void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
+      MQTT.publish((String(host)+String("/log/topic")).c_str(),topic);
+      MQTT.publish((String(host)+String("/log/payload")).c_str(),payloadstr);
+      MQTT.publish((String(host)+String("/log/length")).c_str(),length);
+      MQTT.publish((String(host)+String("/log/error")).c_str(),logtext);
+}
+
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // we received a mqtt callback, so someone is comunicating
   t_last_mqtt_command=millis();
@@ -957,10 +964,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     DeserializationError error = deserializeJson(doc, payloadstr);
   
     if (error) {
-      MQTT.publish("log/topic",topicstr.c_str());
-      MQTT.publish("log/payload",payloadstr);
-      MQTT.publish("log/length",String(length).c_str());
-      MQTT.publish("log/error","Deserialisation failed");
+      LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Deserialisation failed");
     } else {
       if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
         // we have a match
@@ -968,6 +972,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableHotWater=true;
         } else if (String(doc["state"]).equals("OFF")) {
           enableHotWater=false;
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
         }
       } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
         // we have a match
@@ -975,6 +981,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableCooling=true;
         } else if (String(doc["state"]).equals("OFF")) {
           enableCooling=false;
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
         } 
       } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
         // we have a match
@@ -982,6 +990,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableCentralHeating=true;
         } else if (String(doc["state"]).equals("OFF")) {
           enableCentralHeating=false;
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
         }
       } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
         // we have a match, log what we see..
@@ -990,10 +1000,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         // we have a match, log what we see..
         dhw_SetPoint=String(payloadstr).toFloat();
       } else {
-        MQTT.publish("log/topic",topicstr.c_str());
-        MQTT.publish("log/payload",payloadstr);
-        MQTT.publish("log/length",String(length).c_str());
-        MQTT.publish("log/command","unknown topic");
+        LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
       }
     }
   }
