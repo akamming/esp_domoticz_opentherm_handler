@@ -949,16 +949,18 @@ void LogMQTT(const char* topic, const char* payloadstr, const char* length, cons
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
+  // get vars from callback
+  String topicstr=String(topic);
+  char payloadstr[256];
+  strncpy(payloadstr,(char *)payload,length);
+  payloadstr[length]='\0';
+  Serial.println("Received command on topic"+topicstr+", content: "+payloadstr);
+
   // we received a mqtt callback, so someone is comunicating
   t_last_mqtt_command=millis();
 
   if (millis()-t_last_http_command>HTTPTimeoutInMillis) { // only execute mqtt commands if not commanded by http
-    // get vars from callback
-    String topicstr=String(topic);
-    char payloadstr[256];
-    strncpy(payloadstr,(char *)payload,length);
-    payloadstr[length]='\0';
-  
+
     // decode payload
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payloadstr);
