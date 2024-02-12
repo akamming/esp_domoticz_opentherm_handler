@@ -942,10 +942,10 @@ String SetpointCommandTopic(const char* DeviceName){
 }
 
 void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
-      MQTT.publish((String(host)+String("/log/topic")).c_str(),topic);
-      MQTT.publish((String(host)+String("/log/payload")).c_str(),payloadstr);
-      MQTT.publish((String(host)+String("/log/length")).c_str(),length);
-      MQTT.publish((String(host)+String("/log/error")).c_str(),logtext);
+      MQTT.publish((String(host)+String("/log/topic")).c_str(),topic,mqttpersistence);
+      MQTT.publish((String(host)+String("/log/payload")).c_str(),payloadstr,mqttpersistence);
+      MQTT.publish((String(host)+String("/log/length")).c_str(),length,mqttpersistence);
+      MQTT.publish((String(host)+String("/log/error")).c_str(),logtext,mqttpersistence);
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -956,17 +956,17 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   payloadstr[length]='\0';
   Serial.println("Received command on topic"+topicstr+", content: "+payloadstr);
 
-  // we received a mqtt callback, so someone is comunicating
-  t_last_mqtt_command=millis();
-
+  // Assume succesful command 
+  bool CommandSucceeded=true;
+  
   if (millis()-t_last_http_command>HTTPTimeoutInMillis) { // only execute mqtt commands if not commanded by http
-
     // decode payload
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payloadstr);
   
     if (error) {
       LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Deserialisation failed");
+      CommandSucceeded=false;
     } else {
       if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
         // we have a match
@@ -976,6 +976,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableHotWater=false;
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
         }
       } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
         // we have a match
@@ -985,6 +986,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableCooling=false;
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
         } 
       } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
         // we have a match
@@ -994,6 +996,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableCentralHeating=false;
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
         }
       } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
         // we have a match, log what we see..
@@ -1003,10 +1006,14 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         dhw_SetPoint=String(payloadstr).toFloat();
       } else {
         LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
+        CommandSucceeded=false;
       }
     }
+    if (CommandSucceeded) {
+      // we received a succesful mqtt command, so someone is communicating correctly
+      t_last_mqtt_command=millis();
+    }
   }
-
 }
 
 void reconnect()
