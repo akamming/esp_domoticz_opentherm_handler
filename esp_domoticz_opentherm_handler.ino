@@ -335,6 +335,7 @@ void handleGetInfo()
   }
   json["mqttstate"] = MQTT.state();
   json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
+  json["compile_date"] = String(compile_date);
   
   serializeJson(json, buf); 
   server.send(200, "application/json", buf);       //Response to the HTTP request
@@ -544,114 +545,6 @@ void readConfig()
       configFile.close();
     }
   }
-}
-
-void setup()
-{
-  // start Serial port for logging purposes
-  Serial.begin(115200);
-  Serial.println("\nDomEspHelper, compile date "+String(compile_date));
-
-  //read configuration from FS json
-  if (LittleFS.begin()) {
-    Serial.println("mounted file system");
-    readConfig();
-  } else {
-    Serial.println("failed to mount FS");
-  }
-  //end read
-  
-  // Handle Wifi connection by wifi manager
-  WiFiManager wifiManager;
-  wifiManager.setHostname(host.c_str());
-  wifiManager.setConnectTimeout(180);
-  wifiManager.autoConnect("Thermostat");
-
-  if (MDNS.begin(host.c_str())) {
-    Serial.println("MDNS responder started");
-  }
-  // Log IP adress
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());  //Print the local IP to access the server
-
-  // Register commands on webserver
-  server.on("/ResetWifiCredentials", handleResetWifiCredentials);
-  server.on("/GetSensors",handleGetSensors);
-  server.on("/info", handleGetInfo);
-  server.on("/getconfig", handleGetConfig);
-  server.on("/saveconfig", handleSaveConfig);
-  server.on("/removeconfig", handleRemoveConfig);
-  server.on("/reset", handleReset);
-  server.on("/command", handleCommand);   
-  server.onNotFound(handleNotFound);
-
-  // Initialize OTA
-  // Port defaults to 8266
-  // ArduinoOTA.setPort(8266);
-
-  // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname(host.c_str());
-
-  // No authentication by default
-  // ArduinoOTA.setPassword(host.c_str()); // Disable for data upload
-
-  // Password can be set with it's md5 value as well
-  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
-
-  ArduinoOTA.onStart([]() {
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      Serial.println("OTA: Start updating sketch...");
-    } else { // U_FS
-      Serial.println("OTA: Start updating filesystem...");
-    }
-    OTAUpdateInProgress=true;
-  });
-
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-    OTAUpdateInProgress=false;
-  });
-
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
-  });
-  
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("OTA: Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) {
-      Serial.println("OTA: Auth Failed");
-    } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("OTA: Begin Failed");
-    } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("OTA: Connect Failed");
-    } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("OTA: Receive Failed");
-    } else if (error == OTA_END_ERROR) {
-      Serial.println("OTA: End Failed");
-    }
-    OTAUpdateInProgress=false;
-  });
-  
-  ArduinoOTA.begin();
-  
-  //Start the server
-  server.begin();   
-  Serial.println("Opentherm Helper is waiting for commands");   
-
-  //Init DS18B20 sensor
-  sensors.begin();
-
-  // Init builtin led
-  pinMode(LED_BUILTIN, OUTPUT);
-
-  // Start OpenTherm
-  ot.begin(handleInterrupt);
-
-  // MQTT
-  MQTT.setServer(mqttserver.c_str(), mqttport); // server details
-  MQTT.setBufferSize(1024); // discovery messages are longer than default max buffersize(!)
-  MQTT.setCallback(MQTTcallback); // listen to callbacks
 }
 
 // not defined  in opentherm lib, so declaring local
@@ -1352,7 +1245,34 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
 }
 
 
-
+void updateTime() {
+  ms+=(unsigned long)(millis()-previousMillis);
+  if (ms>= 1000)
+  {
+    ms -= 1000;
+    s++;
+    if (s > 59)
+    {
+      s = 0;
+      m++;
+      if (m > 59)
+      {
+        m = 0;
+        h++;
+        if (h > 23) 
+        {
+          h = 0;
+          d++;
+          if (d>364)
+          {
+            y++;
+          }
+        }
+      }
+    }
+  }
+  previousMillis=millis();
+}
 
 void PublishAllMQTTSensors()
 {
@@ -1386,39 +1306,123 @@ void PublishAllMQTTSensors()
   PublishMQTTSetpoint(DHW_Setpoint_Name);
 }
 
+// The setup code
+void setup()
+{
+  // start Serial port for logging purposes
+  Serial.begin(115200);
+  Serial.println("\nDomEspHelper, compile date "+String(compile_date));
+
+  //read configuration from FS json
+  if (LittleFS.begin()) {
+    Serial.println("mounted file system");
+    readConfig();
+  } else {
+    Serial.println("failed to mount FS");
+  }
+  //end read
+  
+  // Handle Wifi connection by wifi manager
+  WiFiManager wifiManager;
+  wifiManager.setHostname(host.c_str());
+  wifiManager.setConnectTimeout(180);
+  wifiManager.autoConnect("Thermostat");
+
+  if (MDNS.begin(host.c_str())) {
+    Serial.println("MDNS responder started");
+  }
+  // Log IP adress
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());  //Print the local IP to access the server
+
+  // Register commands on webserver
+  server.on("/ResetWifiCredentials", handleResetWifiCredentials);
+  server.on("/GetSensors",handleGetSensors);
+  server.on("/info", handleGetInfo);
+  server.on("/getconfig", handleGetConfig);
+  server.on("/saveconfig", handleSaveConfig);
+  server.on("/removeconfig", handleRemoveConfig);
+  server.on("/reset", handleReset);
+  server.on("/command", handleCommand);   
+  server.onNotFound(handleNotFound);
+
+  // Initialize OTA
+  // Port defaults to 8266
+  // ArduinoOTA.setPort(8266);
+
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname(host.c_str());
+
+  // No authentication by default
+  // ArduinoOTA.setPassword(host.c_str()); // Disable for data upload
+
+  // Password can be set with it's md5 value as well
+  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
+  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
+
+  ArduinoOTA.onStart([]() {
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      Serial.println("OTA: Start updating sketch...");
+    } else { // U_FS
+      Serial.println("OTA: Start updating filesystem...");
+    }
+    OTAUpdateInProgress=true;
+  });
+
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+    OTAUpdateInProgress=false;
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
+  });
+  
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("OTA: Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("OTA: Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("OTA: Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("OTA: Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("OTA: Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("OTA: End Failed");
+    }
+    OTAUpdateInProgress=false;
+  });
+  
+  ArduinoOTA.begin();
+  
+  //Start the server
+  server.begin();   
+  Serial.println("Opentherm Helper is waiting for commands");   
+
+  //Init DS18B20 sensor
+  sensors.begin();
+
+  // Init builtin led
+  pinMode(LED_BUILTIN, OUTPUT);
+
+  // Start OpenTherm
+  ot.begin(handleInterrupt);
+
+  // MQTT
+  MQTT.setServer(mqttserver.c_str(), mqttport); // server details
+  MQTT.setBufferSize(1024); // discovery messages are longer than default max buffersize(!)
+  MQTT.setCallback(MQTTcallback); // listen to callbacks
+}
+
+// Loop Code
 void loop()
 {
   // handle OTA
   ArduinoOTA.handle();
 
   // update Uptime
-  ms+=(unsigned long)(millis()-previousMillis);
-  if (ms>= 1000)
-  {
-    ms -= 1000;
-    s++;
-    if (s > 59)
-    {
-      s = 0;
-      m++;
-      if (m > 59)
-      {
-        m = 0;
-        h++;
-        if (h > 23) 
-        {
-          h = 0;
-          d++;
-          if (d>364)
-          {
-            y++;
-          }
-        }
-      }
-    }
-  }
-  previousMillis=millis();
-
+  updateTime();
 
   // don't do anything if we are doing if OTA upgrade is in progress
   if (!OTAUpdateInProgress) {
