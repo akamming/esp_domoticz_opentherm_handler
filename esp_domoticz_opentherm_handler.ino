@@ -357,6 +357,7 @@ void handleGetConfig()
   json["mqttserver"] = mqttserver;
   json["mqttport"] = mqttport;
   json["usemqttauthentication"] = usemqttauthentication;
+  json["mqtttemptopic"] = mqtttemptopic;
   json["mqttuser"] = mqttuser;
   json["mqttpass"] = "*****"; // This is the only not allowed password, password will only be saved if it is not 5 stars
   json["mqttretained"] = mqttpersistence;  
@@ -539,6 +540,7 @@ void readConfig()
         inPin=json["inpin"];
         outPin=json["outpin"];
         OneWireBus=json["temppin"];
+        mqtttemptopic=json["mqtttemptopic"].as<String>();
       } else {
         Serial.println("failed to load json config");
       }

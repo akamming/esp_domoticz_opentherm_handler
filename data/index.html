@@ -47,9 +47,10 @@
         Port <input type="number" class="port_input" id="mqttport" size="10" onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         <label><input type="checkbox" name="usemqttauthentication" id="usemqttauthentication" onchange="onusemqttauthenticationchanged()" disabled>Use Authentication</label><br />
         Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
-        Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled on><br />
-        <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br /><br />
-        <button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
+        Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br />
+        temperature_topic <input type="text" class="user_input" id="temptopic" size="20" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
     </div>
 
     <div class="outer_frame">
@@ -81,6 +82,7 @@
                 document.getElementById("mqttport").disabled = false;
                 document.getElementById("usemqttauthentication").disabled = false;
                 document.getElementById("mqttretained").disabled = false;
+                document.getElementById("temptopic").disabled = false;
 
                 NewValue = true;
                 if (document.getElementById('usemqttauthentication').checked) {
@@ -96,6 +98,7 @@
                 document.getElementById("mqttretained").disabled = true;
                 document.getElementById("mqttuser").disabled = true;
                 document.getElementById("mqttpass").disabled = true;
+                document.getElementById("temptopic").disabled = true;
             }
         }
 
@@ -192,6 +195,7 @@
                     document.getElementById('usemqttauthentication').checked = json.usemqttauthentication;
                     document.getElementById('mqttuser').value = json.mqttuser;
                     document.getElementById('mqttpass').value = json.mqttpass;
+                    document.getElementById('temptopic').value = json.mqtttemptopic;
                     document.getElementById('mqttretained').checked = json.mqttretained;
                     onmqttenabledchanged(); // enable the correct fields
                 }
@@ -240,6 +244,7 @@
                 obj.mqttport = +document.getElementById('mqttport').value;
                 obj.mqttuser = document.getElementById('mqttuser').value;
                 obj.mqttpass = document.getElementById('mqttpass').value;
+                obj.mqtttemptopic = document.getElementById('temptopic').value;
                 obj.mqttretained = document.getElementById('mqttretained').checked;
                 obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
                 var data = JSON.stringify(obj);
