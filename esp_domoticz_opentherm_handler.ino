@@ -60,6 +60,9 @@ const char FaultCode_Name[] = "Faultcode";
 // Current Temp on Thermostat
 float currentTemperature = 0;
 
+// Current Temp on mqtt
+float mqttTemperature = 99;
+
 // return values from boiler
 float dhw_Temperature = 0;
 float boiler_Temperature = 0;
@@ -304,6 +307,7 @@ String getSensors() { //Handler
 
   // Add Temp Sensor value
   message +=",\n  \"ThermostatTemperature\": " + (String(currentTemperature+ThermostatTemperatureCalibration));
+  message +=",\n  \"mqttTemperature\": " + (String(mqttTemperature));
 
   return message;
 }
@@ -863,6 +867,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Deserialisation failed");
       CommandSucceeded=false;
     } else {
+      // Handle Enable Hotwater switch command
       if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
         // we have a match
         if (String(doc["state"]).equals("ON")){
@@ -873,6 +878,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
         }
+      // Handle EnableCooling switch command
       } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
         // we have a match
         if (String(doc["state"]).equals("ON")){
@@ -883,6 +889,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
         } 
+      // Enable Central Heating switch command
       } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
         // we have a match
         if (String(doc["state"]).equals("ON")){
@@ -893,12 +900,17 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
         }
+      // Boiler Setpoint commands
       } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
-        // we have a match, log what we see..
         boiler_SetPoint=String(payloadstr).toFloat();
+
+      // DHW Setpoint command
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
-        // we have a match, log what we see..
         dhw_SetPoint=String(payloadstr).toFloat();
+
+      } else if (topicstr.equals(mqtttemptopic)) {
+        mqttTemperature=doc["value"]; 
+      // Unknown command
       } else {
         LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
         CommandSucceeded=false;
@@ -1306,6 +1318,9 @@ void PublishAllMQTTSensors()
   // Publish setpoints
   PublishMQTTSetpoint(Boiler_Setpoint_Name);
   PublishMQTTSetpoint(DHW_Setpoint_Name);
+
+  // Subscribe to temperature topic
+  MQTT.subscribe(mqtttemptopic.c_str());
 }
 
 // The setup code

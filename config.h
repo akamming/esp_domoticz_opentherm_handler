@@ -23,3 +23,4 @@ int mqttport = 1883;                              // MQTT Server Port
 bool usemqttauthentication = false;                // Use MQTT Authentication
 String mqttuser = "";                             // MQTT Username
 String mqttpass = "";                             // MQTT Password
+String mqtttemptopic = "";                        // MQTT Topic which contains the current temperature

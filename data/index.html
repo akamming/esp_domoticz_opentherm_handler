@@ -29,10 +29,10 @@
         <br />Actual<br />
         <label><input type="checkbox" name="heating" id="heating" disabled>heating</label><label><input type="checkbox" name="cooling" id="cooling" disabled>cooling</label><label><input type="checkbox" name="hotwater" id="hotwater" disabled>hotwater</label><br />
         <br />Temperatures<br />
+        MQTT <input type="number" class="temp_input" id="mqtttemperature" size="10" disabled><br />
         Thermostat <input type="number" class="temp_input" id="thermostattemperature" size="10" disabled> Outside <input type="number" class="temp_input" id="outsidetemperature" size="10" disabled><br />
         Heating SP <input type="number" class="temp_input" id="boilersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="boilertemperature" size="10" disabled><br />
         Hotwater SP <input type="number" class="temp_input" id="hotwatersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="hotwatertemperature" size="10" disabled><br />
-
     </div>
 
     <div class="outer_frame">
@@ -49,7 +49,7 @@
         Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br />
-        temperature_topic <input type="text" class="user_input" id="temptopic" size="20" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        temperature_topic <input type="text" class="user_input" id="mqtttemptopic" size="20" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
     </div>
 
@@ -82,7 +82,7 @@
                 document.getElementById("mqttport").disabled = false;
                 document.getElementById("usemqttauthentication").disabled = false;
                 document.getElementById("mqttretained").disabled = false;
-                document.getElementById("temptopic").disabled = false;
+                document.getElementById("mqtttemptopic").disabled = false;
 
                 NewValue = true;
                 if (document.getElementById('usemqttauthentication').checked) {
@@ -98,7 +98,7 @@
                 document.getElementById("mqttretained").disabled = true;
                 document.getElementById("mqttuser").disabled = true;
                 document.getElementById("mqttpass").disabled = true;
-                document.getElementById("temptopic").disabled = true;
+                document.getElementById("mqtttemptopic").disabled = true;
             }
         }
 
@@ -150,6 +150,7 @@
                     document.getElementById('hotwatertemperature').value = json.DhwTemperature;
                     document.getElementById('thermostattemperature').value = json.ThermostatTemperature;
                     document.getElementById('outsidetemperature').value = json.OutsideTemperature;
+                    document.getElementById('mqtttemperature').value = json.mqttTemperature;
                     document.getElementById('otstatus').value = json.OpenThermStatus;
                     document.getElementById('modulation').value = json.Modulation;
                     document.getElementById('statuscode').value = json.FaultCode;
@@ -195,7 +196,7 @@
                     document.getElementById('usemqttauthentication').checked = json.usemqttauthentication;
                     document.getElementById('mqttuser').value = json.mqttuser;
                     document.getElementById('mqttpass').value = json.mqttpass;
-                    document.getElementById('temptopic').value = json.mqtttemptopic;
+                    document.getElementById('mqtttemptopic').value = json.mqtttemptopic;
                     document.getElementById('mqttretained').checked = json.mqttretained;
                     onmqttenabledchanged(); // enable the correct fields
                 }
@@ -244,7 +245,7 @@
                 obj.mqttport = +document.getElementById('mqttport').value;
                 obj.mqttuser = document.getElementById('mqttuser').value;
                 obj.mqttpass = document.getElementById('mqttpass').value;
-                obj.mqtttemptopic = document.getElementById('temptopic').value;
+                obj.mqtttemptopic = document.getElementById('mqtttemptopic').value;
                 obj.mqttretained = document.getElementById('mqttretained').checked;
                 obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
                 var data = JSON.stringify(obj);
