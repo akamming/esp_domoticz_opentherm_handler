@@ -545,6 +545,10 @@ void readConfig()
         outPin=json["outpin"];
         OneWireBus=json["temppin"];
         mqtttemptopic=json["mqtttemptopic"].as<String>();
+        // Check for null value
+        if (mqtttemptopic.equals("null")) {
+          mqtttemptopic="";
+        }
       } else {
         Serial.println("failed to load json config");
       }
@@ -1320,7 +1324,9 @@ void PublishAllMQTTSensors()
   PublishMQTTSetpoint(DHW_Setpoint_Name);
 
   // Subscribe to temperature topic
-  MQTT.subscribe(mqtttemptopic.c_str());
+  if (mqtttemptopic.length()>0) {
+    MQTT.subscribe(mqtttemptopic.c_str());
+  }
 }
 
 // The setup code
