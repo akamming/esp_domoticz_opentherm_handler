@@ -131,6 +131,7 @@ unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT com
 unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 bool OTAUpdateInProgress=false;
+bool debug=true;
 
 // objects to be used by program
 ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
@@ -139,6 +140,15 @@ DallasTemperature sensors(&oneWire); // for the temp sensor on one wire bus
 OpenTherm ot(inPin, outPin); // for communication with Opentherm adapter
 WiFiClient espClient;  // Needed for MQTT
 PubSubClient MQTT(espClient); // MQTT client
+
+void Debug(const char* text) {
+  if (debug) {
+    if (MQTT.connected()) {
+      MQTT.publish("debug",text,false);
+    }
+    Serial.println(text);
+  }
+}
 
 
 void IRAM_ATTR handleInterrupt() {
@@ -622,6 +632,12 @@ void handleOpenTherm()
           {
             UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
             mqtt_enable_HotWater=enableHotWater;
+            // Communicate to setpoint as well
+            if (enableHotWater) {
+              UpdateMQTTSetpointMode(DHW_Setpoint_Name,1);
+            } else  {
+              UpdateMQTTSetpointMode(DHW_Setpoint_Name,0);
+            }
           }
           if (Cooling!=mqtt_Cooling){ // value changed
             UpdateMQTTSwitch(CoolingActive_Name,Cooling);
@@ -845,10 +861,7 @@ String SetpointCommandTopic(const char* DeviceName){
 }
 
 void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
-      MQTT.publish((String(host)+String("/log/topic")).c_str(),topic,mqttpersistence);
-      MQTT.publish((String(host)+String("/log/payload")).c_str(),payloadstr,mqttpersistence);
-      MQTT.publish((String(host)+String("/log/length")).c_str(),length,mqttpersistence);
-      MQTT.publish((String(host)+String("/log/error")).c_str(),logtext,mqttpersistence);
+  Debug(("Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str());
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -868,8 +881,40 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     DeserializationError error = deserializeJson(doc, payloadstr);
   
     if (error) {
-      LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Deserialisation failed");
-      CommandSucceeded=false;
+      // Might be a string, so handle...
+      
+      // DHW Setpoint mode receive
+      if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
+        if (String(payloadstr).equals("off")) {
+          enableHotWater=false;
+        } else if (String(payloadstr).equals("heat")) {
+          enableHotWater=true;
+        } else {
+          Debug("Unknown payload for dhw setpoint mode command");
+          // sendback current mode to requester, so trick program into making it think it has to communicatie
+          if (enableHotWater) {
+            mqtt_enable_HotWater=false;
+          } else {
+            mqtt_enable_HotWater=true;
+          }
+          CommandSucceeded=false;
+        }
+      // Handle Enable Hotwater switch command
+      } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
+        // we have a match
+        if (String(payloadstr).equals("ON")){
+          enableHotWater=true;
+        } else if (String(payloadstr).equals("OFF")) {
+          enableHotWater=false;
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
+        }
+      } else {
+        // apparently we needed to deserialize, so log the error
+        LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Deserialisation failed");
+        CommandSucceeded=false;
+      }
     } else {
       // Handle Enable Hotwater switch command
       if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
@@ -908,10 +953,11 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
         boiler_SetPoint=String(payloadstr).toFloat();
 
-      // DHW Setpoint command
+      // DHW Setpoint update temp received
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
         dhw_SetPoint=String(payloadstr).toFloat();
 
+      // MQTT temperature received
       } else if (topicstr.equals(mqtttemptopic)) {
         mqttTemperature=doc["value"]; 
       // Unknown command
@@ -939,7 +985,7 @@ void reconnect()
         mqttconnected = MQTT.connect(host.c_str());
       }
       if (mqttconnected) {
-        Serial.println("Connect succeeded");
+        Debug("MQTT Connect succeeded");
         PublishAllMQTTSensors();      
       } else {
         Serial.print("failed, rc=");
@@ -1221,12 +1267,28 @@ void PublishMQTTSetpoint(const char* uniquename)
   JsonDocument json;
 
   // Create message
-  char conf[512];
+  char conf[1024];
+  json["min_temp"] = 10;
+  json["max_temp"] = 90;
+  JsonArray modes = json["modes"].to<JsonArray>();
+  modes.add("off");
+  modes.add("heat");
+  modes.add("cool");
+  modes.add("auto");
+
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
   json["temp_cmd_t"] = host+"/climate/"+String(uniquename)+"/cmd_temp";
   json["temp_stat_t"] = host+"/climate/"+String(uniquename)+"/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
+  json["curr_temp_t"] = host+"/climate/"+String(uniquename)+"/Air_temperature";
+  json["curr_temp_tpl"] = "{{ value_json.value }}";
+  json["mode_stat_t"] = host+"/climate/"+String(uniquename)+"/mode";
+  json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
+  json["mode_stat_tpl"] =  "{{ {0: \"off\", 1: \"heat\", 11: \"cool\", 21: \"auto\"}[value_json.value] | default('off') }}";
+  json["temp_step"] = 0.5;
+  json["temp_unit"] = "C";
+  json["precision"] = 0.1;
 
   JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
@@ -1241,14 +1303,28 @@ void PublishMQTTSetpoint(const char* uniquename)
 
   // publsh the Message
   MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.subscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str());
   MQTT.subscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
 }
+
+void UpdateMQTTSetpointMode(const char* uniquename,int value)
+{
+  Serial.println("UpdateMQTTSetpointmode");
+  JsonDocument json;
+
+  // Construct JSON config message
+  // json["value"] = value;
+
+  // char jsonstr[128];
+  // serializeJson(json, jsonstr);  // conf now contains the json
+
+  MQTT.publish((host+"/climate/"+String(uniquename)+"/mode").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence);
+}
+
 
 void UpdateMQTTSetpoint(const char* uniquename, float temperature)
 {
   Serial.println("UpdateMQTTSetpoint");
-  // char charVal[10];
-  // dtostrf(temperature,4,1,charVal);
   JsonDocument json;
 
   // Construct JSON config message
@@ -1258,8 +1334,6 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
   serializeJson(json, value);  // conf now contains the json
 
   MQTT.publish((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence);
-
-  // MQTT.publish((host+"/climate/"+String(uniquename)+"/state").c_str(),charVal,mqttpersistence);
 }
 
 
