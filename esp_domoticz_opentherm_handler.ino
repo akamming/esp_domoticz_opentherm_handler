@@ -629,16 +629,14 @@ void handleOpenTherm()
             UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
             mqtt_enable_CentralHeating=enableCentralHeating;
             // Communicate to setpoint as well
-            if (enableCentralHeating) {
-              UpdateMQTTSetpointMode(Boiler_Setpoint_Name,1);
-            } else  {
-              UpdateMQTTSetpointMode(Boiler_Setpoint_Name,0);
-            }
+            UpdateMQTTBoilerSetpointMode();
           }
           if (enableCooling!=mqtt_enable_Cooling) // value changed
           {
             UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
             mqtt_enable_Cooling=enableCooling;
+            // Communicate to setpoint as well
+            UpdateMQTTBoilerSetpointMode();
           }
           if (enableHotWater!=mqtt_enable_HotWater) // value changed
           {
@@ -897,12 +895,20 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     if (error) {
       // Might be a string, so handle...
       
-      // DHW Setpoint mode receive
+      // Boiler Setpoint mode receive
       if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
         if (String(payloadstr).equals("off")) {
           enableCentralHeating=false;
+          enableCooling=false;
         } else if (String(payloadstr).equals("heat")) {
           enableCentralHeating=true;
+          enableCooling=false;
+        } else if (String(payloadstr).equals("cool")) {
+          enableCentralHeating=false;
+          enableCooling=true;
+        } else if (String(payloadstr).equals("auto")) {
+          enableCentralHeating=true;
+          enableCooling=true;
         } else {
           Error("Unknown payload for dhw setpoint mode command");
           // sendback current mode to requester, so trick program into making it think it has to communicatie
@@ -1370,6 +1376,28 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
   // serializeJson(json, jsonstr);  // conf now contains the json
 
   MQTT.publish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence);
+}
+
+void UpdateMQTTBoilerSetpointMode()
+{
+  if (enableCentralHeating) {
+    if (enableCooling) {
+      // cooling and heating, set to Auto
+      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,21);
+    } else {
+      // only Central heating, set to Heating
+      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,1);
+    }
+  } else  {
+    if (enableCooling) {
+      // only cooling, set to Cooing
+      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,11);
+    } else {
+      // nothing, set to Off
+      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,0);
+    }
+  }
+
 }
 
 void UpdateMQTTSetpointMode(const char* uniquename,int value)
