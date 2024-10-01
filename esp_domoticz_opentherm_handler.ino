@@ -141,10 +141,10 @@ OpenTherm ot(inPin, outPin); // for communication with Opentherm adapter
 WiFiClient espClient;  // Needed for MQTT
 PubSubClient MQTT(espClient); // MQTT client
 
-void Debug(const char* text) {
+void Debug(String text) {
   if (debug) {
     if (MQTT.connected()) {
-      MQTT.publish((String(host)+"/debug").c_str(),text,mqttpersistence);
+      MQTT.publish((String(host)+"/debug").c_str(),text.c_str(),mqttpersistence);
     }
     Serial.println(text);
   }
@@ -628,6 +628,12 @@ void handleOpenTherm()
           {
             UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
             mqtt_enable_CentralHeating=enableCentralHeating;
+            // Communicate to setpoint as well
+            if (enableCentralHeating) {
+              UpdateMQTTSetpointMode(Boiler_Setpoint_Name,1);
+            } else  {
+              UpdateMQTTSetpointMode(Boiler_Setpoint_Name,0);
+            }
           }
           if (enableCooling!=mqtt_enable_Cooling) // value changed
           {
@@ -878,7 +884,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   char payloadstr[256];
   strncpy(payloadstr,(char *)payload,length);
   payloadstr[length]='\0';
-  Serial.println("Received command on topic"+topicstr+", content: "+payloadstr);
+  Debug("Received command on topic ["+topicstr+"], content: ["+payloadstr+"]");
 
   // Assume succesful command 
   bool CommandSucceeded=true;
@@ -892,7 +898,23 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       // Might be a string, so handle...
       
       // DHW Setpoint mode receive
-      if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
+      if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
+        if (String(payloadstr).equals("off")) {
+          enableCentralHeating=false;
+        } else if (String(payloadstr).equals("heat")) {
+          enableCentralHeating=true;
+        } else {
+          Error("Unknown payload for dhw setpoint mode command");
+          // sendback current mode to requester, so trick program into making it think it has to communicatie
+          if (enableHotWater) {
+            mqtt_enable_CentralHeating=false;
+          } else {
+            mqtt_enable_CentralHeating=true;
+          }
+          CommandSucceeded=false;
+        }
+      // DHW Setpoint mode receive
+      } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
         if (String(payloadstr).equals("off")) {
           enableHotWater=false;
         } else if (String(payloadstr).equals("heat")) {
