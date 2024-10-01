@@ -144,12 +144,18 @@ PubSubClient MQTT(espClient); // MQTT client
 void Debug(const char* text) {
   if (debug) {
     if (MQTT.connected()) {
-      MQTT.publish("debug",text,false);
+      MQTT.publish((String(host)+"/debug").c_str(),text,mqttpersistence);
     }
     Serial.println(text);
   }
 }
 
+void Error(const char* text) {
+  if (MQTT.connected()) {
+    MQTT.publish((String(host)+"/error").c_str(),text,mqttpersistence);
+  }
+  Serial.println(text);
+}
 
 void IRAM_ATTR handleInterrupt() {
     ot.handleInterrupt();
@@ -720,6 +726,7 @@ void handleOpenTherm()
         float delta = mqtt_boiler_Temperature-boiler_Temperature;
         if (delta<-0.1 or delta>0.1){ // value changed
           UpdateMQTTTemperatureSensor(Boiler_Temperature_Name,boiler_Temperature);
+          UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature);
           mqtt_boiler_Temperature=boiler_Temperature;
         }
       }
@@ -737,6 +744,7 @@ void handleOpenTherm()
         float delta = mqtt_dhw_Temperature-dhw_Temperature;
         if (delta<-0.1 or delta>0.1){ // value changed
           UpdateMQTTTemperatureSensor(DHW_Temperature_Name,dhw_Temperature);
+          UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature);
           mqtt_dhw_Temperature=dhw_Temperature;
         }
       }
@@ -861,7 +869,7 @@ String SetpointCommandTopic(const char* DeviceName){
 }
 
 void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
-  Debug(("Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str());
+  MQTT.publish((String(host)+"/error").c_str(),("Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str(),mqttpersistence);
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -890,7 +898,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         } else if (String(payloadstr).equals("heat")) {
           enableHotWater=true;
         } else {
-          Debug("Unknown payload for dhw setpoint mode command");
+          Error("Unknown payload for dhw setpoint mode command");
           // sendback current mode to requester, so trick program into making it think it has to communicatie
           if (enableHotWater) {
             mqtt_enable_HotWater=false;
@@ -906,6 +914,28 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableHotWater=true;
         } else if (String(payloadstr).equals("OFF")) {
           enableHotWater=false;
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
+        }
+      // Handle EnableCooling switch command
+      } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
+        // we have a match
+        if (String(payloadstr).equals("ON")){
+          enableCooling=true;
+        } else if (String(payloadstr).equals("OFF")) {
+          enableCooling=false;
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
+        } 
+      // Enable Central Heating switch command
+      } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
+        // we have a match
+        if (String(payloadstr).equals("ON")){
+          enableCentralHeating=true;
+        } else if (String(payloadstr).equals("OFF")) {
+          enableCentralHeating=false;
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
@@ -985,7 +1015,6 @@ void reconnect()
         mqttconnected = MQTT.connect(host.c_str());
       }
       if (mqttconnected) {
-        Debug("MQTT Connect succeeded");
         PublishAllMQTTSensors();      
       } else {
         Serial.print("failed, rc=");
@@ -1305,6 +1334,20 @@ void PublishMQTTSetpoint(const char* uniquename)
   MQTT.publish((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
   MQTT.subscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str());
   MQTT.subscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str());
+}
+
+void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
+{
+  Serial.println("UpdateMQTTSetpointtemperature");
+  JsonDocument json;
+
+  // Construct JSON config message
+  // json["value"] = value;
+
+  // char jsonstr[128];
+  // serializeJson(json, jsonstr);  // conf now contains the json
+
+  MQTT.publish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence);
 }
 
 void UpdateMQTTSetpointMode(const char* uniquename,int value)
