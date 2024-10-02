@@ -56,6 +56,7 @@ const char DHW_Setpoint_Name[] = "DHW_Setpoint";
 const char Modulation_Name[] = "Modulation";
 const char Pressure_Name[] = "Pressure";
 const char FaultCode_Name[] = "Faultcode";
+const char Climate_Name[] = "Climate";
 
 // Current Temp on Thermostat
 float currentTemperature = 0;
@@ -1489,6 +1490,7 @@ void PublishAllMQTTSensors()
   // Publish setpoints
   PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);
   PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false);
+  PublishMQTTSetpoint(Climate_Name,5,30,true);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0) {
