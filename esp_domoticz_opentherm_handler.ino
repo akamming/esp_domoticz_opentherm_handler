@@ -1316,7 +1316,7 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 
 
 
-void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp)
+void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool includecooling)
 {
   Serial.println("PublishMQTTSetpoint");
   JsonDocument json;
@@ -1328,8 +1328,10 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp)
   JsonArray modes = json["modes"].to<JsonArray>();
   modes.add("off");
   modes.add("heat");
-  modes.add("cool");
-  modes.add("auto");
+  if (includecooling) {
+    modes.add("cool");
+    modes.add("auto");
+  }
 
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
@@ -1485,8 +1487,8 @@ void PublishAllMQTTSensors()
   PublishMQTTSwitch(EnableHotWater_Name,true);
 
   // Publish setpoints
-  PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90);
-  PublishMQTTSetpoint(DHW_Setpoint_Name,10,90);
+  PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);
+  PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0) {
