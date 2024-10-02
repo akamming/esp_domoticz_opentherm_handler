@@ -35,6 +35,7 @@ bool enableHotWater = true;
 bool enableCooling = false;
 float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
+float climate_SetPoint = 20;
 
 // device names for mqtt autodiscovery
 const char Boiler_Temperature_Name[] = "Boiler_Temperature";   
@@ -96,6 +97,7 @@ float mqtt_dhw_Temperature=100;
 float mqtt_return_Temperature=100;
 float mqtt_outside_Temperature=100;
 float mqtt_currentTemperature=100;
+float mqtt_mqttTemperature=100;
 bool mqtt_CentralHeating=true;
 bool mqtt_HotWater=true;
 bool mqtt_Cooling=true;
@@ -107,9 +109,11 @@ bool mqtt_enable_HotWater=false;
 bool mqtt_enable_CentralHeating=true;
 bool mqtt_enable_Cooling=true;
 float mqtt_boiler_setpoint=1;
+float mqtt_climate_setpoint=1;
 float mqtt_dhw_setpoint=0;
 float mqtt_pressure=3; 
 unsigned char mqtt_FaultCode=65;
+
 
 // ot actions (main will loop through these actions in this order)
 enum OTCommand { SetBoilerStatus, 
@@ -585,7 +589,49 @@ float getDHWFlowrate() {
 
 void handleOpenTherm()
 {
-  
+  // Check if we have to communicatie steering vars
+  if (MQTT.connected()) {
+    // Boiler Setpoint
+    if ((boiler_SetPoint-mqtt_boiler_setpoint)>=0.1 or (boiler_SetPoint-mqtt_boiler_setpoint)<=-0.1){ // value changed
+      UpdateMQTTSetpoint(Boiler_Setpoint_Name,boiler_SetPoint);
+      mqtt_boiler_setpoint=boiler_SetPoint;
+    }
+
+    // DHW Setpoint
+    if ((dhw_SetPoint-mqtt_dhw_setpoint)>=0.1 or (dhw_SetPoint-mqtt_dhw_setpoint)<=-0.1){ // value changed
+      UpdateMQTTSetpoint(DHW_Setpoint_Name,dhw_SetPoint);
+      mqtt_dhw_setpoint=dhw_SetPoint;
+    }
+
+    // Enable CEntral Heating
+    if (enableCentralHeating!=mqtt_enable_CentralHeating) // value changed
+    {
+      UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
+      mqtt_enable_CentralHeating=enableCentralHeating;
+      // Communicate to setpoint as well
+      UpdateMQTTBoilerSetpointMode();
+    }
+    if (enableCooling!=mqtt_enable_Cooling) // value changed
+    {
+      UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
+      mqtt_enable_Cooling=enableCooling;
+      // Communicate to setpoint as well
+      UpdateMQTTBoilerSetpointMode();
+    }
+    if (enableHotWater!=mqtt_enable_HotWater) // value changed
+    {
+      UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
+      mqtt_enable_HotWater=enableHotWater;
+      // Communicate to setpoint as well
+      if (enableHotWater) {
+        UpdateMQTTSetpointMode(DHW_Setpoint_Name,1);
+      } else  {
+        UpdateMQTTSetpointMode(DHW_Setpoint_Name,0);
+      }
+    }
+  }
+
+  // Handle commands
   switch (OpenThermCommand)
   {
     case SetBoilerStatus:
@@ -622,31 +668,6 @@ void handleOpenTherm()
           if (Diagnostic!=mqtt_Diagnostic){ // value changed
             UpdateMQTTSwitch(DiagnosticActive_Name,Diagnostic);
             mqtt_Diagnostic=Diagnostic;
-          }
-          if (enableCentralHeating!=mqtt_enable_CentralHeating) // value changed
-          {
-            UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
-            mqtt_enable_CentralHeating=enableCentralHeating;
-            // Communicate to setpoint as well
-            UpdateMQTTBoilerSetpointMode();
-          }
-          if (enableCooling!=mqtt_enable_Cooling) // value changed
-          {
-            UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
-            mqtt_enable_Cooling=enableCooling;
-            // Communicate to setpoint as well
-            UpdateMQTTBoilerSetpointMode();
-          }
-          if (enableHotWater!=mqtt_enable_HotWater) // value changed
-          {
-            UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
-            mqtt_enable_HotWater=enableHotWater;
-            // Communicate to setpoint as well
-            if (enableHotWater) {
-              UpdateMQTTSetpointMode(DHW_Setpoint_Name,1);
-            } else  {
-              UpdateMQTTSetpointMode(DHW_Setpoint_Name,0);
-            }
           }
           if (Cooling!=mqtt_Cooling){ // value changed
             UpdateMQTTSwitch(CoolingActive_Name,Cooling);
@@ -692,14 +713,6 @@ void handleOpenTherm()
       // set setpoint
       ot.setBoilerTemperature(boiler_SetPoint);
 
-      // check if we have to send MQTT message
-      if (MQTT.connected()) {
-        if ((boiler_SetPoint-mqtt_boiler_setpoint)>=0.1 or (boiler_SetPoint-mqtt_boiler_setpoint)<=-0.1){ // value changed
-          UpdateMQTTSetpoint(Boiler_Setpoint_Name,boiler_SetPoint);
-          mqtt_boiler_setpoint=boiler_SetPoint;
-        }
-      }
-
       OpenThermCommand = SetDHWTemp;
       break;
     }
@@ -708,15 +721,7 @@ void handleOpenTherm()
     {
       ot.setDHWSetpoint(dhw_SetPoint);
 
-      // check if we have to send MQTT message
-      if (MQTT.connected()) {
-        if ((dhw_SetPoint-mqtt_dhw_setpoint)>=0.1 or (dhw_SetPoint-mqtt_dhw_setpoint)<=-0.1){ // value changed
-          UpdateMQTTSetpoint(DHW_Setpoint_Name,dhw_SetPoint);
-          mqtt_dhw_setpoint=dhw_SetPoint;
-        }
-      }
-
-      OpenThermCommand = GetBoilerTemp;
+       OpenThermCommand = GetBoilerTemp;
       break;
     }
 
@@ -1010,6 +1015,9 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
         boiler_SetPoint=String(payloadstr).toFloat();
 
+      //Climate Setpoint commands
+      } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
+        climate_SetPoint=String(payloadstr).toFloat();
       // DHW Setpoint update temp received
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
         dhw_SetPoint=String(payloadstr).toFloat();
