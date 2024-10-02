@@ -592,10 +592,21 @@ void handleOpenTherm()
   // Check if we have to communicatie steering vars
   if (MQTT.connected()) {
     // Boiler Setpoint
+    if ((climate_SetPoint-mqtt_climate_setpoint)>=0.1 or (climate_SetPoint-mqtt_climate_setpoint)<=-0.1){ // value changed
+      UpdateMQTTSetpoint(Climate_Name,climate_SetPoint);
+      mqtt_climate_setpoint=climate_SetPoint;
+    }
+    if (mqttTemperature!=mqtt_mqttTemperature) {
+      UpdateMQTTSetpointTemperature(Climate_Name,mqttTemperature);
+      mqtt_mqttTemperature=mqttTemperature;
+    }
+
+    // Climate Setpoint
     if ((boiler_SetPoint-mqtt_boiler_setpoint)>=0.1 or (boiler_SetPoint-mqtt_boiler_setpoint)<=-0.1){ // value changed
       UpdateMQTTSetpoint(Boiler_Setpoint_Name,boiler_SetPoint);
       mqtt_boiler_setpoint=boiler_SetPoint;
     }
+
 
     // DHW Setpoint
     if ((dhw_SetPoint-mqtt_dhw_setpoint)>=0.1 or (dhw_SetPoint-mqtt_dhw_setpoint)<=-0.1){ // value changed
@@ -655,7 +666,7 @@ void handleOpenTherm()
         // modulation is reported on the switches, so make sure we have modulation value as well
         modulation = ot.getModulation();
 
-        // Check if we have to send to MQTT
+        // Check if we have to send to MQTT for steering vars
         if (MQTT.connected()) {
           if (Flame!=mqtt_Flame){ // value changed
             UpdateMQTTSwitch(FlameActive_Name,Flame);
