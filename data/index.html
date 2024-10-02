@@ -50,6 +50,7 @@
         Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br />
         temperature_topic <input type="text" class="user_input" id="mqtttemptopic" size="20" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        <label><input type="checkbox" name="debugtomqtt" id="debugtomqtt" disabled>Debug messages to MQTT</label><br />
         <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
     </div>
 
@@ -83,6 +84,7 @@
                 document.getElementById("usemqttauthentication").disabled = false;
                 document.getElementById("mqttretained").disabled = false;
                 document.getElementById("mqtttemptopic").disabled = false;
+                document.getElementById("debugtomqtt").disabled = false;
 
                 NewValue = true;
                 if (document.getElementById('usemqttauthentication').checked) {
@@ -99,6 +101,7 @@
                 document.getElementById("mqttuser").disabled = true;
                 document.getElementById("mqttpass").disabled = true;
                 document.getElementById("mqtttemptopic").disabled = true;
+                document.getElementById("debugtomqtt").disabled = true;
             }
         }
 
@@ -198,6 +201,7 @@
                     document.getElementById('mqttpass').value = json.mqttpass;
                     document.getElementById('mqtttemptopic').value = json.mqtttemptopic;
                     document.getElementById('mqttretained').checked = json.mqttretained;
+                    document.getElementById('debugtomqtt').value = json.debugtomqtt;
                     onmqttenabledchanged(); // enable the correct fields
                 }
             };
@@ -248,6 +252,7 @@
                 obj.mqtttemptopic = document.getElementById('mqtttemptopic').value;
                 obj.mqttretained = document.getElementById('mqttretained').checked;
                 obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
+                obj.debugtomqtt = document.getElementById('debugtomqtt').checked;
                 var data = JSON.stringify(obj);
                 xhttp.send(data);
             }

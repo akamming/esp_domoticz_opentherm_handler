@@ -390,6 +390,7 @@ void handleGetConfig()
     json["MQTTconnected"] = false;
   }
   json["MQTTState"] = MQTT.state();
+  json["debugtomqtt"]=debug;
 
   json["heap"] = ESP.getFreeHeap();
   json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
@@ -550,21 +551,18 @@ void readConfig()
       serializeJson(json, Serial);
       if ( ! deserializeError ) {
         Serial.println("\nparsed json");
-        usemqtt=json["usemqtt"];
-        usemqttauthentication=json["usemqttauthentication"];
+        usemqtt=json["usemqtt"] | false;
+        usemqttauthentication=json["usemqttauthentication"] | false;
         mqttserver=json["mqttserver"].as<String>();
-        mqttport=json["mqttport"];
+        mqttport=json["mqttport"] | 1883;
         mqttuser=json["mqttuser"].as<String>();
         mqttpass=json["mqttpass"].as<String>();
         mqttpersistence=json["mqttretained"];
-        inPin=json["inpin"];
-        outPin=json["outpin"];
-        OneWireBus=json["temppin"];
+        inPin=json["inpin"] | 4;
+        outPin=json["outpin"] | 5;
+        OneWireBus=json["temppin"] | 14;
         mqtttemptopic=json["mqtttemptopic"].as<String>();
-        // Check for null value
-        if (mqtttemptopic.equals("null")) {
-          mqtttemptopic="";
-        }
+        debug=json["debugtomqtt"] | true;
       } else {
         Serial.println("failed to load json config");
       }
@@ -1318,15 +1316,15 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 
 
 
-void PublishMQTTSetpoint(const char* uniquename)
+void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp)
 {
   Serial.println("PublishMQTTSetpoint");
   JsonDocument json;
 
   // Create message
   char conf[1024];
-  json["min_temp"] = 10;
-  json["max_temp"] = 90;
+  json["min_temp"] = mintemp;
+  json["max_temp"] = maxtemp;
   JsonArray modes = json["modes"].to<JsonArray>();
   modes.add("off");
   modes.add("heat");
@@ -1487,8 +1485,8 @@ void PublishAllMQTTSensors()
   PublishMQTTSwitch(EnableHotWater_Name,true);
 
   // Publish setpoints
-  PublishMQTTSetpoint(Boiler_Setpoint_Name);
-  PublishMQTTSetpoint(DHW_Setpoint_Name);
+  PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90);
+  PublishMQTTSetpoint(DHW_Setpoint_Name,10,90);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0) {
