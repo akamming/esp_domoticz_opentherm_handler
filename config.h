@@ -11,6 +11,12 @@ int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
 String mqttautodiscoverytopic = "homeassistant";  // On what topic are the MQTT autodiscovery messages expected
 
+// Constants for SetpointModes
+const int OFF = 0;
+const int HEAT = 1;
+const int COOL = 11;
+const int AUTO = 21;
+
 // Default Config values
 int inPin = 4;                                    // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
 int outPin = 5;                                   // pin number for opentherm adapter connection, 3 for Arduino, 5 for ESP8266 (D1), 22 for ESP32
@@ -24,3 +30,7 @@ bool usemqttauthentication = false;                // Use MQTT Authentication
 String mqttuser = "";                             // MQTT Username
 String mqttpass = "";                             // MQTT Password
 String mqtttemptopic = "";                        // MQTT Topic which contains the current temperature
+
+// Default values Climate Decice 
+float climate_SetPoint = 20;                      // default setpoint value for climate device
+String climate_Mode = "off";                      // Default mode for climate device

@@ -306,6 +306,8 @@ String getSensors() { //Handler
   message += ",\n  \"EnableCooling\": " + String(enableCooling ? "\"on\"" : "\"off\"");
   message +=",\n  \"BoilerSetpoint\": " + (String(boiler_SetPoint));
   message +=",\n  \"DHWSetpoint\": " + (String(dhw_SetPoint));
+  message +=",\n  \"climateSetpoint\": " + String(climate_SetPoint);
+  message +=",\n  \"climateMode\": \"" + String(climate_Mode) + "\"";
 
   
   // Add BoilerStatus
