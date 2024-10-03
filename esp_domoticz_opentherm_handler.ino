@@ -35,7 +35,6 @@ bool enableHotWater = true;
 bool enableCooling = false;
 float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
-float climate_SetPoint = 20;
 
 // device names for mqtt autodiscovery
 const char Boiler_Temperature_Name[] = "Boiler_Temperature";   
@@ -113,6 +112,7 @@ float mqtt_climate_setpoint=1;
 float mqtt_dhw_setpoint=0;
 float mqtt_pressure=3; 
 unsigned char mqtt_FaultCode=65;
+String mqtt_climate_Mode = "abcd"; 
 
 
 // ot actions (main will loop through these actions in this order)
@@ -591,11 +591,27 @@ void handleOpenTherm()
 {
   // Check if we have to communicatie steering vars
   if (MQTT.connected()) {
-    // Boiler Setpoint
+    // Climate Mode
+    if (!climate_Mode.equals(mqtt_climate_Mode)){ // value changed
+      if (climate_Mode.equals("off")) {
+        UpdateMQTTSetpointMode(Climate_Name,OFF);
+      } else if (climate_Mode.equals("heat")) {
+        UpdateMQTTSetpointMode(Climate_Name,HEAT);
+      } else if (climate_Mode.equals("cool")) {
+        UpdateMQTTSetpointMode(Climate_Name,COOL);
+      } else if (climate_Mode.equals("auto")) {
+        UpdateMQTTSetpointMode(Climate_Name,AUTO);
+      }
+      mqtt_climate_setpoint=climate_SetPoint;
+    }
+
+    // Climate Setpoint
     if ((climate_SetPoint-mqtt_climate_setpoint)>=0.1 or (climate_SetPoint-mqtt_climate_setpoint)<=-0.1){ // value changed
       UpdateMQTTSetpoint(Climate_Name,climate_SetPoint);
       mqtt_climate_setpoint=climate_SetPoint;
     }
+
+    // The actual temperature for the climate device. Now the temp required from mqtt. But should be made switchable to other sources 
     if (mqttTemperature!=mqtt_mqttTemperature) {
       UpdateMQTTSetpointTemperature(Climate_Name,mqttTemperature);
       mqtt_mqttTemperature=mqttTemperature;
@@ -606,7 +622,6 @@ void handleOpenTherm()
       UpdateMQTTSetpoint(Boiler_Setpoint_Name,boiler_SetPoint);
       mqtt_boiler_setpoint=boiler_SetPoint;
     }
-
 
     // DHW Setpoint
     if ((dhw_SetPoint-mqtt_dhw_setpoint)>=0.1 or (dhw_SetPoint-mqtt_dhw_setpoint)<=-0.1){ // value changed
@@ -910,8 +925,20 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     if (error) {
       // Might be a string, so handle...
       
+      // Climate  mode receive
+      if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+        if (String(payloadstr).equals("off") or String(payloadstr).equals("heat") or String(payloadstr).equals("cool") or String(payloadstr).equals("auto")) {
+        climate_Mode=payloadstr;
+
+        } else {
+          Error("Unknown payload for Climate mode command");
+          // sendback current mode to requester, so trick program into making it think it has to communicatie
+          mqtt_climate_Mode="abcd"; // random value, so the program thinks it is changed next time it wants to communicate
+          CommandSucceeded=false;
+        }
+        
       // Boiler Setpoint mode receive
-      if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
+      } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
         if (String(payloadstr).equals("off")) {
           enableCentralHeating=false;
           enableCooling=false;
@@ -925,15 +952,16 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableCentralHeating=true;
           enableCooling=true;
         } else {
-          Error("Unknown payload for dhw setpoint mode command");
+          Error("Unknown payload for central heating setpoint mode command");
           // sendback current mode to requester, so trick program into making it think it has to communicatie
-          if (enableHotWater) {
+          if (enableCentralHeating) {
             mqtt_enable_CentralHeating=false;
           } else {
             mqtt_enable_CentralHeating=true;
           }
           CommandSucceeded=false;
         }
+        
       // DHW Setpoint mode receive
       } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
         if (String(payloadstr).equals("off")) {
@@ -1362,7 +1390,7 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   json["curr_temp_tpl"] = "{{ value_json.value }}";
   json["mode_stat_t"] = host+"/climate/"+String(uniquename)+"/mode";
   json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
-  json["mode_stat_tpl"] =  "{{ {0: \"off\", 1: \"heat\", 11: \"cool\", 21: \"auto\"}[value_json.value] | default('off') }}";
+  json["mode_stat_tpl"] =  "{{ {"+String(OFF)+": \"off\", "+String(HEAT)+": \"heat\", "+String(COOL)+": \"cool\", "+String(AUTO)+": \"auto\"}[value_json.value] | default('off') }}";
   json["temp_step"] = 0.5;
   json["temp_unit"] = "C";
   json["precision"] = 0.1;
