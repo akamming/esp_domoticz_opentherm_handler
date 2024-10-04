@@ -2,14 +2,17 @@
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
-const int MQTTTimeoutInMillis = 30 * 1000;              // if no command was sent in this period, the program will assume the MQTT client is no longer there
+const int MQTTTimeoutInMillis = 15 * 1000;              // if no command was sent in this period, the program will assume the MQTT client is no longer there
 const int HTTPTimeoutInMillis = 10 * 1000;              // if no command was sent during this periode, the program will assume HTTP control stopped.
 const int heartbeatTickInMillis = 1000;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
 const int MQTTDiscoveryHeartbeatInMillis = 10*60*1000;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
+const int ClimateHeartbeatInMillis = 1000;        // Interval to do calculate new PID values when in CLimate mode
 float ThermostatTemperatureCalibration=0;         // set to a differenct value to zero is DS18B20 give a too high or low reading
 int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
 String mqttautodiscoverytopic = "homeassistant";  // On what topic are the MQTT autodiscovery messages expected
+const int MaxBoilerTemp = 50;
+const int MinBoilerTemp = 10;
 
 // Constants for SetpointModes
 const int OFF = 0;
@@ -34,3 +37,8 @@ String mqtttemptopic = "";                        // MQTT Topic which contains t
 // Default values Climate Decice 
 float climate_SetPoint = 20;                      // default setpoint value for climate device
 String climate_Mode = "off";                      // Default mode for climate device
+
+// PID parameters
+float KP = 30; // Proportaional gain: This is the Multiplier of  the error (e.g. KP=30: 1 degree error will result in 30 degrees change of the pid value)
+float KI = 0.01; // Integral Gain: This is the multiplier of the error (e.g. KI=0.01: a 1 degree difference for 10 seconds will result in 0.1 degree change of the integral error (KI*error*duration))
+float KD = 2.5; // Derative Gain:  Correction per every Delta K per Hour (e.g. KD=2.5: if the temp rises with 1 K per Hour, the PID will be lowered with 2.5 degrees)
