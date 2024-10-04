@@ -35,6 +35,9 @@ bool enableHotWater = true;
 bool enableCooling = false;
 float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
+float P=0;
+float I=0;
+float D=20;  
 
 // device names for mqtt autodiscovery
 const char Boiler_Temperature_Name[] = "Boiler_Temperature";   
@@ -135,6 +138,7 @@ unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat time
 unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
+unsigned long t_last_climateheartbeat=millis()-ClimateHeartbeatInMillis; // last climate heartbeat timestamp
 bool OTAUpdateInProgress=false;
 bool debug=true;
 
@@ -589,10 +593,9 @@ float getDHWFlowrate() {
   return ot.isValidResponse(response) ? ot.getFloat(response) : 0;
 }
 
-void handleOpenTherm()
+void CommunicateSteeringVarsToMQTT()
 {
-  // Check if we have to communicatie steering vars
-  if (MQTT.connected()) {
+if (MQTT.connected()) {
     // Climate Mode
     if (!climate_Mode.equals(mqtt_climate_Mode)){ // value changed
       if (climate_Mode.equals("off")) {
@@ -658,7 +661,94 @@ void handleOpenTherm()
       }
     }
   }
+}
 
+void InitPID()
+{
+  I=mqttTemperature;
+}
+
+void UpdatePID(float setpoint,float temperature)
+{
+  int dt;
+  float error;
+  float oldI=I;
+  float oldP=P;
+  float oldD=D;
+
+  //sp = setpoint, pv=current value
+
+  dt=ClimateHeartbeatInMillis/1000;
+  if (dt>10) {
+      dt=10;
+  }
+  
+  // calculate the error (sp-pv)
+  error = setpoint-temperature;
+  
+  /*calculate the measurement derivative
+  #dpv = (pv - pv_last) / dt */
+  
+  // calculate the PID output
+  P = KP * error;          // #proportional contribution
+  I = I + KI * error * dt; // #integral contribution
+  D = 0;                   // D = -KD*DeltaKPH #deritive contribution
+
+  // correct during heating when setpoint goes down when setpoint already below current temperature (or the other way around when cooling) 
+  if ((climate_Mode.equals("heat") and P+I+D<boiler_SetPoint and boiler_SetPoint<temperature) or
+      (climate_Mode.equals("cool") and P+I+D>boiler_SetPoint and boiler_SetPoint>temperature)) 
+  {
+    I=oldI;
+  } 
+
+  // Correct PID if PID above or below min/max boiler temp
+  if (P+I+D<MinBoilerTemp) {
+    // setpoint too low, correcting to absolute min
+    I=oldI;
+    P=oldP;
+    D=oldD;
+    D=MinBoilerTemp-P-I;
+  } else if (P+I+D>MaxBoilerTemp){
+    //setpoint too high, correcting to absolute max
+    I=oldI;
+    P=oldP;
+    D=oldD;
+    D=MaxBoilerTemp-P-I;
+  }
+}
+
+void handleClimateProgram()
+{
+  if (climate_Mode.equals("heat")) {
+    enableCentralHeating=true;
+    enableCooling=false;
+  } else if (climate_Mode.equals("cool")) {
+    enableCentralHeating=false;
+    enableCooling=true;
+  } else if (climate_Mode.equals("auto")) {
+    enableCentralHeating=true;
+    enableCooling=true;
+  }
+  if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
+    // there was a tick, set the PID values
+    UpdatePID(climate_SetPoint,mqttTemperature);
+
+    // reset timestamp
+    t_last_climateheartbeat=millis();
+  }
+  boiler_SetPoint=P+I+D;
+}
+
+void handleOpenTherm()
+{
+  // Set Steeringvars according to climate setpoint
+
+  if (!climate_Mode.equals("off")) {
+    handleClimateProgram();
+  } 
+  
+  // Check if we have to communicatie steering vars
+  CommunicateSteeringVarsToMQTT();
   // Handle commands
   switch (OpenThermCommand)
   {
@@ -929,6 +1019,9 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       
       // Climate  mode receive
       if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+        // Init PID calculater
+        InitPID();
+
         if (String(payloadstr).equals("off") or String(payloadstr).equals("heat") or String(payloadstr).equals("cool") or String(payloadstr).equals("auto")) {
         climate_Mode=payloadstr;
 
@@ -941,6 +1034,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         
       // Boiler Setpoint mode receive
       } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
+        // reset I value to current temp
         if (String(payloadstr).equals("off")) {
           enableCentralHeating=false;
           enableCooling=false;
