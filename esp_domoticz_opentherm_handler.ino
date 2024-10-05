@@ -1015,6 +1015,38 @@ void LogMQTT(const char* topic, const char* payloadstr, const char* length, cons
   MQTT.publish((String(host)+"/error").c_str(),("Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str(),mqttpersistence);
 }
 
+bool HandleClimateMode(const char* mode)
+{
+  bool CommandSucceeded=true;
+  // Init PID calculater
+  InitPID();
+
+  if (String(mode).equals("off") or String(mode).equals("heat") or String(mode).equals("cool") or String(mode).equals("auto")) {
+  climate_Mode=mode;
+
+  } else {
+    Error("Unknown payload for Climate mode command");
+    // sendback current mode to requester, so trick program into making it think it has to communicatie
+    mqtt_climate_Mode="abcd"; // random value, so the program thinks it is changed next time it wants to communicate
+    CommandSucceeded=false;
+  }
+  return CommandSucceeded;
+}
+
+const char* SetpointIntToString(int value) {
+  if (value==OFF) {
+    return "off";
+  } else if (value==HEAT) {
+    return "heat";
+  } else if (value==COOL) {
+    return "cool";
+  } else if (value==AUTO) {
+    return "auto";
+  } else {
+    return "unknown";
+  }
+}
+
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
   String topicstr=String(topic);
@@ -1033,25 +1065,12 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   
     if (error) {
       // Might be a string, so handle...
-      
       // Climate  mode receive
       if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
-        // Init PID calculater
-        InitPID();
-
-        if (String(payloadstr).equals("off") or String(payloadstr).equals("heat") or String(payloadstr).equals("cool") or String(payloadstr).equals("auto")) {
-        climate_Mode=payloadstr;
-
-        } else {
-          Error("Unknown payload for Climate mode command");
-          // sendback current mode to requester, so trick program into making it think it has to communicatie
-          mqtt_climate_Mode="abcd"; // random value, so the program thinks it is changed next time it wants to communicate
-          CommandSucceeded=false;
-        }
+        CommandSucceeded = HandleClimateMode(payloadstr);
         
       // Boiler Setpoint mode receive
       } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
-        // reset I value to current temp
         if (String(payloadstr).equals("off")) {
           enableCentralHeating=false;
           enableCooling=false;
@@ -1168,14 +1187,36 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       // Boiler Setpoint commands
       } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
         boiler_SetPoint=String(payloadstr).toFloat();
+      } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
+        if (doc["value"]==HEAT) {
+          enableCentralHeating=true;
+          enableCooling=false;
+        }else if (doc["value"]==COOL) {
+          enableCentralHeating=false;
+          enableCooling=true;
+        }else if (doc["value"]==AUTO) {
+          enableCentralHeating=true;
+          enableCooling=true;
+        } else { // can only be off
+          enableCentralHeating=false;
+          enableCooling=false;
+        }
 
-      //Climate Setpoint commands
+      // Climate Setpoint Commands
+      } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+        CommandSucceeded = HandleClimateMode(SetpointIntToString(int(doc["value"])));
       } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
         climate_SetPoint=String(payloadstr).toFloat();
 
-      // DHW Setpoint update temp received
+      // DHW Setpoint commands
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
         dhw_SetPoint=String(payloadstr).toFloat();
+      } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
+        if (doc["value"]==HEAT) {
+          enableHotWater=true;
+        } else {
+          enableHotWater=false;
+        }
 
       // MQTT temperature received
       } else if (topicstr.equals(mqtttemptopic)) {
