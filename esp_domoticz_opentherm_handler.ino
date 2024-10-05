@@ -719,22 +719,39 @@ void UpdatePID(float setpoint,float temperature)
 
 void handleClimateProgram()
 {
-  if (climate_Mode.equals("heat")) {
-    enableCentralHeating=true;
-    enableCooling=false;
-  } else if (climate_Mode.equals("cool")) {
-    enableCentralHeating=false;
-    enableCooling=true;
-  } else if (climate_Mode.equals("auto")) {
-    enableCentralHeating=true;
-    enableCooling=true;
-  }
+  float  roomTemperature = mqttTemperature;
+  // At every heartbeat: Set PID values
   if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
     // there was a tick, set the PID values
-    UpdatePID(climate_SetPoint,mqttTemperature);
+    UpdatePID(climate_SetPoint,roomTemperature);
 
     // reset timestamp
     t_last_climateheartbeat=millis();
+  }
+
+  // Set steering vars
+  if (climate_Mode.equals("heat")) {
+    if (P+I+D>roomTemperature+minimumTempDifference) {
+      enableCentralHeating=true;
+    } else {
+      enableCentralHeating=false;
+    }
+    enableCooling=false;
+  } else if (climate_Mode.equals("cool")) {
+    enableCentralHeating=false;
+    if (P+I+D<roomTemperature-minimumTempDifference) {
+      enableCooling=true;
+    } else {
+      enableCooling=false;
+    }
+  } else if (climate_Mode.equals("auto")) {
+    if (P+I+D<roomTemperature-minimumTempDifference or P+I+D>roomTemperature+minimumTempDifference) {
+      enableCentralHeating=true;
+      enableCooling=true;
+    } else {
+      enableCentralHeating=false;
+      enableCooling=false;
+    }
   }
   boiler_SetPoint=P+I+D;
 }

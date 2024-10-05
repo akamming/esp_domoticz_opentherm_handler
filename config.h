@@ -11,8 +11,9 @@ float ThermostatTemperatureCalibration=0;         // set to a differenct value t
 int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
 String mqttautodiscoverytopic = "homeassistant";  // On what topic are the MQTT autodiscovery messages expected
-const int MaxBoilerTemp = 50;
-const int MinBoilerTemp = 10;
+const int MaxBoilerTemp = 50;                     // Max boiler temp when in climate mode
+const int MinBoilerTemp = 10;                     // Min Boiler temp when in climate mode
+const float minimumTempDifference=3;              // Minum tempdiffernce before heating or cooling switches on
 
 // Constants for SetpointModes
 const int OFF = 0;
