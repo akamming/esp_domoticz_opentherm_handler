@@ -607,7 +607,7 @@ if (MQTT.connected()) {
       } else if (climate_Mode.equals("auto")) {
         UpdateMQTTSetpointMode(Climate_Name,AUTO);
       }
-      mqtt_climate_setpoint=climate_SetPoint;
+      mqtt_climate_Mode=climate_Mode;
     }
 
     // Climate Setpoint
@@ -1130,6 +1130,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         CommandSucceeded=false;
       }
     } else {
+      // json was decoded
+
       // Handle Enable Hotwater switch command
       if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
         // we have a match
@@ -1170,6 +1172,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       //Climate Setpoint commands
       } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
         climate_SetPoint=String(payloadstr).toFloat();
+
       // DHW Setpoint update temp received
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
         dhw_SetPoint=String(payloadstr).toFloat();
