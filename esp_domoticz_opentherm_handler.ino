@@ -33,33 +33,12 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 bool enableCentralHeating = false;
 bool enableHotWater = true;
 bool enableCooling = false;
+bool WeatherDependentMode=false;
 float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
 float P=0;
 float I=0;
 float D=20;  
-
-// device names for mqtt autodiscovery
-const char Boiler_Temperature_Name[] = "Boiler_Temperature";   
-const char DHW_Temperature_Name[] = "DHW_Temperature";   
-const char Return_Temperature_Name[] = "Return_Temperature";   
-const char Thermostat_Temperature_Name[] = "Thermostat_Temperature";   
-const char Outside_Temperature_Name[] = "Outside_Temperature";   
-const char FlameActive_Name[] = "FlameActive";   
-const char FaultActive_Name[] = "FaultActive";   
-const char DiagnosticActive_Name[] = "DiagnosticActive";   
-const char CoolingActive_Name[] = "CoolingActive";   
-const char CentralHeatingActive_Name[] = "CentralHeatingActive";   
-const char HotWaterActive_Name[] = "HotWaterActive";  
-const char EnableCooling_Name[] = "EnableCooling";   
-const char EnableCentralHeating_Name[] = "EnableCentralHeating";   
-const char EnableHotWater_Name[] = "EnableHotWater";   
-const char Boiler_Setpoint_Name[] = "Boiler_Setpoint";
-const char DHW_Setpoint_Name[] = "DHW_Setpoint";
-const char Modulation_Name[] = "Modulation";
-const char Pressure_Name[] = "Pressure";
-const char FaultCode_Name[] = "Faultcode";
-const char Climate_Name[] = "Climate";
 
 // Current Temp on Thermostat
 float currentTemperature = 0;
@@ -106,6 +85,7 @@ bool mqtt_Cooling=true;
 bool mqtt_Flame=true;
 bool mqtt_Fault=true;
 bool mqtt_Diagnostic=true;
+bool mqtt_Weather_Dependent_Mode=true;
 float mqtt_modulation=101;
 bool mqtt_enable_HotWater=false;
 bool mqtt_enable_CentralHeating=true;
@@ -316,7 +296,7 @@ String getSensors() { //Handler
   message +=",\n  \"DHWSetpoint\": " + (String(dhw_SetPoint));
   message +=",\n  \"climateSetpoint\": " + String(climate_SetPoint);
   message +=",\n  \"climateMode\": \"" + String(climate_Mode) + "\"";
-
+  message +=",\n  \"weatherDependentMode\": " + String(Weather_Dependent_Mode ? "\"on\"" : "\"off\"");
   
   // Add BoilerStatus
   message += ",\n  \"CentralHeating\": " + String(CentralHeating ? "\"on\"" : "\"off\"");
@@ -440,6 +420,7 @@ void handleSaveConfig() {
     // add/change the Climate settings
     json["climateMode"] = climate_Mode;
     json["climateSetpoint"] = climate_SetPoint;
+    json["weatherDependentMode"] = Weather_Dependent_Mode;
 
     //save the custom parameters to FS
     Debug("saving config");
@@ -589,6 +570,7 @@ void readConfig()
           climate_Mode="off";
         }
         climate_SetPoint = json["climateSetpoint"] | 20;
+        Weather_Dependent_Mode = json["weatherDependentMode"] | false;
         configFile.close();
       }
     } else {
@@ -628,6 +610,7 @@ void SaveConfig()
   // add/change the Climate settings
   json["climateMode"] = climate_Mode;
   json["climateSetpoint"] = climate_SetPoint;
+  json["weatherDependentMode"] = Weather_Dependent_Mode;
 
   // save the new file
   File configFile = LittleFS.open(CONFIGFILE, "w");
@@ -705,6 +688,8 @@ if (MQTT.connected()) {
       // Communicate to setpoint as well
       UpdateMQTTBoilerSetpointMode();
     }
+
+    // EnableCooling
     if (enableCooling!=mqtt_enable_Cooling) // value changed
     {
       UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
@@ -712,6 +697,8 @@ if (MQTT.connected()) {
       // Communicate to setpoint as well
       UpdateMQTTBoilerSetpointMode();
     }
+
+    //Enable HOt Water
     if (enableHotWater!=mqtt_enable_HotWater) // value changed
     {
       UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
@@ -722,6 +709,13 @@ if (MQTT.connected()) {
       } else  {
         UpdateMQTTSetpointMode(DHW_Setpoint_Name,0);
       }
+    }
+
+    // Weather Dependent Mode
+    if (Weather_Dependent_Mode!=mqtt_Weather_Dependent_Mode) // value changed
+    {
+      UpdateMQTTSwitch(Weather_Dependent_Mode_Name,Weather_Dependent_Mode);
+      mqtt_Weather_Dependent_Mode=Weather_Dependent_Mode;
     }
   }
 }
@@ -1222,9 +1216,22 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
         }
+      // Weather Dependent Mode command
+      } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
+        // we have a match
+        if (String(payloadstr).equals("ON")){
+          Weather_Dependent_Mode=true;
+          DelayedSaveConfig();
+        } else if (String(payloadstr).equals("OFF")) {
+          Weather_Dependent_Mode=false;
+          DelayedSaveConfig();
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
+        }
       } else {
         // apparently we needed to deserialize, so log the error
-        LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Deserialisation failed");
+        LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Command unknown");
         CommandSucceeded=false;
       }
     } else {
@@ -1259,6 +1266,19 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           enableCentralHeating=true;
         } else if (String(doc["state"]).equals("OFF")) {
           enableCentralHeating=false;
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
+        }
+      // Weather Dependent mode on or off
+      } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
+        // we have a match
+        if (String(doc["state"]).equals("ON")){
+          Weather_Dependent_Mode=true;
+          DelayedSaveConfig();
+        } else if (String(doc["state"]).equals("OFF")) {
+          Weather_Dependent_Mode=false;
+          DelayedSaveConfig();
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
@@ -1771,6 +1791,7 @@ void PublishAllMQTTSensors()
   PublishMQTTSwitch(EnableCentralHeating_Name,true);
   PublishMQTTSwitch(EnableCooling_Name,true);
   PublishMQTTSwitch(EnableHotWater_Name,true);
+  PublishMQTTSwitch(Weather_Dependent_Mode_Name,true);
 
   // Publish setpoints
   PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);

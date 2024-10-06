@@ -1,5 +1,28 @@
 // Use this file to store all application constants and default config values (can be overruled with webgui)
 
+// device names for mqtt autodiscovery
+const char Boiler_Temperature_Name[] = "Boiler_Temperature";   
+const char DHW_Temperature_Name[] = "DHW_Temperature";   
+const char Return_Temperature_Name[] = "Return_Temperature";   
+const char Thermostat_Temperature_Name[] = "Thermostat_Temperature";   
+const char Outside_Temperature_Name[] = "Outside_Temperature";   
+const char FlameActive_Name[] = "FlameActive";   
+const char FaultActive_Name[] = "FaultActive";   
+const char DiagnosticActive_Name[] = "DiagnosticActive";   
+const char CoolingActive_Name[] = "CoolingActive";   
+const char CentralHeatingActive_Name[] = "CentralHeatingActive";   
+const char HotWaterActive_Name[] = "HotWaterActive";  
+const char EnableCooling_Name[] = "EnableCooling";   
+const char EnableCentralHeating_Name[] = "EnableCentralHeating";   
+const char EnableHotWater_Name[] = "EnableHotWater";   
+const char Boiler_Setpoint_Name[] = "Boiler_Setpoint";
+const char DHW_Setpoint_Name[] = "DHW_Setpoint";
+const char Modulation_Name[] = "Modulation";
+const char Pressure_Name[] = "Pressure";
+const char FaultCode_Name[] = "Faultcode";
+const char Climate_Name[] = "Climate";
+const char Weather_Dependent_Mode_Name[] = "WeatherDependentMode";
+
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
 const int MQTTTimeoutInMillis = 15 * 1000;              // if no command was sent in this period, the program will assume the MQTT client is no longer there
@@ -11,9 +34,6 @@ float ThermostatTemperatureCalibration=0;         // set to a differenct value t
 int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
 String mqttautodiscoverytopic = "homeassistant";  // On what topic are the MQTT autodiscovery messages expected
-const int MaxBoilerTemp = 50;                     // Max boiler temp when in climate mode
-const int MinBoilerTemp = 10;                     // Min Boiler temp when in climate mode
-const float minimumTempDifference=3;              // Minum tempdiffernce before heating or cooling switches on
 const int ConfigSaveDelay=3000;                   // Number of milliseconds delay for when the climate settings are changed. (to prevent saving for every clock on the thermostat device in some UI)
 
 // Constants for SetpointModes
@@ -39,8 +59,20 @@ String mqtttemptopic = "";                        // MQTT Topic which contains t
 // Default values Climate Decice 
 float climate_SetPoint = 20;                      // default setpoint value for climate device
 String climate_Mode = "off";                      // Default mode for climate device
+bool Weather_Dependent_Mode = false;              // Default setting for weather dependent mode
 
 // PID parameters
 float KP = 30; // Proportaional gain: This is the Multiplier of  the error (e.g. KP=30: 1 degree error will result in 30 degrees change of the pid value)
 float KI = 0.01; // Integral Gain: This is the multiplier of the error (e.g. KI=0.01: a 1 degree difference for 10 seconds will result in 0.1 degree change of the integral error (KI*error*duration))
 float KD = 2.5; // Derative Gain:  Correction per every Delta K per Hour (e.g. KD=2.5: if the temp rises with 1 K per Hour, the PID will be lowered with 2.5 degrees)
+
+//Boiler settings
+const int MaxBoilerTemp = 50;                     // Max boiler temp when in climate mode
+const int MinBoilerTemp = 10;                     // Min Boiler temp when in climate mode
+const float minimumTempDifference=3;              // Minum tempdiffernce before heating or cooling switches on
+const int FrostProtectionSetPoint = 6;            // Automatically heat when in frostprotection and below this temperature
+const int BoilerTempAtPlus20 = 20;                // for calculating when in weather dependent mode
+const int BoilerTempAtMinus10 = 50;               // for calculating when in weather dependent mode
+const int Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large
+const int SwitchHeatingOffAt = 19;                // Automatic switch off when in weather dependent mode when outside temp too high
+const int ReferenceRoomCompensation = 3;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
