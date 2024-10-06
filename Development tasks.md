@@ -1,6 +1,6 @@
 # TODO
-- Implement weather dependent mode (Button there, implement logic)
 - stop heating/cooling when temp too old or no connection to mqtt
 - use internal temp as measurement for PID (optional)
 - Frost protection
 - Boiler config to UI
+- only run climate program when hotwater is inactive

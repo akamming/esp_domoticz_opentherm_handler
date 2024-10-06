@@ -33,7 +33,6 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 bool enableCentralHeating = false;
 bool enableHotWater = true;
 bool enableCooling = false;
-bool WeatherDependentMode=false;
 float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
 float P=0;
@@ -777,6 +776,32 @@ void UpdatePID(float setpoint,float temperature)
   }
 }
 
+float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
+{
+  float MaxYDelta=BoilerTempAtMinus10-BoilerTempAtPlus20; // boilertemp at -10 minus boilertemp at +20
+  float MaxXDelta=30;                                     // 20 - (-10)=30
+
+  // curve Calculation based on sine curve
+  float TargetTemperatureWithoutCurvature= (20-CurrentOutsideTemperature) / MaxXDelta * MaxYDelta + BoilerTempAtPlus20;
+  float ExtraCurvature=sin(PI*(20-CurrentOutsideTemperature)/MaxXDelta)*Curvature*MaxYDelta/100;
+  float TargetTemperature=ExtraCurvature+TargetTemperatureWithoutCurvature;
+
+  //Apply reference room compensation
+  if (ReferenceRoomCompensation>0) {
+    TargetTemperature+=(climate_SetPoint-CurrentInsideTemperature)*ReferenceRoomCompensation;
+  }
+
+  // Make sure target temp remains within set boundaries
+  if (TargetTemperature>MaxBoilerTemp) {
+    TargetTemperature=MaxBoilerTemp;
+  }
+  if (TargetTemperature<MinBoilerTemp) {
+    TargetTemperature=MinBoilerTemp;
+  }
+
+  return TargetTemperature;
+}
+
 void handleClimateProgram()
 {
   float  roomTemperature = mqttTemperature;
@@ -789,9 +814,18 @@ void handleClimateProgram()
     t_last_climateheartbeat=millis();
   }
 
-  // Set steering vars
+  // Calculate BoilerSetpoint
+  if (Weather_Dependent_Mode) {
+    // calculate Setpoint based on outside temp
+    boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(mqttTemperature,outside_Temperature);
+  } else {
+    // set Setpoint to PID
+    boiler_SetPoint=P+I+D;
+  }
+
+  // Enable heating and/or cooling
   if (climate_Mode.equals("heat")) {
-    if (P+I+D>roomTemperature+minimumTempDifference) {
+    if (boiler_SetPoint>roomTemperature+minimumTempDifference) {
       enableCentralHeating=true;
     } else {
       enableCentralHeating=false;
@@ -799,13 +833,13 @@ void handleClimateProgram()
     enableCooling=false;
   } else if (climate_Mode.equals("cool")) {
     enableCentralHeating=false;
-    if (P+I+D<roomTemperature-minimumTempDifference) {
+    if (boiler_SetPoint<roomTemperature-minimumTempDifference) {
       enableCooling=true;
     } else {
       enableCooling=false;
     }
   } else if (climate_Mode.equals("auto")) {
-    if (P+I+D<roomTemperature-minimumTempDifference or P+I+D>roomTemperature+minimumTempDifference) {
+    if (boiler_SetPoint<roomTemperature-minimumTempDifference or boiler_SetPoint>roomTemperature+minimumTempDifference) {
       enableCentralHeating=true;
       enableCooling=true;
     } else {
@@ -813,7 +847,6 @@ void handleClimateProgram()
       enableCooling=false;
     }
   }
-  boiler_SetPoint=P+I+D;
 }
 
 void handleOpenTherm()
@@ -1224,6 +1257,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           DelayedSaveConfig();
         } else if (String(payloadstr).equals("OFF")) {
           Weather_Dependent_Mode=false;
+          I=mqttTemperature;
           DelayedSaveConfig();
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
@@ -1278,6 +1312,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           DelayedSaveConfig();
         } else if (String(doc["state"]).equals("OFF")) {
           Weather_Dependent_Mode=false;
+          I=mqttTemperature;
           DelayedSaveConfig();
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
