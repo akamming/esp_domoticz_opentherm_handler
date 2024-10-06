@@ -140,7 +140,9 @@ unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP com
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=millis()-ClimateHeartbeatInMillis; // last climate heartbeat timestamp
 bool OTAUpdateInProgress=false;
+bool temperatureReceived=false;
 bool debug=true;
+float insideTempAt[60];
 
 // objects to be used by program
 ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
@@ -617,7 +619,7 @@ if (MQTT.connected()) {
     }
 
     // The actual temperature for the climate device. Now the temp required from mqtt. But should be made switchable to other sources 
-    if (mqttTemperature!=mqtt_mqttTemperature) {
+    if (mqttTemperature!=mqtt_mqttTemperature and temperatureReceived) {
       UpdateMQTTSetpointTemperature(Climate_Name,mqttTemperature);
       mqtt_mqttTemperature=mqttTemperature;
     }
@@ -671,7 +673,9 @@ void InitPID()
 void UpdatePID(float setpoint,float temperature)
 {
   int dt;
+  int CurrentMinute;
   float error;
+  float DeltaKPH;
   float oldI=I;
   float oldP=P;
   float oldD=D;
@@ -685,14 +689,15 @@ void UpdatePID(float setpoint,float temperature)
   
   // calculate the error (sp-pv)
   error = setpoint-temperature;
-  
-  /*calculate the measurement derivative
-  #dpv = (pv - pv_last) / dt */
+
+  // calculate he amount of rising/dropping temp
+  CurrentMinute=(millis() % 60000 / 1000);
+  DeltaKPH = (mqttTemperature-insideTempAt[(CurrentMinute+45)%60])*4;  // tempchange the last 15 mins mutltiplied by 4 is the number of kelvin per hour the temp is currently dropping or rising
   
   // calculate the PID output
-  P = KP * error;          // #proportional contribution
-  I = I + KI * error * dt; // #integral contribution
-  D = 0;                   // D = -KD*DeltaKPH #deritive contribution
+  P = KP * error;          // proportional contribution
+  I = I + KI * error * dt; // integral contribution
+  D = -KD*DeltaKPH;        // deritive contribution
 
   // correct during heating when setpoint goes down when setpoint already below current temperature (or the other way around when cooling) 
   if ((climate_Mode.equals("heat") and P+I+D<boiler_SetPoint and boiler_SetPoint<temperature) or
@@ -758,14 +763,6 @@ void handleClimateProgram()
 
 void handleOpenTherm()
 {
-  // Set Steeringvars according to climate setpoint
-
-  if (!climate_Mode.equals("off")) {
-    handleClimateProgram();
-  } 
-  
-  // Check if we have to communicatie steering vars
-  CommunicateSteeringVarsToMQTT();
   // Handle commands
   switch (OpenThermCommand)
   {
@@ -1047,6 +1044,21 @@ const char* SetpointIntToString(int value) {
   }
 }
 
+void SetMQTTTemperature(float value) {
+  // Handle actions if first time received
+  if (!temperatureReceived) {
+    Debug("resetting insidetemp matrix to "+String(value));
+    // Set  InsideTempAt array at default value (currenttemp)
+    for (int i=0;i<60;i++) {
+      insideTempAt[i]=value;
+    }
+    temperatureReceived=true; // Make sure we do this only once ;-)
+  }
+  // Set mqttTemperature
+  mqttTemperature=value; 
+}
+
+
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
   String topicstr=String(topic);
@@ -1220,7 +1232,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
       // MQTT temperature received
       } else if (topicstr.equals(mqtttemptopic)) {
-        mqttTemperature=doc["value"]; 
+        SetMQTTTemperature(doc["value"]);
+      
       // Unknown command
       } else {
         LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
@@ -1854,6 +1867,22 @@ void loop()
       // handle MDNS
       MDNS.update();
     }
+
+    // Remember last hour of temperatures (PID calculation needs to be able te determine if temperature is rising or dropping)
+    {
+      if (temperatureReceived) {
+        int CurrentMinute=(millis() % 60000) / 1000;
+        insideTempAt[CurrentMinute] = mqttTemperature;   
+      }
+    }
+
+    // Handle CLimate program (if switched on);
+    if (!climate_Mode.equals("off")) { 
+      handleClimateProgram();
+    } 
+    
+    // Check if we have to communicatie steering vars
+    CommunicateSteeringVarsToMQTT();
 
     // handle openthem commands
     handleOpenTherm();
