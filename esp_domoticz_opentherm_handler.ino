@@ -139,6 +139,8 @@ unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT com
 unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=millis()-ClimateHeartbeatInMillis; // last climate heartbeat timestamp
+unsigned long t_save_config; // timestamp for delayed save
+bool ClimateConfigSaved=false;
 bool OTAUpdateInProgress=false;
 bool temperatureReceived=false;
 bool debug=true;
@@ -549,10 +551,10 @@ void readConfig()
 {
   if (LittleFS.exists(CONFIGFILE)) {
     //file exists, reading and loading
-    Serial.println("reading config file");
+    Debug("reading config file");
     File configFile = LittleFS.open(CONFIGFILE, "r");
     if (configFile) {
-      Serial.println("opened config file");
+      Debug("opened config file");
       size_t size = configFile.size();
       // Allocate a buffer to store contents of the file.
       std::unique_ptr<char[]> buf(new char[size]);
@@ -563,7 +565,7 @@ void readConfig()
       auto deserializeError = deserializeJson(json, buf.get());
       serializeJson(json, Serial);
       if ( ! deserializeError ) {
-        Serial.println("\nparsed json");
+        Debug("\nparsed json");
         usemqtt=json["usemqtt"] | false;
         usemqttauthentication=json["usemqttauthentication"] | false;
         mqttserver=json["mqttserver"].as<String>();
@@ -576,13 +578,63 @@ void readConfig()
         OneWireBus=json["temppin"] | 14;
         mqtttemptopic=json["mqtttemptopic"].as<String>();
         debug=json["debugtomqtt"] | true;
+        climate_Mode = json["climateMode"].as<String>();
+        if (climate_Mode.equals("null")) { //if not present, null will be the value, so change to off
+          climate_Mode="off";
+        }
+        climate_SetPoint = json["climateSetpoint"] | 20;
+        configFile.close();
+      }
+    } else {
+        Debug("failed to load json config");
+    }
+  }
+}
+
+void saveConfig()
+{
+  JsonDocument json;
+
+  // first: Try to existing into json structure (prevent overwriting, we just want to add/change the climate settings in the config)
+
+  if (LittleFS.exists(CONFIGFILE)) {
+    //file exists, reading and loading
+    Debug("reading config file");
+    File configFile = LittleFS.open(CONFIGFILE, "r");
+    if (configFile) {
+      Serial.println("opened config file");
+      size_t size = configFile.size();
+      // Allocate a buffer to store contents of the file.
+      std::unique_ptr<char[]> buf(new char[size]);
+
+      configFile.readBytes(buf.get(), size);
+
+      auto deserializeError = deserializeJson(json, buf.get());
+      if ( ! deserializeError ) {
+        Debug("parsed json");
       } else {
-        Serial.println("failed to load json config");
+        Debug("failed to load json config");
       }
       configFile.close();
     }
   }
+
+  // add/change the Climate settings
+  json["climateMode"] = climate_Mode;
+  json["climateSetpoint"] = climate_SetPoint;
+
+  // save the new file
+  File configFile = LittleFS.open(CONFIGFILE, "w");
+  if (!configFile) {
+    Debug("unable to open "+String(CONFIGFILE));
+  } else {
+    // Save the file
+    serializeJson(json, configFile);
+    configFile.close();
+    Debug("Configfile saved");
+  }    
 }
+
 
 // not defined  in opentherm lib, so declaring local
 float getOutsideTemperature() {
@@ -1020,6 +1072,7 @@ bool HandleClimateMode(const char* mode)
 
   if (String(mode).equals("off") or String(mode).equals("heat") or String(mode).equals("cool") or String(mode).equals("auto")) {
   climate_Mode=mode;
+  saveConfig();
 
   } else {
     Error("Unknown payload for Climate mode command");
@@ -1219,6 +1272,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         CommandSucceeded = HandleClimateMode(SetpointIntToString(int(doc["value"])));
       } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
         climate_SetPoint=String(payloadstr).toFloat();
+        saveConfig();
 
       // DHW Setpoint commands
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
