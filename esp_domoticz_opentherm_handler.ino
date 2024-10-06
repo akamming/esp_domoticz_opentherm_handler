@@ -140,7 +140,7 @@ unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP com
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=millis()-ClimateHeartbeatInMillis; // last climate heartbeat timestamp
 unsigned long t_save_config; // timestamp for delayed save
-bool ClimateConfigSaved=false;
+bool ClimateConfigSaved=true;
 bool OTAUpdateInProgress=false;
 bool temperatureReceived=false;
 bool debug=true;
@@ -473,6 +473,7 @@ void handleRemoveConfig() {
     Serial.println("Config file existst, removing configfile");
     LittleFS.remove(CONFIGFILE);
     server.send(200, "text/plain", "Config file removed");
+    Debug("Configfile removed");
     delay(500); // wait for server send to finish
     ESP.restart(); // restart
   } else {
@@ -596,11 +597,11 @@ void readConfig()
   }
 }
 
-void saveConfig()
+void SaveConfig()
 {
   JsonDocument json;
 
-  // first: Try to existing into json structure (prevent overwriting, we just want to add/change the climate settings in the config)
+  // first: Try to load existing configfile into json structure (prevent overwriting settings, we just want to add/change the climate settings in the config)
 
   if (LittleFS.exists(CONFIGFILE)) {
     //file exists, reading and loading
@@ -637,7 +638,10 @@ void saveConfig()
     serializeJson(json, configFile);
     configFile.close();
     Debug("Configfile saved");
-  }    
+  }  
+
+  ClimateConfigSaved=true;
+  
 }
 
 
@@ -1077,7 +1081,7 @@ bool HandleClimateMode(const char* mode)
 
   if (String(mode).equals("off") or String(mode).equals("heat") or String(mode).equals("cool") or String(mode).equals("auto")) {
   climate_Mode=mode;
-  saveConfig();
+  DelayedSaveConfig();
 
   } else {
     Error("Unknown payload for Climate mode command");
@@ -1116,6 +1120,11 @@ void SetMQTTTemperature(float value) {
   mqttTemperature=value; 
 }
 
+void DelayedSaveConfig() 
+{
+  t_save_config = millis()+ConfigSaveDelay; // timestamp for delayed save
+  ClimateConfigSaved=false;
+}
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
@@ -1277,7 +1286,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         CommandSucceeded = HandleClimateMode(SetpointIntToString(int(doc["value"])));
       } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
         climate_SetPoint=String(payloadstr).toFloat();
-        saveConfig();
+        DelayedSaveConfig();
 
       // DHW Setpoint commands
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
@@ -1891,6 +1900,11 @@ void loop()
 
   // update Uptime
   updateTime();
+
+  // Check if we have to save the config
+  if ((!ClimateConfigSaved) and (millis()>t_save_config)) {
+    SaveConfig();
+  }
 
   // don't do anything if we are doing if OTA upgrade is in progress
   if (!OTAUpdateInProgress) {

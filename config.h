@@ -14,6 +14,7 @@ String mqttautodiscoverytopic = "homeassistant";  // On what topic are the MQTT 
 const int MaxBoilerTemp = 50;                     // Max boiler temp when in climate mode
 const int MinBoilerTemp = 10;                     // Min Boiler temp when in climate mode
 const float minimumTempDifference=3;              // Minum tempdiffernce before heating or cooling switches on
+const int ConfigSaveDelay=3000;                   // Number of milliseconds delay for when the climate settings are changed. (to prevent saving for every clock on the thermostat device in some UI)
 
 // Constants for SetpointModes
 const int OFF = 0;
