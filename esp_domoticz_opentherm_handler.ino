@@ -432,19 +432,24 @@ void handleSaveConfig() {
     server.send(500, "text/plain", Message.c_str());
     return;
   } else {
-    //save the custom parameters to FS
-    Serial.println("saving config");
+    // if password was not changed: leave old password in file
+    if (json["mqttpass"]=="*****") {
+      json["mqttpass"]=mqttpass;
+    }
 
+    // add/change the Climate settings
+    json["climateMode"] = climate_Mode;
+    json["climateSetpoint"] = climate_SetPoint;
+
+    //save the custom parameters to FS
+    Debug("saving config");
     File configFile = LittleFS.open(CONFIGFILE, "w");
     if (!configFile) {
       server.send(500, "text/plain", "failed to open config file for writing");
       return;
     } else {
-      // if password was not changed: leave old password in file
-      if (json["mqttpass"]=="*****") {
-        json["mqttpass"]=mqttpass;
-      }
       
+      // Save the file!
       serializeJson(json, configFile);
       configFile.close();
 
