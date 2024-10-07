@@ -44,7 +44,7 @@
         <br /><b>MQTT</b><br />
         <label><input type="checkbox" name="mqttenabled" id="mqttenabled" onchange="onmqttenabledchanged()">Enabled</label><br />
         Server <input type="text" class="hn_input" id="mqttserver" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
-        Port <input type="number" class="port_input" id="mqttport" size="10" onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        Port <input type="number" class="port_input" id="mqttport" size="10" disabled><br />
         <label><input type="checkbox" name="usemqttauthentication" id="usemqttauthentication" onchange="onusemqttauthenticationchanged()" disabled>Use Authentication</label><br />
         Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
@@ -270,9 +270,12 @@
                     }
                 };
                 var obj = new Object();
+                // device config
                 obj.inpin = +document.getElementById('inpin').value;
                 obj.outpin = +document.getElementById('outpin').value;
                 obj.temppin = +document.getElementById('temppin').value;
+
+                // mqtt config
                 obj.usemqtt = document.getElementById('mqttenabled').checked;
                 obj.mqttserver = document.getElementById('mqttserver').value;
                 obj.mqttport = +document.getElementById('mqttport').value;
@@ -282,6 +285,18 @@
                 obj.mqttretained = document.getElementById('mqttretained').checked;
                 obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
                 obj.debugtomqtt = document.getElementById('debugtomqtt').checked;
+
+                // boiler Config
+                 obj.MinBoilerTemp = document.getElementById('MinBoilerTemp').value;
+                 obj.MaxBoilerTemp = document.getElementById('MaxBoilerTemp').value;
+                 obj.minimumTempDifference = document.getElementById('minimumTempDifference').value;
+                 obj.FrostProtectionSetPoint = document.getElementById('FrostProtectionSetPoint').value;
+                 obj.BoilerTempAtPlus20 = document.getElementById('BoilerTempAtPlus20').value;
+                 obj.BoilerTempAtMinus10 = document.getElementById('BoilerTempAtMinus10').value;
+                 obj.Curvature = document.getElementById('Curvature').value;
+                 obj.SwitchHeatingOffAt = document.getElementById('SwitchHeatingOffAt').value;
+                 obj.ReferenceRoomCompensation = document.getElementById('ReferenceRoomCompensation').value;
+
                 var data = JSON.stringify(obj);
                 xhttp.send(data);
             }

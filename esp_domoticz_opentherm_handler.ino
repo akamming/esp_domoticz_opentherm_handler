@@ -117,7 +117,7 @@ unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat time
 unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
-unsigned long t_last_climateheartbeat=millis()-ClimateHeartbeatInMillis; // last climate heartbeat timestamp
+unsigned long t_last_climateheartbeat=0; // last climate heartbeat timestamp
 unsigned long t_save_config; // timestamp for delayed save
 bool ClimateConfigSaved=true;
 bool OTAUpdateInProgress=false;
@@ -393,8 +393,8 @@ void handleGetConfig()
   json["mqttretained"] = mqttpersistence;  
 
   // Boiler Control Settings
-  json["MinimumBoilerTemp"] = MinBoilerTemp;
-  json["MaximumBoilerTemp"] = MaxBoilerTemp;
+  json["MinBoilerTemp"] = MinBoilerTemp;
+  json["MaxBoilerTemp"] = MaxBoilerTemp;
   json["minimumTempDifference"] = minimumTempDifference;
   json["FrostProtectionSetPoint"] = 6;
   json["BoilerTempAtPlus20"] = BoilerTempAtPlus20;
@@ -804,7 +804,6 @@ void UpdatePID(float setpoint,float temperature)
     D=oldD;
     D=MaxBoilerTemp-P-I;
   }
-  // Debug("P="+String(P)+", I="+String(I)+", D="+String(D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -842,6 +841,8 @@ void handleClimateProgram()
     if (!HotWater) {
       UpdatePID(climate_SetPoint,roomTemperature);
     }
+    // Debug("P="+String(P)+", I="+String(I)+", D="+String(D));
+
     // reset timestamp
     t_last_climateheartbeat=millis();
   }
