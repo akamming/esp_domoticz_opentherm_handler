@@ -73,6 +73,6 @@ const float minimumTempDifference=3;              // Minum tempdiffernce before 
 const int FrostProtectionSetPoint = 6;            // Automatically heat when in frostprotection and below this temperature
 const int BoilerTempAtPlus20 = 20;                // for calculating when in weather dependent mode
 const int BoilerTempAtMinus10 = 50;               // for calculating when in weather dependent mode
-const int Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large
+const int Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 const int SwitchHeatingOffAt = 19;                // Automatic switch off when in weather dependent mode when outside temp too high
 const int ReferenceRoomCompensation = 3;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 

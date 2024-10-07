@@ -355,11 +355,27 @@ void handleGetInfo()
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
+String getCurvatureStringFromInt(int i) 
+{
+  if (i==0) {
+    return "none";
+  } else if (i==10) {
+    return "small";
+  } else if (i==20) {
+    return "medium";
+  } else if (i==30) {
+    return "large";
+  } else if (i==40) {
+    return "extralarge";
+  } else {
+    return "none";
+  }
+}
+
 void handleGetConfig()
 {
   Serial.println("GetConfig");
   JsonDocument json;
-  char buf[512];
 
   // gpio config
   json["inpin"] = inPin;
@@ -376,6 +392,17 @@ void handleGetConfig()
   json["mqttpass"] = "*****"; // This is the only not allowed password, password will only be saved if it is not 5 stars
   json["mqttretained"] = mqttpersistence;  
 
+  // Boiler Control Settings
+  json["MinimumBoilerTemp"] = MinBoilerTemp;
+  json["MaximumBoilerTemp"] = MaxBoilerTemp;
+  json["minimumTempDifference"] = minimumTempDifference;
+  json["FrostProtectionSetPoint"] = 6;
+  json["BoilerTempAtPlus20"] = BoilerTempAtPlus20;
+  json["BoilerTempAtMinus10"] = BoilerTempAtMinus10; 
+  json["Curvature"] = getCurvatureStringFromInt(Curvature);
+  json["SwitchHeatingOffAt"] = SwitchHeatingOffAt;
+  json["ReferenceRoomCompensation"] = ReferenceRoomCompensation;
+
   // Add some General status info 
   if (MQTT.connected())
   {
@@ -389,6 +416,9 @@ void handleGetConfig()
   json["heap"] = ESP.getFreeHeap();
   json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
 
+
+  // Send output
+  char buf[1024];
   serializeJson(json, buf); 
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
