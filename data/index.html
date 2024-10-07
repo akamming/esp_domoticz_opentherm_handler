@@ -219,6 +219,18 @@
                     document.getElementById('mqtttemptopic').value = json.mqtttemptopic;
                     document.getElementById('mqttretained').checked = json.mqttretained;
                     document.getElementById('debugtomqtt').checked = json.debugtomqtt;
+
+                    // get boiler Config
+                    document.getElementById('MinBoilerTemp').value = json.MinBoilerTemp;
+                    document.getElementById('MaxBoilerTemp').value = json.MaxBoilerTemp;
+                    document.getElementById('minimumTempDifference').value = json.minimumTempDifference;
+                    document.getElementById('FrostProtectionSetPoint').value = json.FrostProtectionSetPoint;
+                    document.getElementById('BoilerTempAtPlus20').value = json.BoilerTempAtPlus20;
+                    document.getElementById('BoilerTempAtMinus10').value = json.BoilerTempAtMinus10;
+                    document.getElementById('Curvature').value = json.Curvature;
+                    document.getElementById('SwitchHeatingOffAt').value = json.SwitchHeatingOffAt;
+                    document.getElementById('ReferenceRoomCompensation').value = json.ReferenceRoomCompensation;
+
                     onmqttenabledchanged(); // enable the correct fields
                 }
             };
