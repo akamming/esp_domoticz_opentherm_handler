@@ -807,9 +807,10 @@ void handleClimateProgram()
   float  roomTemperature = mqttTemperature;
   // At every heartbeat: Set PID values
   if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
-    // there was a tick, set the PID values
-    UpdatePID(climate_SetPoint,roomTemperature);
-
+    // Check if we have to update the PID (only when boiler not in hotwater mode)
+    if (!HotWater) {
+      UpdatePID(climate_SetPoint,roomTemperature);
+    }
     // reset timestamp
     t_last_climateheartbeat=millis();
   }
