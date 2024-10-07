@@ -1142,6 +1142,7 @@ void SetMQTTTemperature(float value) {
     for (int i=0;i<60;i++) {
       insideTempAt[i]=value;
     }
+    InitPID();
     temperatureReceived=true; // Make sure we do this only once ;-)
   }
   // Set mqttTemperature
