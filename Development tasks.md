@@ -3,3 +3,4 @@
 - use internal temp as measurement for PID (optional)
 - Frost protection
 - Boiler config to UI
+- first climate heartbeat earlier

@@ -774,6 +774,7 @@ void UpdatePID(float setpoint,float temperature)
     D=oldD;
     D=MaxBoilerTemp-P-I;
   }
+  // Debug("P="+String(P)+", I="+String(I)+", D="+String(D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -1142,11 +1143,11 @@ void SetMQTTTemperature(float value) {
     for (int i=0;i<60;i++) {
       insideTempAt[i]=value;
     }
-    InitPID();
     temperatureReceived=true; // Make sure we do this only once ;-)
   }
   // Set mqttTemperature
   mqttTemperature=value; 
+  InitPID();
 }
 
 void DelayedSaveConfig() 
