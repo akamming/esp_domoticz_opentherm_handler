@@ -878,49 +878,75 @@ float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, fl
 void handleClimateProgram()
 {
   float  roomTemperature = mqttTemperature;
-  // At every heartbeat: Set PID values
-  if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
-    // Check if we have to update the PID (only when boiler not in hotwater mode)
-    if (!HotWater) {
-      UpdatePID(climate_SetPoint,roomTemperature);
+
+  if (climate_Mode.equals("off")) { 
+    // Frost protection mode
+    if (roomTemperature<FrostProtectionSetPoint) {
+      // we need to act
+
+      // Update PID
+      if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
+        // Check if we have to update the PID (only when boiler not in hotwater mode)
+        if (!HotWater) {
+          UpdatePID(FrostProtectionSetPoint,roomTemperature);
+        }
+        Debug("Frost protection: P = "+String(P)+", I="+String(I)+", D="+String(D));
+
+        // reset timestamp
+        t_last_climateheartbeat=millis();
+      }
+
+      // set boiler steering vars
+      enableCentralHeating=true;
+      boiler_SetPoint=P+I+D;
     }
-    // Debug("P="+String(P)+", I="+String(I)+", D="+String(D));
 
-    // reset timestamp
-    t_last_climateheartbeat=millis();
-  }
-
-  // Calculate BoilerSetpoint
-  if (Weather_Dependent_Mode) {
-    // calculate Setpoint based on outside temp
-    boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(mqttTemperature,outside_Temperature);
   } else {
-    // set Setpoint to PID
-    boiler_SetPoint=P+I+D;
-  }
+    // Some kind of Climate mode
 
-  // Enable heating and/or cooling
-  if (climate_Mode.equals("heat")) {
-    if (boiler_SetPoint>roomTemperature+minimumTempDifference) {
-      enableCentralHeating=true;
-    } else {
-      enableCentralHeating=false;
+    // At every heartbeat: Set PID values
+    if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
+      // Check if we have to update the PID (only when boiler not in hotwater mode)
+      if (!HotWater) {
+        UpdatePID(climate_SetPoint,roomTemperature);
+      }
+
+      // reset timestamp
+      t_last_climateheartbeat=millis();
     }
-    enableCooling=false;
-  } else if (climate_Mode.equals("cool")) {
-    enableCentralHeating=false;
-    if (boiler_SetPoint<roomTemperature-minimumTempDifference) {
-      enableCooling=true;
+
+    // Calculate BoilerSetpoint
+    if (Weather_Dependent_Mode) {
+      // calculate Setpoint based on outside temp
+      boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(mqttTemperature,outside_Temperature);
     } else {
-      enableCooling=false;
+      // set Setpoint to PID
+      boiler_SetPoint=P+I+D;
     }
-  } else if (climate_Mode.equals("auto")) {
-    if (boiler_SetPoint<roomTemperature-minimumTempDifference or boiler_SetPoint>roomTemperature+minimumTempDifference) {
-      enableCentralHeating=true;
-      enableCooling=true;
-    } else {
-      enableCentralHeating=false;
+
+    // Enable heating and/or cooling
+    if (climate_Mode.equals("heat")) {
+      if (boiler_SetPoint>roomTemperature+minimumTempDifference) {
+        enableCentralHeating=true;
+      } else {
+        enableCentralHeating=false;
+      }
       enableCooling=false;
+    } else if (climate_Mode.equals("cool")) {
+      enableCentralHeating=false;
+      if (boiler_SetPoint<roomTemperature-minimumTempDifference) {
+        enableCooling=true;
+      } else {
+        enableCooling=false;
+      }
+    } else if (climate_Mode.equals("auto")) {
+      if (boiler_SetPoint<roomTemperature-minimumTempDifference or boiler_SetPoint>roomTemperature+minimumTempDifference) {
+        enableCentralHeating=true;
+        enableCooling=true;
+      } else {
+        enableCentralHeating=false;
+        enableCooling=false;
+      }
     }
   }
 }
@@ -2082,10 +2108,8 @@ void loop()
       }
     }
 
-    // Handle CLimate program (if switched on);
-    if (!climate_Mode.equals("off")) { 
-      handleClimateProgram();
-    } 
+    // Handle CLimate program 
+    handleClimateProgram(); 
     
     // Check if we have to communicatie steering vars
     CommunicateSteeringVarsToMQTT();
