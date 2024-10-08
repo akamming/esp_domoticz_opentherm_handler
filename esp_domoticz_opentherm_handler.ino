@@ -396,10 +396,11 @@ void handleGetConfig()
   json["MinBoilerTemp"] = MinBoilerTemp;
   json["MaxBoilerTemp"] = MaxBoilerTemp;
   json["minimumTempDifference"] = minimumTempDifference;
-  json["FrostProtectionSetPoint"] = 6;
+  json["FrostProtectionSetPoint"] = FrostProtectionSetPoint;
   json["BoilerTempAtPlus20"] = BoilerTempAtPlus20;
   json["BoilerTempAtMinus10"] = BoilerTempAtMinus10; 
   json["Curvature"] = getCurvatureStringFromInt(Curvature);
+  json["CurvatureInt"] = Curvature;
   json["SwitchHeatingOffAt"] = SwitchHeatingOffAt;
   json["ReferenceRoomCompensation"] = ReferenceRoomCompensation;
 
@@ -563,6 +564,22 @@ void handleNotFound()
   }
 }
 
+int getCurvatureIntFromString(String value) {
+  if (value=="none") {
+    return 0;
+  } else if (value=="small") {
+    return 10;
+  } else if (value=="medium") {
+    return 20;
+  } else if (value=="large") {
+    return 30;
+  } else if (value=="extralarge") {
+    return 40;
+  } else {
+    return 10;
+  }
+}
+
 void readConfig()
 {
   if (LittleFS.exists(CONFIGFILE)) {
@@ -570,7 +587,6 @@ void readConfig()
     Debug("reading config file");
     File configFile = LittleFS.open(CONFIGFILE, "r");
     if (configFile) {
-      Debug("opened config file");
       size_t size = configFile.size();
       // Allocate a buffer to store contents of the file.
       std::unique_ptr<char[]> buf(new char[size]);
@@ -581,7 +597,7 @@ void readConfig()
       auto deserializeError = deserializeJson(json, buf.get());
       serializeJson(json, Serial);
       if ( ! deserializeError ) {
-        Debug("\nparsed json");
+        // mqtt config
         usemqtt=json["usemqtt"] | false;
         usemqttauthentication=json["usemqttauthentication"] | false;
         mqttserver=json["mqttserver"].as<String>();
@@ -589,17 +605,34 @@ void readConfig()
         mqttuser=json["mqttuser"].as<String>();
         mqttpass=json["mqttpass"].as<String>();
         mqttpersistence=json["mqttretained"];
+        
+        //device config
         inPin=json["inpin"] | 4;
         outPin=json["outpin"] | 5;
         OneWireBus=json["temppin"] | 14;
         mqtttemptopic=json["mqtttemptopic"].as<String>();
         debug=json["debugtomqtt"] | true;
+
+        // Boiler Control Settings
+        MinBoilerTemp = json["MinBoilerTemp"] | 10;
+        MaxBoilerTemp = json["MaxBoilerTemp"] | 50;
+        minimumTempDifference = json["minimumTempDifference"] | 3;
+        FrostProtectionSetPoint = json["FrostProtectionSetPoint"] | 6;
+        BoilerTempAtPlus20 = json["BoilerTempAtPlus20"] | 20;
+        BoilerTempAtMinus10 = json["BoilerTempAtMinus10"] | 50;  
+        Curvature=getCurvatureIntFromString(json["Curvature"] | "small");
+        SwitchHeatingOffAt = json["SwitchHeatingOffAt"] | 19;
+        ReferenceRoomCompensation = json["ReferenceRoomCompensation"] | 3;
+
+        // persistent climate mode
         climate_Mode = json["climateMode"].as<String>();
         if (climate_Mode.equals("null")) { //if not present, null will be the value, so change to off
           climate_Mode="off";
         }
         climate_SetPoint = json["climateSetpoint"] | 20;
         Weather_Dependent_Mode = json["weatherDependentMode"] | false;
+
+        // close the file
         configFile.close();
       }
     } else {
