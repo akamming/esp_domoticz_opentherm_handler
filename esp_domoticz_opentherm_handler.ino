@@ -392,6 +392,11 @@ void handleGetConfig()
   json["mqttpass"] = "*****"; // This is the only not allowed password, password will only be saved if it is not 5 stars
   json["mqttretained"] = mqttpersistence;  
 
+  // PID settings
+  json["KP"] = KP;
+  json["KI"] = KI;
+  json["KD"] = KD; 
+
   // Boiler Control Settings
   json["MinBoilerTemp"] = MinBoilerTemp;
   json["MaxBoilerTemp"] = MaxBoilerTemp;
@@ -612,6 +617,11 @@ void readConfig()
         OneWireBus=json["temppin"] | 14;
         mqtttemptopic=json["mqtttemptopic"].as<String>();
         debug=json["debugtomqtt"] | true;
+
+        // PID Settings
+        KP = json["KP"] | 30;
+        KI = json["KI"] | 0.01;
+        KD = json["KD"] | 2.5;
 
         // Boiler Control Settings
         MinBoilerTemp = json["MinBoilerTemp"] | 10;

@@ -62,6 +62,11 @@
         Minimum Temp Difference <input type="number" class="pin_input" id="minimumTempDifference" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         FrostProtection SetPoint <input type="number" class="pin_input" id="FrostProtectionSetPoint" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         <br />
+        <b>PID parameters</b><br />
+        Proportional Gain (KP) <input type="number" class="pin_input" id="KP" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Integral Gain (KI) <input type="number" class="pin_input" id="KI" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Derative Gain (KD) <input type="number" class="pin_input" id="KD" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <br />
         <b>Weather Dependent Mode</b><br />
         BoilerTempAtPlus20 <input type="number" class="pin_input" id="BoilerTempAtPlus20" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         BoilerTempAtMinus10 <input type="number" class="pin_input" id="BoilerTempAtMinus10" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
@@ -221,6 +226,11 @@
                     document.getElementById('debugtomqtt').checked = json.debugtomqtt;
 
                     // get boiler Config
+                    document.getElementById('KP').value = +json.KP;
+                    document.getElementById('KI').value = +json.KI;
+                    document.getElementById('KD').value = +json.KD;
+
+                    // get boiler Config
                     document.getElementById('MinBoilerTemp').value = +json.MinBoilerTemp;
                     document.getElementById('MaxBoilerTemp').value = +json.MaxBoilerTemp;
                     document.getElementById('minimumTempDifference').value = +json.minimumTempDifference;
@@ -252,8 +262,9 @@
 
         function saveSettings() {
             var server = document.getElementById('mqttserver').value;
-            if (!isValidIP(server)) {
-                alert("Invalid IP Adres!");
+            var usemqtt = document.getElementById('mqttenabled').checked;
+            if (usemqtt && !isValidIP(server)) {
+                alert("MQTT Server has Invalid IP Adres!");
                 return;
             } else {
                 // Sending and receiving data in JSON format using POST method
@@ -287,15 +298,20 @@
                 obj.debugtomqtt = document.getElementById('debugtomqtt').checked;
 
                 // boiler Config
-                 obj.MinBoilerTemp = +document.getElementById('MinBoilerTemp').value;
-                 obj.MaxBoilerTemp = +document.getElementById('MaxBoilerTemp').value;
-                 obj.minimumTempDifference = +document.getElementById('minimumTempDifference').value;
-                 obj.FrostProtectionSetPoint = +document.getElementById('FrostProtectionSetPoint').value;
-                 obj.BoilerTempAtPlus20 = +document.getElementById('BoilerTempAtPlus20').value;
-                 obj.BoilerTempAtMinus10 = +document.getElementById('BoilerTempAtMinus10').value;
-                 obj.Curvature = document.getElementById('Curvature').value;
-                 obj.SwitchHeatingOffAt = +document.getElementById('SwitchHeatingOffAt').value;
-                 obj.ReferenceRoomCompensation = +document.getElementById('ReferenceRoomCompensation').value;
+                obj.KP = +document.getElementById('KP').value;
+                obj.KI = +document.getElementById('KI').value;
+                obj.KD = +document.getElementById('KD').value;
+
+                // boiler Config
+                obj.MinBoilerTemp = +document.getElementById('MinBoilerTemp').value;
+                obj.MaxBoilerTemp = +document.getElementById('MaxBoilerTemp').value;
+                obj.minimumTempDifference = +document.getElementById('minimumTempDifference').value;
+                obj.FrostProtectionSetPoint = +document.getElementById('FrostProtectionSetPoint').value;
+                obj.BoilerTempAtPlus20 = +document.getElementById('BoilerTempAtPlus20').value;
+                obj.BoilerTempAtMinus10 = +document.getElementById('BoilerTempAtMinus10').value;
+                obj.Curvature = document.getElementById('Curvature').value;
+                obj.SwitchHeatingOffAt = +document.getElementById('SwitchHeatingOffAt').value;
+                obj.ReferenceRoomCompensation = +document.getElementById('ReferenceRoomCompensation').value;
 
                 var data = JSON.stringify(obj);
                 xhttp.send(data);
