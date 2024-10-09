@@ -61,6 +61,7 @@ bool Flame = false;
 bool Fault = false;
 bool Diagnostic = false;
 unsigned char FaultCode=65;
+bool FrostProtectionActive;
 
 // uptime
 unsigned long previousMillis = 0; // remember last millis value
@@ -84,6 +85,7 @@ bool mqtt_Cooling=true;
 bool mqtt_Flame=true;
 bool mqtt_Fault=true;
 bool mqtt_Diagnostic=true;
+bool mqtt_FrostProtectionActive=true;
 bool mqtt_Weather_Dependent_Mode=true;
 float mqtt_modulation=101;
 bool mqtt_enable_HotWater=false;
@@ -296,6 +298,7 @@ String getSensors() { //Handler
   message +=",\n  \"climateSetpoint\": " + String(climate_SetPoint);
   message +=",\n  \"climateMode\": \"" + String(climate_Mode) + "\"";
   message +=",\n  \"weatherDependentMode\": " + String(Weather_Dependent_Mode ? "\"on\"" : "\"off\"");
+  message +=",\n  \"FrostProtectionActive\": " + String(FrostProtectionActive ? "\"on\"" : "\"off\"");
   
   // Add BoilerStatus
   message += ",\n  \"CentralHeating\": " + String(CentralHeating ? "\"on\"" : "\"off\"");
@@ -789,6 +792,13 @@ if (MQTT.connected()) {
       UpdateMQTTSwitch(Weather_Dependent_Mode_Name,Weather_Dependent_Mode);
       mqtt_Weather_Dependent_Mode=Weather_Dependent_Mode;
     }
+
+    // Frost Protection Active
+    if (FrostProtectionActive!=mqtt_FrostProtectionActive) // value changed
+    {
+      UpdateMQTTSwitch(FrostProtectionActive_Name,FrostProtectionActive);
+      mqtt_FrostProtectionActive=FrostProtectionActive;
+    }
   }
 }
 
@@ -883,6 +893,7 @@ void handleClimateProgram()
     // Frost protection mode
     if (roomTemperature<FrostProtectionSetPoint) {
       // we need to act
+      FrostProtectionActive=true;
 
       // Update PID
       if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
@@ -899,6 +910,9 @@ void handleClimateProgram()
       // set boiler steering vars
       enableCentralHeating=true;
       boiler_SetPoint=P+I+D;
+    } else {
+      // no need to actie, set the correct state
+      FrostProtectionActive=false;
     }
 
   } else {
@@ -1923,6 +1937,7 @@ void PublishAllMQTTSensors()
   PublishMQTTSwitch(CoolingActive_Name,false);
   PublishMQTTDimmer(CentralHeatingActive_Name);
   PublishMQTTDimmer(HotWaterActive_Name);
+  PublishMQTTSwitch(FrostProtectionActive_Name,false);
   t_last_mqtt_discovery=millis();
 
   // Switches to control the boiler

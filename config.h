@@ -12,6 +12,7 @@ const char DiagnosticActive_Name[] = "DiagnosticActive";
 const char CoolingActive_Name[] = "CoolingActive";   
 const char CentralHeatingActive_Name[] = "CentralHeatingActive";   
 const char HotWaterActive_Name[] = "HotWaterActive";  
+const char FrostProtectionActive_Name[] = "FrostProtectionActive";
 const char EnableCooling_Name[] = "EnableCooling";   
 const char EnableCentralHeating_Name[] = "EnableCentralHeating";   
 const char EnableHotWater_Name[] = "EnableHotWater";   
