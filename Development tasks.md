@@ -4,3 +4,4 @@
 - add holiday mode
 - make holiday mode and weather dependent mode persistent
 - convert to vstudio
+- make I = mqttemperature a generic statement

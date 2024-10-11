@@ -87,6 +87,7 @@ bool mqtt_Fault=true;
 bool mqtt_Diagnostic=true;
 bool mqtt_FrostProtectionActive=true;
 bool mqtt_Weather_Dependent_Mode=true;
+bool mqtt_Holiday_Mode=true;
 float mqtt_modulation=101;
 bool mqtt_enable_HotWater=false;
 bool mqtt_enable_CentralHeating=true;
@@ -298,6 +299,7 @@ String getSensors() { //Handler
   message +=",\n  \"climateSetpoint\": " + String(climate_SetPoint);
   message +=",\n  \"climateMode\": \"" + String(climate_Mode) + "\"";
   message +=",\n  \"weatherDependentMode\": " + String(Weather_Dependent_Mode ? "\"on\"" : "\"off\"");
+  message +=",\n  \"HolidayMode\": " + String(Holiday_Mode ? "\"on\"" : "\"off\"");
   message +=",\n  \"FrostProtectionActive\": " + String(FrostProtectionActive ? "\"on\"" : "\"off\"");
   
   // Add BoilerStatus
@@ -459,6 +461,7 @@ void handleSaveConfig() {
     json["climateMode"] = climate_Mode;
     json["climateSetpoint"] = climate_SetPoint;
     json["weatherDependentMode"] = Weather_Dependent_Mode;
+    json["holidayMode"] = Holiday_Mode;
 
     //save the custom parameters to FS
     Debug("saving config");
@@ -644,6 +647,7 @@ void readConfig()
         }
         climate_SetPoint = json["climateSetpoint"] | 20;
         Weather_Dependent_Mode = json["weatherDependentMode"] | false;
+        Holiday_Mode = json["holidayMode"] | false;
 
         // close the file
         configFile.close();
@@ -686,6 +690,7 @@ void SaveConfig()
   json["climateMode"] = climate_Mode;
   json["climateSetpoint"] = climate_SetPoint;
   json["weatherDependentMode"] = Weather_Dependent_Mode;
+  json["holidayMode"] = Holiday_Mode;
 
   // save the new file
   File configFile = LittleFS.open(CONFIGFILE, "w");
@@ -793,6 +798,13 @@ if (MQTT.connected()) {
       mqtt_Weather_Dependent_Mode=Weather_Dependent_Mode;
     }
 
+    // Holiday Mode
+    if (Holiday_Mode!=mqtt_Holiday_Mode) // value changed
+    {
+      UpdateMQTTSwitch(Holiday_Mode_Name,Holiday_Mode);
+      mqtt_Holiday_Mode=Holiday_Mode;
+    }
+
     // Frost Protection Active
     if (FrostProtectionActive!=mqtt_FrostProtectionActive) // value changed
     {
@@ -889,7 +901,7 @@ void handleClimateProgram()
 {
   float  roomTemperature = mqttTemperature;
 
-  if (climate_Mode.equals("off")) { 
+  if (climate_Mode.equals("off") or Holiday_Mode==true) { 
     // Frost protection mode
     if (roomTemperature<FrostProtectionSetPoint) {
       // we need to act
@@ -1380,6 +1392,20 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
         }
+      // Holiday Mode command
+      } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
+        // we have a match
+        if (String(payloadstr).equals("ON")){
+          Holiday_Mode=true;
+          DelayedSaveConfig();
+        } else if (String(payloadstr).equals("OFF")) {
+          Holiday_Mode=false;
+          I=mqttTemperature;
+          DelayedSaveConfig();
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
+        }
       } else {
         // apparently we needed to deserialize, so log the error
         LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Command unknown");
@@ -1429,6 +1455,20 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           DelayedSaveConfig();
         } else if (String(doc["state"]).equals("OFF")) {
           Weather_Dependent_Mode=false;
+          I=mqttTemperature;
+          DelayedSaveConfig();
+        } else {
+          LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
+          CommandSucceeded=false;
+        }
+      // Holiday mode on or off
+      } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
+        // we have a match
+        if (String(doc["state"]).equals("ON")){
+          Holiday_Mode=true;
+          DelayedSaveConfig();
+        } else if (String(doc["state"]).equals("OFF")) {
+          Holiday_Mode=false;
           I=mqttTemperature;
           DelayedSaveConfig();
         } else {
@@ -1945,6 +1985,7 @@ void PublishAllMQTTSensors()
   PublishMQTTSwitch(EnableCooling_Name,true);
   PublishMQTTSwitch(EnableHotWater_Name,true);
   PublishMQTTSwitch(Weather_Dependent_Mode_Name,true);
+  PublishMQTTSwitch(Holiday_Mode_Name,true);
 
   // Publish setpoints
   PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);

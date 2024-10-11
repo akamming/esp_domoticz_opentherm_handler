@@ -23,6 +23,7 @@ const char Pressure_Name[] = "Pressure";
 const char FaultCode_Name[] = "Faultcode";
 const char Climate_Name[] = "Climate";
 const char Weather_Dependent_Mode_Name[] = "WeatherDependentMode";
+const char Holiday_Mode_Name[] = "HolidayMode";
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
@@ -61,6 +62,7 @@ String mqtttemptopic = "";                        // MQTT Topic which contains t
 float climate_SetPoint = 20;                      // default setpoint value for climate device
 String climate_Mode = "off";                      // Default mode for climate device
 bool Weather_Dependent_Mode = false;              // Default setting for weather dependent mode
+bool Holiday_Mode = false;                        // Default setting for holiday mode
 
 // PID parameters
 float KP = 30; // Proportional gain: This is the Multiplier of  the error (e.g. KP=30: 1 degree error will result in 30 degrees change of the pid value)
