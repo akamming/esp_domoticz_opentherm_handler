@@ -1386,7 +1386,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           DelayedSaveConfig();
         } else if (String(payloadstr).equals("OFF")) {
           Weather_Dependent_Mode=false;
-          I=mqttTemperature;
+          InitPID();
           DelayedSaveConfig();
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
@@ -1400,7 +1400,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           DelayedSaveConfig();
         } else if (String(payloadstr).equals("OFF")) {
           Holiday_Mode=false;
-          I=mqttTemperature;
+          InitPID();
           DelayedSaveConfig();
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
@@ -1455,7 +1455,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           DelayedSaveConfig();
         } else if (String(doc["state"]).equals("OFF")) {
           Weather_Dependent_Mode=false;
-          I=mqttTemperature;
+          InitPID();
           DelayedSaveConfig();
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
@@ -1469,7 +1469,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           DelayedSaveConfig();
         } else if (String(doc["state"]).equals("OFF")) {
           Holiday_Mode=false;
-          I=mqttTemperature;
+          InitPID();
           DelayedSaveConfig();
         } else {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
