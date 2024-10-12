@@ -966,8 +966,11 @@ void handleClimateProgram()
         enableCooling=false;
       }
     } else if (climate_Mode.equals("auto")) {
-      if (boiler_SetPoint<roomTemperature-minimumTempDifference or boiler_SetPoint>roomTemperature+minimumTempDifference) {
+      if (boiler_SetPoint>roomTemperature+minimumTempDifference) {
         enableCentralHeating=true;
+        enableCooling=false;
+      } else if (boiler_SetPoint<roomTemperature-minimumTempDifference) {
+        enableCentralHeating=false;
         enableCooling=true;
       } else {
         enableCentralHeating=false;
