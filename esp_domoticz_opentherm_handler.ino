@@ -1279,6 +1279,39 @@ void SetMQTTTemperature(float value) {
   InitPID();
 }
 
+bool HandleBoilerMode(const char* mode) 
+{
+  bool succeeded=true;
+  if (String(mode).equals("off")) {
+    enableCentralHeating=false;
+    enableCooling=false;
+  } else if (String(mode).equals("heat")) {
+    enableCentralHeating=true;
+    enableCooling=false;
+  } else if (String(mode).equals("cool")) {
+    enableCentralHeating=false;
+    enableCooling=true;
+  } else if (String(mode).equals("auto")) {
+    enableCentralHeating=true;
+    enableCooling=true;
+  } else {
+    Error("Unknown payload for central boiler setpoint mode command");
+    // sendback current mode to requester, so trick program into making it think it has to communicatie
+    if (enableCentralHeating) {
+      mqtt_enable_CentralHeating=false;
+    } else {
+      mqtt_enable_CentralHeating=true;
+    }
+    if (enableCooling) {
+      mqtt_enable_Cooling=false;
+    } else {
+      mqtt_enable_Cooling=true;
+    }
+    succeeded=false;
+  }
+  return succeeded;
+}
+
 void DelayedSaveConfig() 
 {
   t_save_config = millis()+ConfigSaveDelay; // timestamp for delayed save
@@ -1309,29 +1342,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         
       // Boiler Setpoint mode receive
       } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
-        if (String(payloadstr).equals("off")) {
-          enableCentralHeating=false;
-          enableCooling=false;
-        } else if (String(payloadstr).equals("heat")) {
-          enableCentralHeating=true;
-          enableCooling=false;
-        } else if (String(payloadstr).equals("cool")) {
-          enableCentralHeating=false;
-          enableCooling=true;
-        } else if (String(payloadstr).equals("auto")) {
-          enableCentralHeating=true;
-          enableCooling=true;
-        } else {
-          Error("Unknown payload for central heating setpoint mode command");
-          // sendback current mode to requester, so trick program into making it think it has to communicatie
-          if (enableCentralHeating) {
-            mqtt_enable_CentralHeating=false;
-          } else {
-            mqtt_enable_CentralHeating=true;
-          }
-          CommandSucceeded=false;
-        }
-        
+          CommandSucceeded=HandleBoilerMode(payloadstr);
       // DHW Setpoint mode receive
       } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
         if (String(payloadstr).equals("off")) {
@@ -1478,27 +1489,19 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown state");
           CommandSucceeded=false;
         }
-      // Boiler Setpoint commands
+      // Boiler Setpoint temperature command
       } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
         boiler_SetPoint=String(payloadstr).toFloat();
-      } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
-        if (doc["value"]==HEAT) {
-          enableCentralHeating=true;
-          enableCooling=false;
-        }else if (doc["value"]==COOL) {
-          enableCentralHeating=false;
-          enableCooling=true;
-        }else if (doc["value"]==AUTO) {
-          enableCentralHeating=true;
-          enableCooling=true;
-        } else { // can only be off
-          enableCentralHeating=false;
-          enableCooling=false;
-        }
 
-      // Climate Setpoint Commands
+      // Boiler Setpoint mode command
+      } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
+        CommandSucceeded=HandleBoilerMode(SetpointIntToString(int(doc["value"])));
+
+      // Climate Setpoint mode Commands
       } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
         CommandSucceeded = HandleClimateMode(SetpointIntToString(int(doc["value"])));
+
+      // Climate setpoint temperature command
       } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
         climate_SetPoint=String(payloadstr).toFloat();
         DelayedSaveConfig();
