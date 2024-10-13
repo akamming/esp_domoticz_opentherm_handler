@@ -1312,6 +1312,26 @@ bool HandleBoilerMode(const char* mode)
   return succeeded;
 }
 
+bool HandleDHWMode(const char* mode) 
+{
+  bool succeeded=true;
+  if (String(mode).equals("off")) {
+    enableHotWater=false;
+  } else if (String(mode).equals("heat")) {
+    enableHotWater=true;
+  } else {
+    Error("Unknown payload for dhw setpoint mode command");
+    // sendback current mode to requester, so trick program into making it think it has to communicatie
+    if (enableHotWater) {
+      mqtt_enable_HotWater=false;
+    } else {
+      mqtt_enable_HotWater=true;
+    }
+    succeeded=false;
+  }
+  return succeeded;
+}
+
 void DelayedSaveConfig() 
 {
   t_save_config = millis()+ConfigSaveDelay; // timestamp for delayed save
@@ -1345,20 +1365,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           CommandSucceeded=HandleBoilerMode(payloadstr);
       // DHW Setpoint mode receive
       } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
-        if (String(payloadstr).equals("off")) {
-          enableHotWater=false;
-        } else if (String(payloadstr).equals("heat")) {
-          enableHotWater=true;
-        } else {
-          Error("Unknown payload for dhw setpoint mode command");
-          // sendback current mode to requester, so trick program into making it think it has to communicatie
-          if (enableHotWater) {
-            mqtt_enable_HotWater=false;
-          } else {
-            mqtt_enable_HotWater=true;
-          }
-          CommandSucceeded=false;
-        }
+          CommandSucceeded=HandleDHWMode(payloadstr);
       // Handle Enable Hotwater switch command
       } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
         // we have a match
@@ -1510,12 +1517,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
         dhw_SetPoint=String(payloadstr).toFloat();
       } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
-        if (doc["value"]==HEAT) {
-          enableHotWater=true;
-        } else {
-          enableHotWater=false;
-        }
-
+        CommandSucceeded=HandleDHWMode(SetpointIntToString(int(doc["value"])));
+        
       // MQTT temperature received
       } else if (topicstr.equals(mqtttemptopic)) {
         SetMQTTTemperature(doc["value"]);
