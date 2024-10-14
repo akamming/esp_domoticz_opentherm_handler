@@ -1228,7 +1228,7 @@ String SetpointCommandTopic(const char* DeviceName){
 }
 
 void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
-  MQTT.publish((String(host)+"/error").c_str(),("Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str(),mqttpersistence);
+  MQTT.publish((String(host)+"/debug").c_str(),("ERROR: Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str(),mqttpersistence);
 }
 
 bool HandleClimateMode(const char* mode)
@@ -1374,123 +1374,102 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   if (millis()-t_last_http_command>HTTPTimeoutInMillis) { // only execute mqtt commands if not commanded by http
     // decode payload
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payloadstr);
-  
-    if (error) {
-      // Might be a string, so handle...
-      // Climate  mode receive
-      if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+    DeserializationError jsonerror = deserializeJson(doc, payloadstr);
+
+    if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+      if (jsonerror) {
         CommandSucceeded = HandleClimateMode(payloadstr);
-        
-      // Boiler Setpoint mode receive
-      } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
-        CommandSucceeded=HandleBoilerMode(payloadstr);
-
-      // DHW Setpoint mode receive
-      } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
-        CommandSucceeded=HandleDHWMode(payloadstr);
-
-      // Handle Enable Hotwater switch command
-      } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
-        CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, payloadstr);
-
-      // Handle EnableCooling switch command
-      } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
-        CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, payloadstr);
-
-      // Enable Central Heating switch command
-      } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
-        CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, payloadstr);
-
-      // Weather Dependent Mode command
-      } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
-        CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, payloadstr);
-        if (CommandSucceeded) {
-          InitPID();
-          DelayedSaveConfig();
-        }
-
-      // Holiday Mode command
-      } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
-        CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, payloadstr);
-        if (CommandSucceeded) {
-          InitPID();
-          DelayedSaveConfig();
-        }
-
       } else {
-        // apparently we needed to deserialize, so log the error
-        LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"Command unknown");
-        CommandSucceeded=false;
-      }
-    } else {
-      // json was decoded
-
-      // Handle Enable Hotwater switch command
-      if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
-        CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, doc["state"]);
-
-      // Handle EnableCooling switch command
-      } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
-        CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, doc["state"]);
-
-      // Enable Central Heating switch command
-      } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
-        CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, doc["state"]);
-
-      // Weather Dependent mode on or off
-      } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
-        CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, doc["state"]);
-        if (CommandSucceeded) {
-          InitPID();
-          DelayedSaveConfig();
-        }
-
-      // Holiday mode on or off
-      } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
-        CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, doc["state"]);
-        if (CommandSucceeded) {
-          InitPID();
-          DelayedSaveConfig();
-        }
-
-      // Boiler Setpoint temperature command
-      } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
-        boiler_SetPoint=String(payloadstr).toFloat();
-
-      // Boiler Setpoint mode command
-      } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
-        CommandSucceeded=HandleBoilerMode(SetpointIntToString(int(doc["value"])));
-
-      // Climate Setpoint mode Commands
-      } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
         CommandSucceeded = HandleClimateMode(SetpointIntToString(int(doc["value"])));
-
-      // Climate setpoint temperature command
-      } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
-        climate_SetPoint=String(payloadstr).toFloat();
-        if (CommandSucceeded) {
-          InitPID();
-          DelayedSaveConfig();
-        }
-
-      // DHW Setpoint temperature commands
-      } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
-        dhw_SetPoint=String(payloadstr).toFloat();
-
-      // DHW Setpoint MOde Command
-      } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
-        CommandSucceeded=HandleDHWMode(SetpointIntToString(int(doc["value"])));
-
-      // MQTT temperature received
-      } else if (topicstr.equals(mqtttemptopic)) {
-        SetMQTTTemperature(doc["value"]);
-      
-      // Unknown command
-      } else {
-        LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
-        CommandSucceeded=false;
       }
+      
+    // Boiler Setpoint mode receive
+    } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
+      if (jsonerror) {
+        CommandSucceeded=HandleBoilerMode(payloadstr);
+      } else {
+        CommandSucceeded=HandleBoilerMode(SetpointIntToString(int(doc["value"])));
+      }
+
+    // DHW Setpoint mode receive
+    } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
+      if (jsonerror) {
+        CommandSucceeded=HandleDHWMode(payloadstr);
+      } else {
+        CommandSucceeded=HandleDHWMode(SetpointIntToString(int(doc["value"])));
+      }
+
+    // Handle Enable Hotwater switch command
+    } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
+      if (jsonerror)  {
+        CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, payloadstr);
+      } else {
+        CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, doc["state"]);
+      }
+
+    // Handle EnableCooling switch command
+    } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
+      if (jsonerror) {
+        CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, payloadstr);
+      } else {
+        CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, doc["state"]);
+      }
+
+    // Enable Central Heating switch command
+    } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
+      if (jsonerror) {
+        CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, payloadstr);
+      } else {
+        CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, doc["state"]);
+      }
+
+    // Weather Dependent Mode command
+    } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
+      if (jsonerror) {
+        CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, payloadstr);
+      } else {
+        CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, doc["state"]);
+      }
+      if (CommandSucceeded) {
+        InitPID();
+        DelayedSaveConfig();
+      }
+
+    // Holiday Mode command
+    } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
+      if (jsonerror) {
+        CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, payloadstr);
+      } else {
+        CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, doc["state"]);
+      }        
+      if (CommandSucceeded) {
+        InitPID();
+        DelayedSaveConfig();
+      }
+    } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
+      boiler_SetPoint=String(payloadstr).toFloat();
+
+    // Climate setpoint temperature command
+    } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
+      climate_SetPoint=String(payloadstr).toFloat();
+      if (CommandSucceeded) {
+        InitPID();
+        DelayedSaveConfig();
+      }
+
+    // DHW Setpoint temperature commands
+    } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
+      dhw_SetPoint=String(payloadstr).toFloat();
+
+    // MQTT temperature received
+    } else if (topicstr.equals(mqtttemptopic)) {
+      SetMQTTTemperature(doc["value"]);
+
+    
+    // Unrecognized  
+    } else {
+      LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
+      CommandSucceeded=false;
     }
     if (CommandSucceeded) {
       // we received a succesful mqtt command, so someone is communicating correctly
