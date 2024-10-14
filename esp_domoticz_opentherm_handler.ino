@@ -1625,10 +1625,8 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
 
   // Create message
   char state[128];
-  json["value"] =  temperature;
+  json["value"] =  float(int(temperature*10))/10;   // ensures round to 1 decimal behind the comma
   serializeJson(json, state);  // buf now contains the json 
-  // char charVal[10];
-  // dtostrf(temperature,4,1,charVal); 
   MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
