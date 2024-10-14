@@ -126,7 +126,9 @@ bool ClimateConfigSaved=true;
 bool OTAUpdateInProgress=false;
 bool temperatureReceived=false;
 bool debug=true;
+
 float insideTempAt[60];
+
 
 // objects to be used by program
 ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
@@ -622,6 +624,7 @@ void readConfig()
         outPin=json["outpin"] | 5;
         OneWireBus=json["temppin"] | 14;
         mqtttemptopic=json["mqtttemptopic"].as<String>();
+
         debug=json["debugtomqtt"] | true;
 
         // PID Settings
@@ -899,7 +902,13 @@ float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, fl
 
 void handleClimateProgram()
 {
-  float  roomTemperature = mqttTemperature;
+  float  roomTemperature;
+  if (mqttTemperature==99) { // no temp received
+    roomTemperature=currentTemperature; // use internal temp sensor
+  } else {
+    roomTemperature=mqttTemperature;
+  }
+  
 
   if (climate_Mode.equals("off") or Holiday_Mode==true) { 
     // Frost protection mode
@@ -944,7 +953,7 @@ void handleClimateProgram()
     // Calculate BoilerSetpoint
     if (Weather_Dependent_Mode) {
       // calculate Setpoint based on outside temp
-      boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(mqttTemperature,outside_Temperature);
+      boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature);
     } else {
       // set Setpoint to PID
       boiler_SetPoint=P+I+D;
@@ -1208,6 +1217,9 @@ void handleOpenTherm()
         if (delta<-0.1 or delta>0.1){ // value changed
           UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name,currentTemperature);
           mqtt_currentTemperature=currentTemperature;
+          if (mqtttemptopic.length()==0) { // temptopic empty, use internal temperature
+            SetMQTTTemperature(currentTemperature);
+          }
         }
       }
 
@@ -1363,10 +1375,12 @@ bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode)
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
   String topicstr=String(topic);
-  char payloadstr[256];
+  char payloadstr[1024];
   strncpy(payloadstr,(char *)payload,length);
   payloadstr[length]='\0';
-  Debug("Received command on topic ["+topicstr+"], content: ["+payloadstr+"]");
+  if (!topicstr.equals(domoticzoutputtopic)) { // prevent flooding debug log with updates from domoticzdevices
+    Debug("Received command on topic ["+topicstr+"], content: ["+payloadstr+"]");
+  }
 
   // Assume succesful command 
   bool CommandSucceeded=true;
@@ -1465,7 +1479,15 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if (topicstr.equals(mqtttemptopic)) {
       SetMQTTTemperature(doc["value"]);
 
-    
+    } else if (topicstr.equals(domoticzoutputtopic)) {
+      // See if it was the device we needed
+      // Debug("Received domoticz device reading: "+String(doc["idx"])+","+String(doc["name"]));
+      if (mqtttemptopic.equals(doc["idx"].as<String>())) {
+        SetMQTTTemperature(doc["svalue1"].as<float>());
+        Debug("Gotcha: Temp is "+String(mqttTemperature));
+        Debug(payloadstr);
+      }
+
     // Unrecognized  
     } else {
       LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
@@ -1476,6 +1498,10 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       t_last_mqtt_command=millis();
     }
   }
+}
+
+void SubScribeToDomoticz() {
+  MQTT.subscribe(domoticzoutputtopic.c_str());
 }
 
 void reconnect()
@@ -1490,7 +1516,10 @@ void reconnect()
         mqttconnected = MQTT.connect(host.c_str());
       }
       if (mqttconnected) {
-        PublishAllMQTTSensors();      
+        PublishAllMQTTSensors();
+        if (mqtttemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
+          SubScribeToDomoticz();
+        }      
       } else {
         Serial.print("failed, rc=");
         Serial.print(MQTT.state());
@@ -1501,7 +1530,7 @@ void reconnect()
 
 void PublishMQTTDimmer(const char* uniquename)
 {
-  Serial.println("UpdateMQTTDimmer");
+  Serial.println("PublishMQTTDimmer");
   JsonDocument json;
 
   // Construct JSON config message
@@ -1942,7 +1971,7 @@ void PublishAllMQTTSensors()
   PublishMQTTSetpoint(Climate_Name,5,30,true);
 
   // Subscribe to temperature topic
-  if (mqtttemptopic.length()>0) {
+  if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
     MQTT.subscribe(mqtttemptopic.c_str());
   }
 }

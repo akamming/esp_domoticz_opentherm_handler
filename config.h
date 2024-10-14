@@ -57,6 +57,7 @@ bool usemqttauthentication = false;                // Use MQTT Authentication
 String mqttuser = "";                             // MQTT Username
 String mqttpass = "";                             // MQTT Password
 String mqtttemptopic = "";                        // MQTT Topic which contains the current temperature
+String domoticzoutputtopic="domoticz/out";        // Topic where to listen to for domoticz sensors
 
 // Default values Climate Decice 
 float climate_SetPoint = 20;                      // default setpoint value for climate device
