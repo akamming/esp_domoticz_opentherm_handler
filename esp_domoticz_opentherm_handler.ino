@@ -885,7 +885,7 @@ float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, fl
   float TargetTemperature=ExtraCurvature+TargetTemperatureWithoutCurvature;
 
   //Apply reference room compensation
-  if (ReferenceRoomCompensation>0) {
+  if (ReferenceRoomCompensation>0 and CurrentInsideTemperature<climate_SetPoint) {
     TargetTemperature+=(climate_SetPoint-CurrentInsideTemperature)*ReferenceRoomCompensation;
   }
 
@@ -942,7 +942,7 @@ void handleClimateProgram()
     // At every heartbeat: Set PID values
     if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
       // Check if we have to update the PID (only when boiler not in hotwater mode)
-      if (!HotWater) {
+      if (!(HotWater or Weather_Dependent_Mode)) {
         UpdatePID(climate_SetPoint,roomTemperature);
       }
 
