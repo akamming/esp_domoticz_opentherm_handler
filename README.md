@@ -6,7 +6,8 @@ Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm
 - The firmware sets up a connection with the boiler
 - And then boiler can be controlled using HTTP, MQTT or the builtin UI (http://domesphelper or http://IP_adress_of_device)
 - Autodiscovery supported, so easy integration for Domoticz and/or Home Assistant
-- Made to work perfectly for domoticz weather dependent heating plugin (https://github.com/akamming/Domoticz_Thermostate_Plugin)
+- Made to work perfectly for domoticz weather dependent heating plugin (https://github.com/akamming/Domoticz_Thermostate_Plugin), 
+- As of release 1.0, the thermostat functionality is also included in the firmware itself, See thermostat mode  
 
 ### Supported HTTP commands:
 Controlling the boiler commands:
@@ -36,8 +37,14 @@ The following device are created using MQTT autodiscovery in domoticz and home a
 - A Boiler setpoint device: Set the temperature to which you want the heating/cooling system to heat or cool
 - A HotWater Setpoint device: (if supported by your boiler): The to be temperature of the hot water reserve in your heating/cooling system
 - Several sensors containing the state of the heating/cooling system
-
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
+
+### Thermostat mode
+Additional 3 more devices:
+- a Climate setpoint Device (when you want to use the firmware in thermostat mode)
+- a Holiday Mode  switch: Prevents heating when in themostat mode (only frostprotection)
+- a Weather Dependent Mde switch: When in thermostat mode decides wheter to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature 
+
 
 ## Installation
 Installation is simple, but for newbies i esp8266 here's the detailed explanation:
@@ -78,3 +85,24 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
 - Configure at least MQTT settings if you want to be able to control using Domoticz or Home Assistant (in that case also enable MQTT autodiscovery in Domoticz and/or Home Assistant)
 - or use this link to see the value of the sensors and/or control the device using this UI (in the latter: Hit the "take control button". Warning: MQTT commands won't work as long as this webpage is still active, so make sure to reset the take control switch or close the webpage again)  
   
+## Thermostat mode
+As of release 1.0. It also includes thermostat mode. This only works when MQTT is configured. Additionally you need to configure the following settings (http://domesphelper.local):
+### MQTT settings 
+- MQTT should be switch on
+- MQTT temperature topic: should be either 
+  - the MQTT State topic of your temperature sensor
+  - The IDX of your domoticz device ( it will listen to domoticz/out. Note, with many domoticz devices, this makes your this firmware run slow!)
+  - leave empty (it will use the internal dallastemperature sensor connected to the device, so the DS18B20 pin should be configured correctly)
+
+### Boiler settings:
+- MinBoilerTemp & MaxBOilerTemp: The thermostat will limit the setpoint for the boiler between these 2 values
+- MiminumTemp difference: Heating will only be switched on if the boiler setpoint if this amount above the reference room temperature
+- Frostprotection setpoint: If thermostat switched off, heating will still be on if reference termperature below this point
+- PID parameters: Leave to 30 (KP), 0.03 (KI) and 2.5(KD), unless you know what you are doing. Can be used for tweaking the algorithm.  Is regular PID regulator
+
+### Weather dependent mode
+- BoilerTempAtPlus20 and BoilerTempAtMinus10: Basic data for the boiler firing line
+- Curvature:  Can curve the boiler firing line (basically meaning the boiler setpoint will go up earlier)
+- Switchheatingoffat: Disable the heating when the outside temp is above this value 
+- Refroomcompensation: Can change the boiler setpoint if the reference room temperature is lower than the climate setpoint
+
