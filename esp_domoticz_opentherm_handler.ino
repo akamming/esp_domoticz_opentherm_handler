@@ -1477,8 +1477,17 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
     // MQTT temperature received
     } else if (topicstr.equals(mqtttemptopic)) {
-      SetMQTTTemperature(doc["value"]);
-
+      if (jsonerror) {
+        SetMQTTTemperature(String(payloadstr).toFloat()); // Just try to convert
+      } else {
+        if (doc["value"].is<float>()) {   // e.g. from zwavejsui
+          SetMQTTTemperature(doc["value"]);
+        } else if (doc["svalue1"].is<const char*>()) { // e.g. from domoticz/out
+          SetMQTTTemperature(String(doc["svalue1"]).toFloat());
+        } else {
+          SetMQTTTemperature(String(payloadstr).toFloat()); // Just try to convert to Float
+        }
+      }
     } else if (topicstr.equals(domoticzoutputtopic)) {
       // See if it was the device we needed
       // Debug("Received domoticz device reading: "+String(doc["idx"])+","+String(doc["name"]));

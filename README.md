@@ -90,15 +90,21 @@ As of release 1.0. It also includes thermostat mode. This only works when MQTT i
 ### MQTT settings 
 - MQTT should be switch on
 - MQTT temperature topic: should be either 
-  - the MQTT State topic of your temperature sensor
-  - The IDX of your domoticz device ( it will listen to domoticz/out. Note, with many domoticz devices, this makes your this firmware run slow!)
-  - leave empty (it will use the internal dallastemperature sensor connected to the device, so the DS18B20 pin should be configured correctly)
+  - the MQTT State topic of your temperature sensor 
+  - The IDX of your domoticz device (it will listen to domoticz/out. Note, this is not recommended, cause the device than has to check every domoticz device update on if it's the temperature sensor, which will make the device very slow if domoticz has many device updates!)
+  - leave empty (it will use the internal dallastemperature sensor connected to the device, so the DS18B20 pin should be configured correctly. This is also not recommended, cause the temperature of the ESP influences the temperature sensor)
+
+About the mqtt temperature topic: If you want to use a domoticz sensor to be used, there are several options available, but this is the best way to do it:
+- Install Mosquitto (or another MQTT broker) of you did not yet install a MQTT broker
+- Setup both the "MQTT Client gateway with LAN interface" and the "MQTT Auto Discovery Client Gateway" in domoticz (only if these aren't configured yet) and for bth: Set the Adress, port (and optionally username/password) to match your MQTT server settings.   
+- Set the Publish Topic setting for the MQTT Client Gateway  to "Index (with Retain)". 
+- In the settings of this ESP firmware: Set the MQTT switch to on, and the MQTT temperature Topic to "domoticz/out/<idx of your temperature device>"
 
 ### Boiler settings:
 - MinBoilerTemp & MaxBOilerTemp: The thermostat will limit the setpoint for the boiler between these 2 values
 - MiminumTemp difference: Heating will only be switched on if the boiler setpoint if this amount above the reference room temperature
 - Frostprotection setpoint: If thermostat switched off, heating will still be on if reference termperature below this point
-- PID parameters: Leave to 30 (KP), 0.03 (KI) and 2.5(KD), unless you know what you are doing. Can be used for tweaking the algorithm.  Is regular PID regulator
+- PID parameters: Leave to 30 (KP), 0.03 (KI) and 2.5(KD), unless you know what you are doing.  The software contains a regular PID controller (https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) So with KP, KI and KD you can tweak the mechanism to your needs   
 
 ### Weather dependent mode
 - BoilerTempAtPlus20 and BoilerTempAtMinus10: Basic data for the boiler firing line
