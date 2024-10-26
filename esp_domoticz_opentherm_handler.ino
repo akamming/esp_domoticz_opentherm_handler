@@ -832,45 +832,49 @@ void UpdatePID(float setpoint,float temperature)
   float oldP=P;
   float oldD=D;
 
-  //sp = setpoint, pv=current value
+  // only update PID when Hotwater is not active
+  if (!HotWater) {
 
-  dt=ClimateHeartbeatInMillis/1000;
-  if (dt>10) {
-      dt=10;
-  }
-  
-  // calculate the error (sp-pv)
-  error = setpoint-temperature;
+    //sp = setpoint, pv=current value
 
-  // calculate he amount of rising/dropping temp
-  CurrentMinute=(millis() % 60000 / 1000);
-  DeltaKPH = (mqttTemperature-insideTempAt[(CurrentMinute+45)%60])*4;  // tempchange the last 15 mins mutltiplied by 4 is the number of kelvin per hour the temp is currently dropping or rising
-  
-  // calculate the PID output
-  P = KP * error;          // proportional contribution
-  I = I + KI * error * dt; // integral contribution
-  D = -KD*DeltaKPH;        // deritive contribution
+    dt=ClimateHeartbeatInMillis/1000;
+    if (dt>10) {
+        dt=10;
+    }
+    
+    // calculate the error (sp-pv)
+    error = setpoint-temperature;
 
-  // correct during heating when setpoint goes down when setpoint already below current temperature (or the other way around when cooling) 
-  if ((climate_Mode.equals("heat") and P+I+D<boiler_SetPoint and boiler_SetPoint<temperature) or
-      (climate_Mode.equals("cool") and P+I+D>boiler_SetPoint and boiler_SetPoint>temperature)) 
-  {
-    I=oldI;
-  } 
+    // calculate he amount of rising/dropping temp
+    CurrentMinute=(millis() % 60000 / 1000);
+    DeltaKPH = (mqttTemperature-insideTempAt[(CurrentMinute+45)%60])*4;  // tempchange the last 15 mins mutltiplied by 4 is the number of kelvin per hour the temp is currently dropping or rising
+    
+    // calculate the PID output
+    P = KP * error;          // proportional contribution
+    I = I + KI * error * dt; // integral contribution
+    D = -KD*DeltaKPH;        // deritive contribution
 
-  // Correct PID if PID above or below min/max boiler temp
-  if (P+I+D<MinBoilerTemp) {
-    // setpoint too low, correcting to absolute min
-    I=oldI;
-    P=oldP;
-    D=oldD;
-    D=MinBoilerTemp-P-I;
-  } else if (P+I+D>MaxBoilerTemp){
-    //setpoint too high, correcting to absolute max
-    I=oldI;
-    P=oldP;
-    D=oldD;
-    D=MaxBoilerTemp-P-I;
+    // correct during heating when setpoint goes down when setpoint already below current temperature (or the other way around when cooling) 
+    if ((climate_Mode.equals("heat") and P+I+D<boiler_SetPoint and boiler_SetPoint<temperature) or
+        (climate_Mode.equals("cool") and P+I+D>boiler_SetPoint and boiler_SetPoint>temperature)) 
+    {
+      I=oldI;
+    } 
+
+    // Correct PID if PID above or below min/max boiler temp
+    if (P+I+D<MinBoilerTemp) {
+      // setpoint too low, correcting to absolute min
+      I=oldI;
+      P=oldP;
+      D=oldD;
+      D=MinBoilerTemp-P-I;
+    } else if (P+I+D>MaxBoilerTemp){
+      //setpoint too high, correcting to absolute max
+      I=oldI;
+      P=oldP;
+      D=oldD;
+      D=MaxBoilerTemp-P-I;
+    }
   }
 }
 
