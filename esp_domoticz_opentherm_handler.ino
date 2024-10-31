@@ -916,7 +916,7 @@ void handleClimateProgram()
   }
   
   if (climate_Mode.equals("off") or Holiday_Mode==true) { 
-    if (not (millis()-t_last_http_command<HTTPTimeoutInMillis)) { // Allow HTTP commands when not in climate mode 
+    if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis) { // allow HTTP or MQTT commands when not in climate mode
       // Frost protection mode
       if (roomTemperature<FrostProtectionSetPoint) {
         // we need to act
@@ -941,6 +941,7 @@ void handleClimateProgram()
     } else {
       // no need to actie, set the correct state
       FrostProtectionActive=false;
+      enableCentralHeating=false;
     }
 
   } else {
