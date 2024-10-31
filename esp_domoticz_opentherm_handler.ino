@@ -125,7 +125,7 @@ unsigned long t_save_config; // timestamp for delayed save
 bool ClimateConfigSaved=true;
 bool OTAUpdateInProgress=false;
 bool temperatureReceived=false;
-bool debug=true;
+bool debug=false;
 
 float insideTempAt[60];
 
@@ -811,7 +811,7 @@ if (MQTT.connected()) {
     // Frost Protection Active
     if (FrostProtectionActive!=mqtt_FrostProtectionActive) // value changed
     {
-      UpdateMQTTSwitch(FrostProtectionActive_Name,FrostProtectionActive);
+      UpdateMQTTBinarySensor(FrostProtectionActive_Name,FrostProtectionActive);
       mqtt_FrostProtectionActive=FrostProtectionActive;
     }
   }
@@ -1022,35 +1022,27 @@ void handleOpenTherm()
         // Check if we have to send to MQTT for steering vars
         if (MQTT.connected()) {
           if (Flame!=mqtt_Flame){ // value changed
-            UpdateMQTTSwitch(FlameActive_Name,Flame);
+            UpdateMQTTBinarySensor(FlameActive_Name,Flame);
             mqtt_Flame=Flame;
           }
           if (Fault!=mqtt_Fault){ // value changed
-            UpdateMQTTSwitch(FaultActive_Name,Fault);
+            UpdateMQTTBinarySensor(FaultActive_Name,Fault);
             mqtt_Fault=Fault;
           }
           if (Diagnostic!=mqtt_Diagnostic){ // value changed
-            UpdateMQTTSwitch(DiagnosticActive_Name,Diagnostic);
+            UpdateMQTTBinarySensor(DiagnosticActive_Name,Diagnostic);
             mqtt_Diagnostic=Diagnostic;
           }
           if (Cooling!=mqtt_Cooling){ // value changed
-            UpdateMQTTSwitch(CoolingActive_Name,Cooling);
+            UpdateMQTTBinarySensor(CoolingActive_Name,Cooling);
             mqtt_Cooling=Cooling;
           }
-          if (CentralHeating!=mqtt_CentralHeating or modulation!=mqtt_modulation){ // Update switch when on/off or modulation changed
-            if (CentralHeating) {
-              UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,modulation);
-            } else {
-              UpdateMQTTDimmer(CentralHeatingActive_Name,CentralHeating,0);
-            }
+          if (CentralHeating!=mqtt_CentralHeating){ // value changed
+            UpdateMQTTBinarySensor(CentralHeatingActive_Name,CentralHeating);
             mqtt_CentralHeating=CentralHeating;
           }
-          if (HotWater!=mqtt_HotWater or modulation!=mqtt_modulation){ // Update switch when on/off or modulation changed
-            if (HotWater) {
-              UpdateMQTTDimmer(HotWaterActive_Name,HotWater,modulation);
-            } else {
-              UpdateMQTTDimmer(HotWaterActive_Name,HotWater,0);
-            }
+          if (HotWater!=mqtt_HotWater){ // value changed
+            UpdateMQTTBinarySensor(HotWaterActive_Name,HotWater);
             mqtt_HotWater=HotWater;
           }
           if (modulation!=mqtt_modulation){ // value changed
@@ -1630,6 +1622,53 @@ void UpdateMQTTSwitch(const char* uniquename, bool Value)
   MQTT.publish((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence);
 }
 
+void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
+{
+  Serial.println("PublishBinarySensor");
+  JsonDocument json;
+
+  // Construct JSON config message
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["stat_t"] = host+"/binary_sensor/"+String(uniquename)+"/state";
+  json["payload_on"] = true;
+  json["payload_off"] = false;
+  json["val_tpl"] = "{{ value_json.value }}";
+  if (!String(deviceclass).equals("None")) {
+    json["device_class"] =deviceclass;
+  }
+
+  JsonObject dev = json["dev"].to<JsonObject>();
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
+
+  char conf[512];
+  serializeJson(json, conf);  // conf now contains the json
+
+  // Publish config message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/binary_sensor/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+}
+
+void UpdateMQTTBinarySensor(const char* uniquename, bool Value)
+{
+  Serial.println("UpdateBinarySensor");
+
+   JsonDocument json;
+   json["value"] = Value;
+
+   char message[512];
+   serializeJson(json,message);
+
+  // publish state message
+  MQTT.publish((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence);
+}
+
 void PublishMQTTTemperatureSensor(const char* uniquename)
 {
   Serial.println("PublishMQTTTemperatureSensor");
@@ -1961,15 +2000,14 @@ void PublishAllMQTTSensors()
   PublishMQTTPercentageSensor(Modulation_Name);
   PublishMQTTFaultCodeSensor(FaultCode_Name);
 
-  // On/off sensors telling state
-  PublishMQTTSwitch(FlameActive_Name,false);
-  PublishMQTTSwitch(FaultActive_Name,false);
-  PublishMQTTSwitch(DiagnosticActive_Name,false);
-  PublishMQTTSwitch(CoolingActive_Name,false);
-  PublishMQTTDimmer(CentralHeatingActive_Name);
-  PublishMQTTDimmer(HotWaterActive_Name);
-  PublishMQTTSwitch(FrostProtectionActive_Name,false);
-  t_last_mqtt_discovery=millis();
+  // binary sesnors sensors telling state
+  PublishMQTTBinarySensor(FlameActive_Name,"None");
+  PublishMQTTBinarySensor(FaultActive_Name,"None");
+  PublishMQTTBinarySensor(DiagnosticActive_Name,"None");
+  PublishMQTTBinarySensor(CoolingActive_Name,"None");
+  PublishMQTTBinarySensor(CentralHeatingActive_Name,"None");
+  PublishMQTTBinarySensor(HotWaterActive_Name,"None");
+  PublishMQTTBinarySensor(FrostProtectionActive_Name,"None");
 
   // Switches to control the boiler
   PublishMQTTSwitch(EnableCentralHeating_Name,true);
@@ -1987,6 +2025,10 @@ void PublishAllMQTTSensors()
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
     MQTT.subscribe(mqtttemptopic.c_str());
   }
+
+  // reset the timer
+  t_last_mqtt_discovery=millis();
+
 }
 
 // The setup code
