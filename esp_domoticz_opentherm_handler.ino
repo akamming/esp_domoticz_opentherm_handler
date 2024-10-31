@@ -280,7 +280,9 @@ String getSensors() { //Handler
   }
 
   // Report if we are receiving commands
-  if (millis()-t_last_http_command<HTTPTimeoutInMillis) {
+  if (not (climate_Mode.equals("off") or Holiday_Mode==true)) {
+    message += ",\n  \"ControlledBy\": \"Climate Mode\""; // Climate mode overrules everything else
+  } else if (millis()-t_last_http_command<HTTPTimeoutInMillis) {
     message += ",\n  \"ControlledBy\": \"HTTP\""; // HTTP overrules MQTT so check HTTP 1st
   } else if (millis()-t_last_mqtt_command<MQTTTimeoutInMillis) {
     message += ",\n  \"ControlledBy\": \"MQTT\""; // then check if MQTT command was given
@@ -913,28 +915,29 @@ void handleClimateProgram()
     roomTemperature=mqttTemperature;
   }
   
-
   if (climate_Mode.equals("off") or Holiday_Mode==true) { 
-    // Frost protection mode
-    if (roomTemperature<FrostProtectionSetPoint) {
-      // we need to act
-      FrostProtectionActive=true;
+    if (not (millis()-t_last_http_command<HTTPTimeoutInMillis)) { // Allow HTTP commands when not in climate mode 
+      // Frost protection mode
+      if (roomTemperature<FrostProtectionSetPoint) {
+        // we need to act
+        FrostProtectionActive=true;
 
-      // Update PID
-      if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
-        // Check if we have to update the PID (only when boiler not in hotwater mode)
-        if (!HotWater) {
-          UpdatePID(FrostProtectionSetPoint,roomTemperature);
+        // Update PID
+        if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
+          // Check if we have to update the PID (only when boiler not in hotwater mode)
+          if (!HotWater) {
+            UpdatePID(FrostProtectionSetPoint,roomTemperature);
+          }
+          Debug("Frost protection: P = "+String(P)+", I="+String(I)+", D="+String(D));
+
+          // reset timestamp
+          t_last_climateheartbeat=millis();
         }
-        Debug("Frost protection: P = "+String(P)+", I="+String(I)+", D="+String(D));
 
-        // reset timestamp
-        t_last_climateheartbeat=millis();
+        // set boiler steering vars
+        enableCentralHeating=true;
+        boiler_SetPoint=P+I+D;
       }
-
-      // set boiler steering vars
-      enableCentralHeating=true;
-      boiler_SetPoint=P+I+D;
     } else {
       // no need to actie, set the correct state
       FrostProtectionActive=false;
@@ -2197,8 +2200,8 @@ void loop()
       }
     }
 
-    // Handle CLimate program 
-    handleClimateProgram(); 
+    // Handle CLimate program
+      handleClimateProgram(); 
     
     // Check if we have to communicatie steering vars
     CommunicateSteeringVarsToMQTT();
