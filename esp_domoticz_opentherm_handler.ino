@@ -1141,6 +1141,11 @@ void handleOpenTherm()
     case GetOutsideTemp:
     {
       outside_Temperature = getOutsideTemperature();
+      if(outside_Temperature==0) { // 0 can also mean no temperature reading, so do some extra checks
+        if (abs(outside_Temperature-mqtt_outside_Temperature)>0.5) { // ignore if zero was reported with a bif temp difference at that time 
+          outside_Temperature=mqtt_outside_Temperature;
+        }
+      }
       
       // Check if we have to send to MQTT
       if (MQTT.connected()) {
