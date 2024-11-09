@@ -124,11 +124,13 @@ unsigned long t_last_climateheartbeat=0; // last climate heartbeat timestamp
 unsigned long t_save_config; // timestamp for delayed save
 bool ClimateConfigSaved=true;
 bool OTAUpdateInProgress=false;
-bool temperatureReceived=false;
-bool debug=false;
-
+bool insideTemperatureReceived=false;
+bool outsideTemperatureReceived=false;
+#define NUMBEROFMEASUREMENTS 10 // number of measurements over which to average for outside temp
 float insideTempAt[60];
-
+float outsidetemp[NUMBEROFMEASUREMENTS];
+int outsidetempcursor;
+bool debug=false;
 
 // objects to be used by program
 ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
@@ -748,7 +750,7 @@ if (MQTT.connected()) {
     }
 
     // The actual temperature for the climate device. Now the temp required from mqtt. But should be made switchable to other sources 
-    if (mqttTemperature!=mqtt_mqttTemperature and temperatureReceived) {
+    if (mqttTemperature!=mqtt_mqttTemperature and insideTemperatureReceived) {
       UpdateMQTTSetpointTemperature(Climate_Name,mqttTemperature);
       mqtt_mqttTemperature=mqttTemperature;
     }
@@ -1142,8 +1144,32 @@ void handleOpenTherm()
     {
       outside_Temperature = getOutsideTemperature();
       if(outside_Temperature==0) { // 0 can also mean no temperature reading, so do some extra checks
-        if (abs(outside_Temperature-mqtt_outside_Temperature)>0.5) { // ignore if zero was reported with a bif temp difference at that time 
+        if (abs(outside_Temperature-mqtt_outside_Temperature)>0.5) { // ignore if zero was reported with a bif temp difference at that time
           outside_Temperature=mqtt_outside_Temperature;
+        } else {
+          if (!outsideTemperatureReceived) {
+            // this is our first measurement, initialize the array
+            for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
+              outsidetemp[i]=outside_Temperature;
+            }
+            outsideTemperatureReceived=true;
+          } else {
+            // Not the first measurement fill in new value in array
+            outsidetemp[outsidetempcursor]=outside_Temperature;
+
+            // move the cursor in the array
+            outsidetempcursor++;
+            if (outsidetempcursor>=NUMBEROFMEASUREMENTS) {
+              outsidetempcursor=0;
+            }
+
+            // calculate the average
+            outside_Temperature=0;
+            for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
+              outside_Temperature += outsidetemp[outsidetempcursor];
+            }
+            outside_Temperature=outside_Temperature / NUMBEROFMEASUREMENTS;
+          }
         }
       }
       
@@ -1283,13 +1309,13 @@ const char* SetpointIntToString(int value) {
 
 void SetMQTTTemperature(float value) {
   // Handle actions if first time received
-  if (!temperatureReceived) {
+  if (!insideTemperatureReceived) {
     Debug("resetting insidetemp matrix to "+String(value));
     // Set  InsideTempAt array at default value (currenttemp)
     for (int i=0;i<60;i++) {
       insideTempAt[i]=value;
     }
-    temperatureReceived=true; // Make sure we do this only once ;-)
+    insideTemperatureReceived=true; // Make sure we do this only once ;-)
   }
   // Set mqttTemperature
   mqttTemperature=value; 
@@ -2200,7 +2226,7 @@ void loop()
 
     // Remember last hour of temperatures (PID calculation needs to be able te determine if temperature is rising or dropping)
     {
-      if (temperatureReceived) {
+      if (insideTemperatureReceived) {
         int CurrentMinute=(millis() % 60000) / 1000;
         insideTempAt[CurrentMinute] = mqttTemperature;   
       }
