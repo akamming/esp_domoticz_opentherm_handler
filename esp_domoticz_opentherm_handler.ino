@@ -131,6 +131,7 @@ bool outsideTemperatureReceived=false;
 float insideTempAt[60];
 float outsidetemp[NUMBEROFMEASUREMENTS];
 int outsidetempcursor;
+bool controlledByHTTP = false;
 bool debug=false;
 
 // objects to be used by program
@@ -171,7 +172,7 @@ void SendHTTP(String command, String result) {
   json["Command"] = command;
   json["Result"] = result;
   json["CompileDate"] = compile_date;
-  json["uptime"] =  String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" mins & "+String(s)+" secs"+"\"";
+  json["uptime"] =  String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" mins & "+String(s)+" secs";
 
   // Add Opentherm Status
   if (responseStatus == OpenThermResponseStatus::SUCCESS) {
@@ -266,6 +267,7 @@ void handleCommand() {
 
   // we received a command, so someone is comunicating
   t_last_http_command=millis();
+  controlledByHTTP=true;
 
   // blink the LED, so we can see a command was sent
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off , to indicate we are executing a command
@@ -331,13 +333,13 @@ void handleCommand() {
   if (server.arg("climateMode")!="") {
     Statustext="OK";
     Serial.println("Setting climate mode to "+server.arg("climateMode"));
-    climate_Mode=server.arg("climateMode");
+    HandleClimateMode(server.arg("climateMode").c_str());
   }
 
   // Set climate Setpoint Temp
   if (server.arg("climateSetpoint")!="") {
     Serial.println("Setting Climate Setpoint to "+server.arg("climateSetpoint"));
-    climate_SetPoint=server.arg("climateSetpoint").toFloat();
+    handleClimateSetpoint(server.arg("climateSetpoint").toFloat());
     Statustext="OK";
   }
 
@@ -1440,6 +1442,12 @@ bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode)
   return succeeded;
 }
 
+bool handleClimateSetpoint(float setpoint) {
+    climate_SetPoint=setpoint;
+    InitPID();
+    DelayedSaveConfig();
+  return true;
+}
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
@@ -1466,6 +1474,10 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         CommandSucceeded = HandleClimateMode(SetpointIntToString(int(doc["value"])));
       }
       
+    // Climate setpoint temperature command
+    } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
+      handleClimateSetpoint(String(payloadstr).toFloat());
+
     // Boiler Setpoint mode receive
     } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
       if (jsonerror) {
@@ -1531,14 +1543,6 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       }
     } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
       boiler_SetPoint=String(payloadstr).toFloat();
-
-    // Climate setpoint temperature command
-    } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
-      climate_SetPoint=String(payloadstr).toFloat();
-      if (CommandSucceeded) {
-        InitPID();
-        DelayedSaveConfig();
-      }
 
     // DHW Setpoint temperature commands
     } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
@@ -2227,6 +2231,12 @@ void loop()
     SaveConfig();
   }
 
+  // check if controlling by http stopped
+  if (controlledByHTTP and millis()-t_last_http_command>HTTPTimeoutInMillis) {
+    controlledByHTTP=false;
+    HandleClimateMode(climate_Mode); // do whatever needs to be done to reset the thermostat to the correct climate mode
+  }
+
   // don't do anything if we are doing if OTA upgrade is in progress
   if (!OTAUpdateInProgress) {
     if (millis()-t_heartbeat>heartbeatTickInMillis) {
@@ -2274,7 +2284,7 @@ void loop()
     }
 
     // Handle CLimate program
-      handleClimateProgram(); 
+    handleClimateProgram(); 
     
     // Check if we have to communicatie steering vars
     CommunicateSteeringVarsToMQTT();
