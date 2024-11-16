@@ -174,15 +174,15 @@
                     // console.log("received " + xhttp.responseText);
                     const json = JSON.parse(xhttp.responseText);
                     document.getElementById('otstatus').value = json.OpenThermStatus;
-                    document.getElementById('flame').checked = Boolean(json.Flame);
-                    document.getElementById('fault').checked = Boolean(json.Fault);
-                    document.getElementById('diagnostic').checked = Boolean(json.Diagnostic);
-                    document.getElementById('enableheating').checked = Boolean(json.EnableCentralHeating);
-                    document.getElementById('enablecooling').checked = Boolean(json.EnableCooling);
-                    document.getElementById('enablehotwater').checked = Boolean(json.EnableHotWater);
-                    document.getElementById('heating').checked = Boolean(json.CentralHeating);
-                    document.getElementById('cooling').checked = Boolean(json.Cooling);
-                    document.getElementById('hotwater').checked = Boolean(json.HotWater);
+                    document.getElementById('flame').checked = json.Flame;
+                    document.getElementById('fault').checked = json.Fault;
+                    document.getElementById('diagnostic').checked = json.Diagnostic;
+                    document.getElementById('enableheating').checked = json.EnableCentralHeating;
+                    document.getElementById('enablecooling').checked = json.EnableCooling;
+                    document.getElementById('enablehotwater').checked = json.EnableHotWater;
+                    document.getElementById('heating').checked = json.CentralHeating;
+                    document.getElementById('cooling').checked = json.Cooling;
+                    document.getElementById('hotwater').checked = json.HotWater;
                     document.getElementById('boilersetpoint').value = json.BoilerSetpoint;
                     document.getElementById('boilertemperature').value = json.BoilerTemperature;
                     document.getElementById('hotwatersetpoint').value = json.DHWSetpoint;
@@ -199,9 +199,9 @@
                     document.getElementById('uptime').value = json.uptime;
                     document.getElementById('climateSetpoint').value = json.climateSetpoint;
                     document.getElementById('climateMode').value = json.climateMode;
-                    document.getElementById('weatherDependentMode').checked = Boolean(json.weatherDependentMode);
-                    document.getElementById('HolidayMode').checked = Boolean(json.HolidayMode);
-                    document.getElementById('FrostProtectionActive').checked = Boolean(json.FrostProtectionActive);
+                    document.getElementById('weatherDependentMode').checked = json.weatherDependentMode;
+                    document.getElementById('HolidayMode').checked = json.HolidayMode;
+                    document.getElementById('FrostProtectionActive').checked = json.FrostProtectionActive;
                 }
             };
             if (document.getElementById('takecontrol').checked == false) {

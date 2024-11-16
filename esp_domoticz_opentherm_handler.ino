@@ -161,8 +161,83 @@ void IRAM_ATTR handleInterrupt() {
 }
 
 void SendHTTP(String command, String result) {
-    String message = "{\n  \"InterfaceVersion\":2,\n  \"Command\":\""+command+"\",\n  \"Result\":\""+result+"\""+getSensors()+"\n}";
-    server.send(200, "application/json", message);       //Response to the HTTP request
+  JsonDocument json;
+
+  // generate message
+
+  // Generic
+  json["InterfaceVersion"] = 3;
+  json["Command"] = command;
+  json["Result"] = result;
+  json["CompileDate"] = compile_date;
+  json["uptime"] =  String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" mins & "+String(s)+" secs"+"\"";
+
+  // Add Opentherm Status
+  if (responseStatus == OpenThermResponseStatus::SUCCESS) {
+    json["OpenThermStatus"] = "OK";
+  } else if (responseStatus == OpenThermResponseStatus::NONE) {
+    json["OpenThermStatus"] = "OpenTherm is not initialized";
+  } else if (responseStatus == OpenThermResponseStatus::INVALID) {
+    json["OpenThermStatus"] = "Invalid response";
+  } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
+    json["OpenThermStatus"] = "Response timeout, is the boiler connected?";
+  } else {
+    json["OpenThermStatus"] = "Unknown Status";
+  }
+
+  // Report if we are receiving commands
+  if (not (climate_Mode.equals("off") or Holiday_Mode==true)) {
+    json["ControlledBy"] = "Climate Mode";
+  } else if (millis()-t_last_http_command<HTTPTimeoutInMillis) {
+    json["ControlledBy"] = "HTTP";
+  } else if (millis()-t_last_mqtt_command<MQTTTimeoutInMillis) {
+    json["ControlledBy"] = "MQTT";
+  } else {
+    json["ControlledBy"] = "None";
+  }
+  
+  // Add MQTT Connection status 
+  json["MQTTconnected"] = MQTT.connected() ? "true" : "false";
+  json["MQTTstate"] = MQTT.state();
+
+  // Add BoilerManagementVars
+  json["EnableCentralHeating"] = enableCentralHeating;
+  json["EnableHotWater"] = enableHotWater;
+  json["EnableCooling"] = enableCooling;
+  json["BoilerSetpoint"] = float(int(boiler_SetPoint*100))/100;
+  json["DHWSetpoint"] = dhw_SetPoint;
+  json["climateSetpoint"] = climate_SetPoint;
+  json["climateMode"] = climate_Mode;
+  json["weatherDependentMode"] = Weather_Dependent_Mode;
+  json["HolidayMode"] = Holiday_Mode;
+  json["FrostProtectionActive"] = FrostProtectionActive;
+  
+  // Add BoilerStatus
+  json["CentralHeating"] = CentralHeating;
+  json["HotWater"] = HotWater;
+  json["Cooling"] = Cooling;
+  json["Flame"] = Flame;
+  json["Fault"] = Fault;
+  json["Diagnostic"] = Diagnostic;
+
+   // Add boiler sensors
+  json["BoilerTemperature"] = float(int(boiler_Temperature*100))/100;
+  json["DhwTemperature"] = float(int(dhw_Temperature*100))/100;    
+  json["ReturnTemperature"] = float(int(return_Temperature*100))/100;
+  json["OutsideTemperature"] = float(int(outside_Temperature*100))/100;
+  json["Modulation"] = modulation;
+  json["Pressure"] = pressure;
+  json["Flowrate"] = flowrate;
+  json["FaultCode"] = FaultCode;
+
+  // Add Temp Sensor value
+  json["ThermostatTemperature"] = float(int(currentTemperature+ThermostatTemperatureCalibration*100))/100;
+  json["mqttTemperature"] = float(int(mqttTemperature*100))/100;
+
+   // Send output
+  char buf[1024];
+  serializeJson(json, buf); 
+  server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
 void handleResetWifiCredentials() {
@@ -293,83 +368,6 @@ void handleCommand() {
   digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we executed the command
 
   SendHTTP("SetDHWTemp",Statustext);
-}
-
-String getSensors() { //Handler
-
-  String message;
-
-  // Add Compile Date
-  message = ",\n  \"CompileDate\": \"" + String(compile_date) + "\"";
-
-  // Add uptime
-  message += ",\n  \"uptime\": \"" + String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" mins & "+String(s)+" secs"+"\"";
-
-  // Add Opentherm Status
-  message += ",\n  \"OpenThermStatus\":";
-  if (responseStatus == OpenThermResponseStatus::SUCCESS) {
-      message += "\"OK\"";
-
-  } else if (responseStatus == OpenThermResponseStatus::NONE) {
-      message += "\"OpenTherm is not initialized\"";
-  } else if (responseStatus == OpenThermResponseStatus::INVALID) {
-      message += "\"Invalid response\"";
-  } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
-      message += "\"Response timeout, is the boiler connected?\"";
-  } else {
-      message += "\"Unknown Status\"";
-  }
-
-  // Report if we are receiving commands
-  if (not (climate_Mode.equals("off") or Holiday_Mode==true)) {
-    message += ",\n  \"ControlledBy\": \"Climate Mode\""; // Climate mode overrules everything else
-  } else if (millis()-t_last_http_command<HTTPTimeoutInMillis) {
-    message += ",\n  \"ControlledBy\": \"HTTP\""; // HTTP overrules MQTT so check HTTP 1st
-  } else if (millis()-t_last_mqtt_command<MQTTTimeoutInMillis) {
-    message += ",\n  \"ControlledBy\": \"MQTT\""; // then check if MQTT command was given
-  } else {
-    message += ",\n  \"ControlledBy\": \"None\""; // no commands given lately
-  }
-  
-  // Add MQTT Connection status 
-  message += ",\n  \"MQTTconnected\": " + String(MQTT.connected() ? "true" : "false");
-  message += ",\n  \"MQTTstate\": " + String(MQTT.state());
-
-  // Add BoilerManagementVars
-  message += ",\n  \"EnableCentralHeating\": " + String(enableCentralHeating ? "\"on\"" : "\"off\"");
-  message += ",\n  \"EnableHotWater\": " + String(enableHotWater ? "\"on\"" : "\"off\"");
-  message += ",\n  \"EnableCooling\": " + String(enableCooling ? "\"on\"" : "\"off\"");
-  message +=",\n  \"BoilerSetpoint\": " + (String(boiler_SetPoint));
-  message +=",\n  \"DHWSetpoint\": " + (String(dhw_SetPoint));
-  message +=",\n  \"climateSetpoint\": " + String(climate_SetPoint);
-  message +=",\n  \"climateMode\": \"" + String(climate_Mode) + "\"";
-  message +=",\n  \"weatherDependentMode\": " + String(Weather_Dependent_Mode ? "\"on\"" : "\"off\"");
-  message +=",\n  \"HolidayMode\": " + String(Holiday_Mode ? "\"on\"" : "\"off\"");
-  message +=",\n  \"FrostProtectionActive\": " + String(FrostProtectionActive ? "\"on\"" : "\"off\"");
-  
-  // Add BoilerStatus
-  message += ",\n  \"CentralHeating\": " + String(CentralHeating ? "\"on\"" : "\"off\"");
-  message += ",\n  \"HotWater\": " + String(HotWater ? "\"on\"" : "\"off\"");
-  message += ",\n  \"Cooling\": " + String(Cooling ? "\"on\"" : "\"off\"");
-  message += ",\n  \"Flame\": " + String(Flame ? "\"on\"" : "\"off\"");
-  message += ",\n  \"Fault\": " + String(Fault ? "\"on\"" : "\"off\"");
-  message += ",\n  \"Diagnostic\": " + String(Diagnostic ? "\"on\"" : "\"off\"");
-
-   // Add boiler sensors
-  message +=",\n  \"BoilerTemperature\": " + (String)boiler_Temperature;
-  message +=",\n  \"DhwTemperature\": " + String(dhw_Temperature);    
-  message +=",\n  \"ReturnTemperature\": " + String(return_Temperature);
-  message +=",\n  \"OutsideTemperature\": " + String(outside_Temperature);
-  message +=",\n  \"Modulation\": " + String(modulation);
-  message +=",\n  \"Pressure\": " + String(pressure);
-  message +=",\n  \"Flowrate\": " + String(flowrate);
-  message +=",\n  \"FaultCode\": " + String(FaultCode);
-
-  // Add Temp Sensor value
-  message +=",\n  \"ThermostatTemperature\": " + (String(currentTemperature+ThermostatTemperatureCalibration));
-  message +=",\n  \"mqttTemperature\": " + (String(mqttTemperature));
-
-  return message;
 }
 
 void handleGetInfo()
