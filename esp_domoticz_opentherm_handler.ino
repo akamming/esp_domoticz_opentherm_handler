@@ -122,6 +122,7 @@ unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP com
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=0; // last climate heartbeat timestamp
 unsigned long t_save_config; // timestamp for delayed save
+unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
 bool ClimateConfigSaved=true;
 bool OTAUpdateInProgress=false;
 bool insideTemperatureReceived=false;
@@ -2235,7 +2236,10 @@ void loop()
       // (Re)connect MQTT
       if (!MQTT.connected()) {
         // We are no connected, so try to reconnect
-        reconnect();
+        if (millis()-t_last_mqtt_try_connect>MQTTConnectTimeoutInMillis) {
+          reconnect();
+          t_last_mqtt_try_connect=millis();
+        }
       } else {
         // we are connected, check if we have to resend discovery info
         if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis)

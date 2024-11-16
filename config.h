@@ -27,6 +27,7 @@ const char Holiday_Mode_Name[] = "HolidayMode";
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
+const int MQTTConnectTimeoutInMillis = 3*1000;     // the time to reconnect if disconnect occurred 
 const int MQTTTimeoutInMillis = 15 * 1000;              // if no command was sent in this period, the program will assume the MQTT client is no longer there
 const int HTTPTimeoutInMillis = 10 * 1000;              // if no command was sent during this periode, the program will assume HTTP control stopped.
 const int heartbeatTickInMillis = 1000;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
