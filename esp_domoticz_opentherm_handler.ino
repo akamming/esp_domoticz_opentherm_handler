@@ -2234,7 +2234,7 @@ void loop()
   // check if controlling by http stopped
   if (controlledByHTTP and millis()-t_last_http_command>HTTPTimeoutInMillis) {
     controlledByHTTP=false;
-    HandleClimateMode(climate_Mode); // do whatever needs to be done to reset the thermostat to the correct climate mode
+    HandleClimateMode(climate_Mode.c_str()); // do whatever needs to be done to reset the thermostat to the correct climate mode
   }
 
   // don't do anything if we are doing if OTA upgrade is in progress
