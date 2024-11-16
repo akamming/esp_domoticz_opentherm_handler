@@ -251,6 +251,45 @@ void handleCommand() {
     }
   }
 
+  // Set Climate Mode
+  if (server.arg("climateMode")!="") {
+    Statustext="OK";
+    Serial.println("Setting climate mode to "+server.arg("climateMode"));
+    climate_Mode=server.arg("climateMode");
+  }
+
+  // Set climate Setpoint Temp
+  if (server.arg("climateSetpoint")!="") {
+    Serial.println("Setting Climate Setpoint to "+server.arg("climateSetpoint"));
+    climate_SetPoint=server.arg("climateSetpoint").toFloat();
+    Statustext="OK";
+  }
+
+  // Enable/Disable WeatherDependentMode
+  if (server.arg("weatherDependentMode")!="") {
+    Statustext="OK";
+    if (server.arg("weatherDependentMode").equalsIgnoreCase("On")) {
+      Serial.println("Enabling WeatherDependentMode");
+      Weather_Dependent_Mode=true;
+    } else {
+      Serial.println("Disabling WeatherDependentMode");
+      Weather_Dependent_Mode=false;
+    }
+  }
+
+  // Enable/Disable HolidayMode
+  if (server.arg("holidayMode")!="") {
+    Statustext="OK";
+    if (server.arg("holidayMode").equalsIgnoreCase("On")) {
+      Serial.println("Enabling holidayMode");
+      Holiday_Mode=true;
+    } else {
+      Serial.println("Disabling Holiday Mode");
+      Holiday_Mode=false;
+    }
+  }
+
+
   digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we executed the command
 
   SendHTTP("SetDHWTemp",Statustext);
