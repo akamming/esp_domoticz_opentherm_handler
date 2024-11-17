@@ -233,7 +233,7 @@ void SendHTTP(String command, String result) {
   json["FaultCode"] = FaultCode;
 
   // Add Temp Sensor value
-  json["ThermostatTemperature"] = float(int(currentTemperature+ThermostatTemperatureCalibration*100))/100;
+  json["ThermostatTemperature"] = float(int((currentTemperature+ThermostatTemperatureCalibration)*100))/100;
   json["mqttTemperature"] = float(int(mqttTemperature*100))/100;
 
    // Send output
