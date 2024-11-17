@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta name="viewport" content="width=300">
+    <meta name="viewport" content="width=device-width">
     <title>OpenTherm Control</title>
     <link rel="stylesheet" href="index.css">
 </head>
@@ -20,12 +20,12 @@
     <div class="outer_frame">
         <p>Thermostat</p><br />
         Setpoint <input type="number" class="temp_input" id="climateSetpoint" size="10" step="0.5" onchange="onThermostatChanged()"><br />
-        Mode <select name="climateMode" id="climateMode" onchange="onThermostatChanged()">
+        <label>Mode <select name="climateMode" id="climateMode" onchange="onThermostatChanged()">
                 <option value="off">Off</option>
                 <option value="heat">Heating</option>
                 <option value="cool">Cooling</option>
                 <option value="auto">Auto</option>
-            </select><br />
+            </select></label><br />
         <label><input type="checkbox" name="weatherDependentMode" id="weatherDependentMode" onchange="onThermostatChanged()">weatherDependentMode</label><br />
         <label><input type="checkbox" name="HolidayMode" id="HolidayMode" onchange="onThermostatChanged()">HolidayMode</label><br /><br />
         <label><input type="checkbox" name="FrostProtectionActive" id="FrostProtectionActive" disabled>FrostProtectionActive</label><br />
