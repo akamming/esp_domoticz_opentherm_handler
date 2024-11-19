@@ -40,19 +40,20 @@ The following device are created using MQTT autodiscovery in domoticz and home a
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
 
 ### Thermostat mode
-Additional 3 more devices:
+Additional 3 more devices :
 - a Climate setpoint Device (when you want to use the firmware in thermostat mode)
 - a Holiday Mode  switch: Prevents heating when in themostat mode (only frostprotection)
 - a Weather Dependent Mde switch: When in thermostat mode decides wheter to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature 
 
-
 ## Installation
-Installation is simple, but for newbies i esp8266 here's the detailed explanation:
+
+### Hardware
 - Connect your OpenTherm adapter to the Wemos D1 mini and the boiler, according to http://ihormelnyk.com/opentherm_adapter. 
+
+### Firmware
 - Connect your Wemos D1 to the USB of your laptop/pc
 - A new com port should now be available on your system. If not, install CH340 drivers (https://www.wemos.cc/en/latest/ch340_driver.html) 
-- Install Arduino IDE (https://www.arduino.cc/en/software). Use the legacy version (1.8 or lower, cause 2.0 does not yet support plugins which you will need for uploading sketch data)
-- Install Arduino-esp8266littlefs-plugin (https://github.com/earlephilhower/arduino-esp8266littlefs-plugin)
+- Install Arduino IDE (https://www.arduino.cc/en/software). 
 - Within Arduino IDE, 
     - Add support of your ESP8266 board by adding https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the Arduino board management settings (menu File, Settings, "more boardmanager urls")
     - Install the following libraries if they are not present on your system (menu Tools / Manage Libraries in Arduino IDE): 
@@ -64,31 +65,29 @@ Installation is simple, but for newbies i esp8266 here's the detailed explanatio
         - PubSubClient (by Nick O'Leary)
     - do a "git clone https://github.com/akamming/esp_domoticz_opentherm_handler"
     - using arduino open the .ino file in the cloned dir
-    - OPTIONAL: adjust config.h for your default config settings. 
     - Open the board manager (menu Tools / Board / Board Manager)
     - Search for ESP8266 and click install, then close
     - Select your Board type, "LOLIN(WEMOS) D1 R2 & mini" if you use a Wemos D1 but in principle any ESP8266 board should work (menu Tools/Board)
     - Select the com Port to which your wemos is connected (menu Tools / Port)
     - Upload the firmware to your Wemos (menu Sketch / Upload)
-    - Upload the data to your Wemos (menu Tools / ESP8266 LittleFS Data Upload)
 
- ## Configuration
- ### Wifi config 
- - For connecting to wifi:
-      - connect with a device to WiFi Access Point "Thermostat"
-      - browse to http://192.168.4.1
-      - follow instructions to connect the ESP to correct WiFi network
+### First Time setup
+For connecting to wifi:
+- on your laptop/PC: connect to a WiFi Access Point called "Thermostat"
+- browse to http://192.168.4.1
+- follow instructions to connect the ESP to correct WiFi network
+- After the ESP is connected, connect to your normal Wifi Access Point again 
+- Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser to connect to the device. 
+- If all went correct you should now see a "File not found" error including some buttons to upload files (go to next step), on that page: Upload index.html, index.css and favicon.ico
 
- ### Other Settings & Controlling heating/cooling manually
-- (After you've setup the wifi connection, see above) 
+## Configuration
+(After you've complete the installation, see above): 
 - Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser  
-- Configure at least MQTT settings if you want to be able to control using Domoticz or Home Assistant (in that case also enable MQTT autodiscovery in Domoticz and/or Home Assistant)
-- or use this link to see the value of the sensors and/or control the device using this UI (in the latter: Hit the "take control button". Warning: MQTT commands won't work as long as this webpage is still active, so make sure to reset the take control switch or close the webpage again)  
+- See below for an explanation of the settings (make sure you configure the MQTT settings and a MQTT temperature topic if you want to be able to control the thermostat from domoticz and/or home assistant)
+- you can also use this page to control the boiler or thermostat directly 
   
-## Thermostat mode
-As of release 1.0. It also includes thermostat mode. This only works when MQTT is configured. Additionally you need to configure the following settings (http://domesphelper.local):
 ### MQTT settings 
-- MQTT should be switch on
+- MQTT should be switched on
 - MQTT temperature topic: should be either 
   - the MQTT State topic of your temperature sensor 
   - The IDX of your domoticz device (it will listen to domoticz/out. Note, this is not recommended, cause the device than has to check every domoticz device update on if it's the temperature sensor, which will make the device very slow if domoticz has many device updates!)
@@ -101,7 +100,7 @@ About the mqtt temperature topic: If you want to use a domoticz sensor to be use
 - In the settings of this ESP firmware: Set the MQTT switch to on, and the MQTT temperature Topic to "domoticz/out/<idx of your temperature device>"
 
 ### Boiler settings:
-- MinBoilerTemp & MaxBOilerTemp: The thermostat will limit the setpoint for the boiler between these 2 values
+- MinBoilerTemp & MaxBoilerTemp: The thermostat will limit the setpoint for the boiler between these 2 values
 - MiminumTemp difference: Heating will only be switched on if the boiler setpoint if this amount above the reference room temperature
 - Frostprotection setpoint: If thermostat switched off, heating will still be on if reference termperature below this point
 - PID parameters: Leave to 30 (KP), 0.03 (KI) and 2.5(KD), unless you know what you are doing.  The software contains a regular PID controller (https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) So with KP, KI and KD you can tweak the mechanism to your needs   
@@ -112,3 +111,15 @@ About the mqtt temperature topic: If you want to use a domoticz sensor to be use
 - Switchheatingoffat: Disable the heating when the outside temp is above this value 
 - Refroomcompensation: Can change the boiler setpoint if the reference room temperature is lower than the climate setpoint
 
+## Controlling the Device
+The device can be controlled either by the MQTT devices (see above) or by navigating to the homepage 
+
+## Backup/Restore config
+
+### Backing up the config
+- Using a browser, navigate to http://domesphelper/config.json. 
+- Copy and past the json and store it on a save position
+- Alternatively you could write a script which does a curl or a wget command to get http://domesphelper/config.json
+
+### Restoring the config
+- Upload your saved config.json file on http://domesphelper/upload
