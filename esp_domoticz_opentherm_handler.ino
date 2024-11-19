@@ -134,6 +134,9 @@ int outsidetempcursor;
 bool controlledByHTTP = false;
 bool debug=false;
 
+// object for uploading files
+File fsUploadFile;
+
 // objects to be used by program
 ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
 OneWire oneWire(OneWireBus);  // for OneWire Bus
@@ -423,6 +426,46 @@ String getCurvatureStringFromInt(int i)
   }
 }
 
+void sendUploadForm()
+{
+  Serial.println("sendUploadForm");
+
+  server.send(200, "text/html", (String("Use this form to upload index.html, favicon.ico and index.css<BR /><BR />")+String(HTTP_UPLOAD_FORM)).c_str());       //Response to the HTTP request
+}
+
+void handleFileUpload(){ // upload a new file to the SPIFFS
+  HTTPUpload& upload = server.upload();
+  if(upload.status == UPLOAD_FILE_START){
+    Debug("Upload file start");
+    String filename = upload.filename;
+    if(!filename.startsWith("/")) filename = "/"+filename;
+    Serial.print("handleFileUpload Name: "); Serial.println(filename);
+    Debug("HandleFileUpload Name "+filename);
+    fsUploadFile = LittleFS.open(filename, "w");            // Open the file for writing in LittleFS (create if it doesn't exist)
+    if (!fsUploadFile) {
+      server.send(500, "text/plain", "500: couldn't create file");
+    }
+    filename = String();
+  } else if(upload.status == UPLOAD_FILE_WRITE){
+    Debug("Upload file write");
+    if(fsUploadFile)
+      fsUploadFile.write(upload.buf, upload.currentSize); // Write the received bytes to the file
+  } else if(upload.status == UPLOAD_FILE_END){
+    Debug("Upload file end");
+    if(fsUploadFile) {                                    // If the file was successfully created
+      fsUploadFile.close();                               // Close the file again
+      Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
+      // server.send(200, "text/plain", "File succesfully uploaded");
+      server.send(200, "text/html", (String(upload.filename)+
+                                      String(" succesfully uploaded (")+
+                                      String(upload.totalSize)+String(" bytes), do you want to upload another file?<BR /><BR />")+
+                                      String(HTTP_UPLOAD_FORM)).c_str()); // send form to upload another file
+    } else {
+      server.send(500, "text/plain", "500: couldn't create file");
+    }
+  }
+}
+
 void handleGetConfig()
 {
   Serial.println("GetConfig");
@@ -546,7 +589,8 @@ void handleRemoveConfig() {
     ESP.restart(); // restart
   } else {
     server.send(200, "text/plain", "No confile file present to remove");
-  }
+  } 
+
   return;
 }
 
@@ -596,6 +640,7 @@ bool serveFile(const char url[])
     else if (endsWith(path,".pdf") ) server.streamFile(file, "application./x-pdf");
     else if (endsWith(path,".zip") ) server.streamFile(file, "application./x-zip");
     else if (endsWith(path,".gz") ) server.streamFile(file, "application./x-gzip");
+    else if (endsWith(path,".json") ) server.streamFile(file, "application/json");
     else server.streamFile(file, "text/plain");
     file.close();
     return true;
@@ -610,14 +655,16 @@ void handleNotFound()
   if (!serveFile(server.uri().c_str()))
   {
     // create 404 message if no file was found for this URI
-    String message = "File Not Found\n\nURI: "+server.uri() + "\nMethod: "+ ( server.method() == HTTP_GET ? "GET" : "POST" ) + "\nArguments "+server.args()+"\n";
+    String message = "File Not Found\n\nURI: "+server.uri() + "\nMethod: "+ ( server.method() == HTTP_GET ? "GET" : "POST" ) + "\nArguments "+server.args()+"<BR />";
     
     for (uint8_t i = 0; i < server.args(); i++)
     {
-      message += server.argName(i)+"="+server.arg(i)+"\n";
+      message += server.argName(i)+"="+server.arg(i)+"<BR />";
     }
+
+    message += "<BR /><a href=\"upload\">Click here to upload index.html, favicon.ico and index.css</a>";
     
-    server.send(404, "text/plain", message.c_str());
+    server.send(404, "text/html", message.c_str());
   }
 }
 
@@ -2108,6 +2155,7 @@ void PublishAllMQTTSensors()
 
 }
 
+
 // The setup code
 void setup()
 {
@@ -2145,7 +2193,9 @@ void setup()
   server.on("/saveconfig", handleSaveConfig);
   server.on("/removeconfig", handleRemoveConfig);
   server.on("/reset", handleReset);
-  server.on("/command", handleCommand);   
+  server.on("/command", handleCommand); 
+  server.on("/upload", HTTP_GET, sendUploadForm);  
+  server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
   server.onNotFound(handleNotFound);
 
   // Initialize OTA

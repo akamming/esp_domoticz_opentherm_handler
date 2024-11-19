@@ -81,3 +81,6 @@ int BoilerTempAtMinus10 = 50;               // for calculating when in weather d
 int Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 int SwitchHeatingOffAt = 19;                // Automatic switch off when in weather dependent mode when outside temp too high
 int ReferenceRoomCompensation = 3;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
+
+// uploadform
+const char HTTP_UPLOAD_FORM[] PROGMEM = "<form method=\"post\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"name\"><input class=\"button\" type=\"submit\" value=\"Upload\"></form>";
