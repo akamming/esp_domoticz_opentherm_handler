@@ -99,7 +99,14 @@ float mqtt_pressure=3;
 unsigned char mqtt_FaultCode=65;
 String mqtt_climate_Mode = "abcd"; 
 float mqtt_minboilertemp=0;
-
+float mqtt_maxboilertemp=0;
+float mqtt_minimumTempDifference=99;              // Minum tempdiffernce before heating or cooling switches on
+float mqtt_FrostProtectionSetPoint =99;            // Automatically heat when in frostprotection and below this temperature
+float mqtt_BoilerTempAtPlus20 = 99;                // for calculating when in weather dependent mode
+float mqtt_BoilerTempAtMinus10 = 99;               // for calculating when in weather dependent mode
+// float Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
+float mqtt_SwitchHeatingOffAt = 99;                // Automatic switch off when in weather dependent mode when outside temp too high
+float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
 
 
 // ot actions (main will loop through these actions in this order)
@@ -853,6 +860,13 @@ if (MQTT.connected()) {
 
     // Communicatie the steering vars
     CommunicateNumber(MinBoilerTemp_Name,MinBoilerTemp,&mqtt_minboilertemp);
+    CommunicateNumber(MaxBoilerTemp_Name,MaxBoilerTemp,&mqtt_maxboilertemp);
+    CommunicateNumber(MinimumTempDifference_Name,minimumTempDifference,&mqtt_minimumTempDifference);
+    CommunicateNumber(FrostProtectionSetPoint_Name,FrostProtectionSetPoint,&mqtt_FrostProtectionSetPoint);
+    CommunicateNumber(BoilerTempAtPlus20_Name,BoilerTempAtPlus20,&mqtt_BoilerTempAtPlus20);
+    CommunicateNumber(BoilerTempAtMinus10_Name,BoilerTempAtMinus10,&mqtt_BoilerTempAtMinus10);
+    CommunicateNumber(SwitchHeatingOffAt_Name,SwitchHeatingOffAt,&mqtt_SwitchHeatingOffAt);
+    CommunicateNumber(ReferenceRoomCompensation_Name,ReferenceRoomCompensation,&mqtt_ReferenceRoomCompensation);
 
     // The actual temperature for the climate device. Now the temp required from mqtt. But should be made switchable to other sources 
     if (mqttTemperature!=mqtt_mqttTemperature and insideTemperatureReceived) {
@@ -1619,16 +1633,43 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           SetMQTTTemperature(String(payloadstr).toFloat()); // Just try to convert to Float
         }
       }
+
+    // Boiler Vars
     } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
       MinBoilerTemp=String(payloadstr).toFloat();
       DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(MaxBoilerTemp_Name))) {
+      MaxBoilerTemp=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(MinimumTempDifference_Name))) {
+      minimumTempDifference=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(FrostProtectionSetPoint_Name))) {
+      FrostProtectionSetPoint=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtPlus20_Name))) {
+      BoilerTempAtPlus20=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtMinus10_Name))) {
+      BoilerTempAtMinus10=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(SwitchHeatingOffAt_Name))) {
+      SwitchHeatingOffAt=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
+      ReferenceRoomCompensation=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+
+
+
+    // Domoticz devices
     } else if (topicstr.equals(domoticzoutputtopic)) {
       // See if it was the device we needed
       // Debug("Received domoticz device reading: "+String(doc["idx"])+","+String(doc["name"]));
       if (mqtttemptopic.equals(doc["idx"].as<String>())) {
         SetMQTTTemperature(doc["svalue1"].as<float>());
       }
-      
+
     // Unrecognized  
     } else {
       LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
@@ -2051,12 +2092,13 @@ void PublishMQTTNumber(const char* uniquename, int min, int max)
   json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/number/"+String(uniquename)+"/state";
   json["cmd_t"] = host+"/number/"+String(uniquename)+"/set";
-  json["stat_tpl"] = "{{value_json.value}}";
+  // json["stat_tpl"] = "{{value_json.value}}";
 
   json["min"] = min;
   json["max"] = max;
   json["step"] = 0.5;
-  json["unit_of_mesurement"] = "C";
+  json["unit_of_measurement"] = "°C";
+  json["mode"] = "slider"; 
 
   JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
@@ -2206,7 +2248,14 @@ void PublishAllMQTTSensors()
   PublishMQTTSetpoint(Climate_Name,5,30,true);
 
   // publish parameters
-  PublishMQTTNumber(MinBoilerTemp_Name,10,90);
+  PublishMQTTNumber(MinBoilerTemp_Name,10,50);
+  PublishMQTTNumber(MaxBoilerTemp_Name,50,90);
+  PublishMQTTNumber(MinimumTempDifference_Name,0,20);
+  PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90);
+  PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90);
+  PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90);
+  PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90);
+  PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {

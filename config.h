@@ -25,6 +25,14 @@ const char Climate_Name[] = "Climate";
 const char Weather_Dependent_Mode_Name[] = "WeatherDependentMode";
 const char Holiday_Mode_Name[] = "HolidayMode";
 const char MinBoilerTemp_Name[] = "MinimumBoilerTemp";
+const char MaxBoilerTemp_Name[] = "MaximumBoilerTemp";
+const char MinimumTempDifference_Name[] = "MinimumTempDifference";              // Minum tempdiffernce before heating or cooling switches on
+const char FrostProtectionSetPoint_Name[] = "FrostProtectionSetPoint";          // Automatically heat when in frostprotection and below this temperature
+const char BoilerTempAtPlus20_Name[] = "BoilerTempAtPlus20";                    // for calculating when in weather dependent mode
+const char BoilerTempAtMinus10_Name[] = "BoilerTempAtMinus10";                  // for calculating when in weather dependent mode
+// const char Curvature_Name[]="Curavature";                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
+const char SwitchHeatingOffAt_Name[] = "SwitchHeatingOffAt";                    // Automatic switch off when in weather dependent mode when outside temp too high
+const char ReferenceRoomCompensation_Name[] = "ReferenceRoomCompensation";           // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
@@ -73,15 +81,15 @@ float KI = 0.01; // Integral Gain: This is the multiplier of the error (e.g. KI=
 float KD = 2.5; // Derative Gain:  Correction per every Delta K per Hour (e.g. KD=2.5: if the temp rises with 1 K per Hour, the PID will be lowered with 2.5 degrees)
 
 //Boiler settings
-int MaxBoilerTemp = 50;                     // Max boiler temp when in climate mode
-int MinBoilerTemp = 10;                     // Min Boiler temp when in climate mode
+float MaxBoilerTemp = 50;                     // Max boiler temp when in climate mode
+float MinBoilerTemp = 10;                     // Min Boiler temp when in climate mode
 float minimumTempDifference=3;              // Minum tempdiffernce before heating or cooling switches on
-int FrostProtectionSetPoint = 6;            // Automatically heat when in frostprotection and below this temperature
-int BoilerTempAtPlus20 = 20;                // for calculating when in weather dependent mode
-int BoilerTempAtMinus10 = 50;               // for calculating when in weather dependent mode
+float FrostProtectionSetPoint = 6;            // Automatically heat when in frostprotection and below this temperature
+float BoilerTempAtPlus20 = 20;                // for calculating when in weather dependent mode
+float BoilerTempAtMinus10 = 50;               // for calculating when in weather dependent mode
 int Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
-int SwitchHeatingOffAt = 19;                // Automatic switch off when in weather dependent mode when outside temp too high
-int ReferenceRoomCompensation = 3;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
+float SwitchHeatingOffAt = 19;                // Automatic switch off when in weather dependent mode when outside temp too high
+float ReferenceRoomCompensation = 3;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
 
 // uploadform
 const char HTTP_UPLOAD_FORM[] PROGMEM = "<form method=\"post\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"name\"><input class=\"button\" type=\"submit\" value=\"Upload\"></form>";
