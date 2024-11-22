@@ -24,6 +24,7 @@ const char FaultCode_Name[] = "Faultcode";
 const char Climate_Name[] = "Climate";
 const char Weather_Dependent_Mode_Name[] = "WeatherDependentMode";
 const char Holiday_Mode_Name[] = "HolidayMode";
+const char MinBoilerTemp_Name[] = "MinimumBoilerTemp";
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image

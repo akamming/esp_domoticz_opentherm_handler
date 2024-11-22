@@ -98,6 +98,8 @@ float mqtt_dhw_setpoint=0;
 float mqtt_pressure=3; 
 unsigned char mqtt_FaultCode=65;
 String mqtt_climate_Mode = "abcd"; 
+float mqtt_minboilertemp=0;
+
 
 
 // ot actions (main will loop through these actions in this order)
@@ -813,8 +815,22 @@ float getDHWFlowrate() {
   return ot.isValidResponse(response) ? ot.getFloat(response) : 0;
 }
 
-void CommunicateSteeringVarsToMQTT()
-{
+void CommunicateSetpoint(const char* setpointName,float setpointValue,float *mqttValue) {
+  // Debug("CommunicateSetpoint("+String(setpointName)+","+String(setpointValue)+","+String(*mqttValue)+"), diff is "+String(setpointValue-*mqttValue));
+  if (not (setpointValue-*mqttValue>-0.1 and setpointValue-*mqttValue<0.1)) { 
+    UpdateMQTTSetpoint(setpointName,setpointValue);
+    *mqttValue=setpointValue;
+  }
+}
+
+void CommunicateNumber(const char* numberName,float Value,float *mqttValue) {
+  if (not (Value-*mqttValue>-0.1 and Value-*mqttValue<0.1)){ // value changed
+    UpdateMQTTNumber(numberName,Value);
+    *mqttValue=Value;
+  }
+}
+
+void CommunicateSteeringVarsToMQTT() {
 if (MQTT.connected()) {
     // Climate Mode
     if (!climate_Mode.equals(mqtt_climate_Mode)){ // value changed
@@ -830,28 +846,18 @@ if (MQTT.connected()) {
       mqtt_climate_Mode=climate_Mode;
     }
 
-    // Climate Setpoint
-    if ((climate_SetPoint-mqtt_climate_setpoint)>=0.1 or (climate_SetPoint-mqtt_climate_setpoint)<=-0.1){ // value changed
-      UpdateMQTTSetpoint(Climate_Name,climate_SetPoint);
-      mqtt_climate_setpoint=climate_SetPoint;
-    }
+    // Communicate the setpoints
+    CommunicateSetpoint(Climate_Name,climate_SetPoint,&mqtt_climate_setpoint);
+    CommunicateSetpoint(Boiler_Setpoint_Name,boiler_SetPoint,&mqtt_boiler_setpoint);
+    CommunicateSetpoint(DHW_Setpoint_Name,dhw_SetPoint,&mqtt_dhw_setpoint);
+
+    // Communicatie the steering vars
+    CommunicateNumber(MinBoilerTemp_Name,MinBoilerTemp,&mqtt_minboilertemp);
 
     // The actual temperature for the climate device. Now the temp required from mqtt. But should be made switchable to other sources 
     if (mqttTemperature!=mqtt_mqttTemperature and insideTemperatureReceived) {
       UpdateMQTTSetpointTemperature(Climate_Name,mqttTemperature);
       mqtt_mqttTemperature=mqttTemperature;
-    }
-
-    // Climate Setpoint
-    if ((boiler_SetPoint-mqtt_boiler_setpoint)>=0.1 or (boiler_SetPoint-mqtt_boiler_setpoint)<=-0.1){ // value changed
-      UpdateMQTTSetpoint(Boiler_Setpoint_Name,boiler_SetPoint);
-      mqtt_boiler_setpoint=boiler_SetPoint;
-    }
-
-    // DHW Setpoint
-    if ((dhw_SetPoint-mqtt_dhw_setpoint)>=0.1 or (dhw_SetPoint-mqtt_dhw_setpoint)<=-0.1){ // value changed
-      UpdateMQTTSetpoint(DHW_Setpoint_Name,dhw_SetPoint);
-      mqtt_dhw_setpoint=dhw_SetPoint;
     }
 
     // Enable CEntral Heating
@@ -1357,6 +1363,11 @@ String SetpointCommandTopic(const char* DeviceName){
   return String(host)+"/climate/"+String(DeviceName)+"/cmd_temp";
 }
 
+String NumberCommandTopic(const char* DeviceName){
+  return String(host)+"/number/"+String(DeviceName)+"/set";
+}
+
+
 void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
   MQTT.publish((String(host)+"/debug").c_str(),("ERROR: Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str(),mqttpersistence);
 }
@@ -1608,15 +1619,16 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           SetMQTTTemperature(String(payloadstr).toFloat()); // Just try to convert to Float
         }
       }
+    } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
+      MinBoilerTemp=String(payloadstr).toFloat();
+      DelayedSaveConfig();
     } else if (topicstr.equals(domoticzoutputtopic)) {
       // See if it was the device we needed
       // Debug("Received domoticz device reading: "+String(doc["idx"])+","+String(doc["name"]));
       if (mqtttemptopic.equals(doc["idx"].as<String>())) {
         SetMQTTTemperature(doc["svalue1"].as<float>());
-        Debug("Gotcha: Temp is "+String(mqttTemperature));
-        Debug(payloadstr);
       }
-
+      
     // Unrecognized  
     } else {
       LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
@@ -1966,9 +1978,7 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
   MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
-
-
-void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool includecooling)
+void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool includeCooling)
 {
   Serial.println("PublishMQTTSetpoint");
   JsonDocument json;
@@ -1977,27 +1987,27 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   char conf[1024];
   json["min_temp"] = mintemp;
   json["max_temp"] = maxtemp;
-  JsonArray modes = json["modes"].to<JsonArray>();
-  modes.add("off");
-  modes.add("heat");
-  if (includecooling) {
-    modes.add("cool");
-    modes.add("auto");
-  }
 
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
   json["temp_cmd_t"] = host+"/climate/"+String(uniquename)+"/cmd_temp";
   json["temp_stat_t"] = host+"/climate/"+String(uniquename)+"/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
-  json["curr_temp_t"] = host+"/climate/"+String(uniquename)+"/Air_temperature";
-  json["curr_temp_tpl"] = "{{ value_json.value }}";
-  json["mode_stat_t"] = host+"/climate/"+String(uniquename)+"/mode";
-  json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
-  json["mode_stat_tpl"] =  "{{ {"+String(OFF)+": \"off\", "+String(HEAT)+": \"heat\", "+String(COOL)+": \"cool\", "+String(AUTO)+": \"auto\"}[value_json.value] | default('off') }}";
   json["temp_step"] = 0.5;
   json["temp_unit"] = "C";
   json["precision"] = 0.1;
+  json["curr_temp_t"] = host+"/climate/"+String(uniquename)+"/Air_temperature";
+  json["curr_temp_tpl"] = "{{ value_json.value }}";
+  JsonArray modes = json["modes"].to<JsonArray>();
+  modes.add("off");
+  modes.add("heat");
+  if (includeCooling) {
+    modes.add("cool");
+    modes.add("auto");
+  }
+  json["mode_stat_t"] = host+"/climate/"+String(uniquename)+"/mode";
+  json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
+  json["mode_stat_tpl"] =  "{{ {"+String(OFF)+": \"off\", "+String(HEAT)+": \"heat\", "+String(COOL)+": \"cool\", "+String(AUTO)+": \"auto\"}[value_json.value] | default('off') }}";
 
   JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
@@ -2028,6 +2038,56 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
   // serializeJson(json, jsonstr);  // conf now contains the json
 
   MQTT.publish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence);
+}
+
+
+void PublishMQTTNumber(const char* uniquename, int min, int max)
+{
+  Debug("PublishMQTTNumber");
+  JsonDocument json;
+
+  // Create message
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["stat_t"] = host+"/number/"+String(uniquename)+"/state";
+  json["cmd_t"] = host+"/number/"+String(uniquename)+"/set";
+  json["stat_tpl"] = "{{value_json.value}}";
+
+  json["min"] = min;
+  json["max"] = max;
+  json["step"] = 0.5;
+  json["unit_of_mesurement"] = "C";
+
+  JsonObject dev = json["dev"].to<JsonObject>();
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
+  char conf[1024];
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.subscribe((host+"/number/"+String(uniquename)+"/set").c_str());
+  Debug("Publish to "+String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config");
+}
+
+void UpdateMQTTNumber(const char* uniquename,float value)
+{
+  Serial.println("UpdateMQTTSetpointtemperature");
+  JsonDocument json;
+
+  // Construct JSON config message
+  // json["value"] = value;
+
+  // char jsonstr[128];
+  // serializeJson(json, jsonstr);  // conf now contains the json
+
+  MQTT.publish((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence);
 }
 
 void UpdateMQTTBoilerSetpointMode()
@@ -2144,6 +2204,9 @@ void PublishAllMQTTSensors()
   PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);
   PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false);
   PublishMQTTSetpoint(Climate_Name,5,30,true);
+
+  // publish parameters
+  PublishMQTTNumber(MinBoilerTemp_Name,10,90);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
