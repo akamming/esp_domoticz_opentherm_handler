@@ -1,6 +1,10 @@
 # esp_domoticz_opentherm_handler
 custom made EPS8266 firmware for OpenTherm Adapter (http://ihormelnyk.com/opentherm_adapter). Connects to Home Assistant and Domoticz using MQTT autodiscovery, but can also be controled with HTTP or the builtin UI
 
+Home Assistant Example:
+![hadashboard](https://github.com/akamming/esp_domoticz_opentherm_handler/blob/master/ha%20dashboard%20example.png)
+(see sample YAML on the bottom of this document)
+
 ## Functionality
 Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm_library:
 - The firmware sets up a connection with the boiler
@@ -127,14 +131,12 @@ The device can be controlled either by the MQTT devices (see above) or by naviga
 
 ## Home Assistant Configuration
 
-You can make a very heating control dashboard (sorry for the dutch) like this when using home assistant:
-
-![hadashboard](https://github.com/akamming/esp_domoticz_opentherm_handler/blob/master/ha%20dashboard%20example.png)
+You can make a very heating control dashboard (see  example on top of this readme) like this when using home assistant:
 
 ### Howto
 - Install the device and connect to MQTT as described above under Installation
 - In Home Assistant: 
-- And configure your dashboard using the dashboard editor (see sample YAML below which was used for the above dashboard)
+- And configure your dashboard using the dashboard editor (see sample YAML below)
 
 ### Home Assistant Sample Dashboard Configuration YAML
 
