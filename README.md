@@ -122,4 +122,91 @@ The device can be controlled either by the MQTT devices (see above) or by naviga
 - Alternatively you could write a script which does a curl or a wget command to get http://domesphelper/config.json
 
 ### Restoring the config
+
 - Upload your saved config.json file on http://domesphelper/upload
+
+## Home Assistant Configuration
+
+You can make a very heating control dashboard (sorry for the dutch) like this when using home assistant:
+
+![hadashboard](https://github.com/akamming/esp_domoticz_opentherm_handler/blob/master/ha%20dashboard%20example.png)
+
+### Howto
+- Install the device and connect to MQTT as described above under Installation
+- In Home Assistant: 
+- And configure your dashboard using the dashboard editor (see sample YAML below which was used for the above dashboard)
+
+### Home Assistant Sample Dashboard Configuration YAML
+
+```
+views:
+  - title: C.V.
+    path: c-v
+    cards:
+      - square: false
+        type: grid
+        columns: 1
+        cards:
+          - type: thermostat
+            entity: climate.domesphelper_climate
+            features:
+              - type: climate-hvac-modes
+                hvac_modes:
+                  - 'off'
+                  - heat
+                  - cool
+                  - auto
+          - type: entities
+            entities:
+              - entity: light.domesphelper_weatherdependentmode
+                name: Weersfhankelijk stoken
+                icon: mdi:heat-wave
+              - entity: light.domesphelper_holidaymode
+                icon: mdi:account-group
+                name: Vakantiemodus
+              - entity: >-
+                  switch.werkkast_vloerverwarming_werkkast_vloerverwarming_switch
+              - entity: sensor.domesphelper_outside_temperature
+                name: Buitentemperatuur
+      - type: entities
+        entities:
+          - entity: sensor.garage_pir_garage_garage_pir_garage_temperature_air
+          - entity: climate.domesphelper_boiler_setpoint
+            icon: mdi:heat-wave
+            name: CV warmtevraag
+          - entity: binary_sensor.domesphelper_flameactive
+          - entity: binary_sensor.domesphelper_hotwateractive
+          - entity: binary_sensor.domesphelper_centralheatingactive
+          - entity: binary_sensor.domesphelper_diagnosticactive
+          - entity: binary_sensor.domesphelper_frostprotectionactive
+          - entity: sensor.domesphelper_modulation
+          - entity: schedule.cv
+          - entity: binary_sensor.domesphelper_faultactive
+          - entity: sensor.domesphelper_faultcode
+        title: CV Sensoren
+      - type: grid
+        square: false
+        columns: 1
+        cards:
+          - type: entities
+            entities:
+              - entity: number.domesphelper_minimumboilertemp
+              - entity: number.domesphelper_maximumboilertemp
+              - entity: number.domesphelper_minimumtempdifference
+              - entity: number.domesphelper_frostprotectionsetpoint
+            title: Generieke Boiler Instellingen
+          - type: entities
+            entities:
+              - number.domesphelper_kp
+              - number.domesphelper_ki
+              - number.domesphelper_kd
+            title: PID parameters
+          - type: entities
+            entities:
+              - number.domesphelper_boilertempatplus20
+              - number.domesphelper_boilertempatminus10
+              - select.domesphelper_curvature
+              - number.domesphelper_switchheatingoffat
+              - number.domesphelper_referenceroomcompensation
+            title: Weersafhankelijke Stooklijn
+```
