@@ -796,6 +796,17 @@ void SaveConfig()
   json["weatherDependentMode"] = Weather_Dependent_Mode;
   json["holidayMode"] = Holiday_Mode;
 
+  // add boiler control settings
+  json["MinBoilerTemp"] = MinBoilerTemp;
+  json["MaxBoilerTemp"] = MaxBoilerTemp;
+  json["minimumTempDifference"] = minimumTempDifference;
+  json["FrostProtectionSetPoint"] = FrostProtectionSetPoint;
+  json["BoilerTempAtPlus20"] = BoilerTempAtPlus20;
+  json["BoilerTempAtMinus10"] = BoilerTempAtMinus10;
+  json["Curvature"] = Curvature;
+  json["SwitchHeatingOffAt"] = SwitchHeatingOffAt;
+  json["ReferenceRoomCompensation"] = ReferenceRoomCompensation;
+
   // save the new file
   File configFile = LittleFS.open(CONFIGFILE, "w");
   if (!configFile) {
