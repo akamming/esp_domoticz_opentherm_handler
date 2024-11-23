@@ -418,24 +418,6 @@ void handleGetInfo()
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
-String getCurvatureStringFromInt(int i) 
-{
-  if (i==0) {
-    return "none";
-  } else if (i==10) {
-    return "small";
-  } else if (i==20) {
-    return "medium";
-  } else if (i==30) {
-    return "large";
-  } else if (i==40) {
-    return "extralarge";
-  } else {
-    return "none";
-  }
-}
-
-
 void sendUploadForm()
 {
   Serial.println("sendUploadForm");
@@ -675,6 +657,23 @@ void handleNotFound()
     message += "<BR /><a href=\"upload\">Click here to upload index.html, favicon.ico and index.css</a>";
     
     server.send(404, "text/html", message.c_str());
+  }
+}
+
+String getCurvatureStringFromInt(int i) 
+{
+  if (i==0) {
+    return "none";
+  } else if (i==10) {
+    return "small";
+  } else if (i==20) {
+    return "medium";
+  } else if (i==30) {
+    return "large";
+  } else if (i==40) {
+    return "extralarge";
+  } else {
+    return "none";
   }
 }
 
@@ -2101,7 +2100,7 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
 
 void PublishMQTTNumber(const char* uniquename, int min, int max)
 {
-  Debug("PublishMQTTNumber");
+  // Debug("PublishMQTTNumber");
   JsonDocument json;
 
   // Create message
@@ -2132,7 +2131,7 @@ void PublishMQTTNumber(const char* uniquename, int min, int max)
   // publsh the Message
   MQTT.publish((String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
   MQTT.subscribe((host+"/number/"+String(uniquename)+"/set").c_str());
-  Debug("Publish to "+String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config");
+  // Debug("Publish to "+String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config");
 }
 
 void UpdateMQTTNumber(const char* uniquename,float value)
@@ -2151,7 +2150,7 @@ void UpdateMQTTNumber(const char* uniquename,float value)
 
 void PublishMQTTCurvatureSelect(const char* uniquename)
 {
-  Debug("PublishMQTTRefRoomCompensationSelect");
+  // Debug("PublishMQTTRefRoomCurvatureSelect");
   JsonDocument json;
 
   // Create message
