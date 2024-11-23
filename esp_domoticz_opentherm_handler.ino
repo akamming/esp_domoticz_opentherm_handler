@@ -104,7 +104,7 @@ float mqtt_minimumTempDifference=99;              // Minum tempdiffernce before 
 float mqtt_FrostProtectionSetPoint =99;            // Automatically heat when in frostprotection and below this temperature
 float mqtt_BoilerTempAtPlus20 = 99;                // for calculating when in weather dependent mode
 float mqtt_BoilerTempAtMinus10 = 99;               // for calculating when in weather dependent mode
-// float Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
+float mqtt_Curvature=99;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 float mqtt_SwitchHeatingOffAt = 99;                // Automatic switch off when in weather dependent mode when outside temp too high
 float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
 
@@ -434,6 +434,7 @@ String getCurvatureStringFromInt(int i)
     return "none";
   }
 }
+
 
 void sendUploadForm()
 {
@@ -867,6 +868,11 @@ if (MQTT.connected()) {
     CommunicateNumber(BoilerTempAtMinus10_Name,BoilerTempAtMinus10,&mqtt_BoilerTempAtMinus10);
     CommunicateNumber(SwitchHeatingOffAt_Name,SwitchHeatingOffAt,&mqtt_SwitchHeatingOffAt);
     CommunicateNumber(ReferenceRoomCompensation_Name,ReferenceRoomCompensation,&mqtt_ReferenceRoomCompensation);
+
+    if (mqtt_Curvature!=Curvature) {
+      UpdateMQTTCurvatureSelect(Curvature_Name,Curvature);
+      mqtt_Curvature=Curvature;
+    }
 
     // The actual temperature for the climate device. Now the temp required from mqtt. But should be made switchable to other sources 
     if (mqttTemperature!=mqtt_mqttTemperature and insideTemperatureReceived) {
@@ -1659,8 +1665,9 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
       ReferenceRoomCompensation=String(payloadstr).toFloat();
       DelayedSaveConfig();
-
-
+    } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
+      Curvature=getCurvatureIntFromString(payloadstr);
+      DelayedSaveConfig();
 
     // Domoticz devices
     } else if (topicstr.equals(domoticzoutputtopic)) {
@@ -2081,7 +2088,6 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
   MQTT.publish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence);
 }
 
-
 void PublishMQTTNumber(const char* uniquename, int min, int max)
 {
   Debug("PublishMQTTNumber");
@@ -2131,6 +2137,57 @@ void UpdateMQTTNumber(const char* uniquename,float value)
 
   MQTT.publish((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence);
 }
+
+void PublishMQTTCurvatureSelect(const char* uniquename)
+{
+  Debug("PublishMQTTRefRoomCompensationSelect");
+  JsonDocument json;
+
+  // Create message
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["stat_t"] = host+"/select/"+String(uniquename)+"/state";
+  json["cmd_t"] = host+"/select/"+String(uniquename)+"/set";
+  json["platform"] = "select";
+
+  JsonArray options = json["options"].to<JsonArray>();
+  options.add("none");
+  options.add("small");
+  options.add("medium");
+  options.add("large");
+  options.add("extralarge");
+
+  JsonObject dev = json["dev"].to<JsonObject>();
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
+  char conf[1024];
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/select/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.subscribe((host+"/select/"+String(uniquename)+"/set").c_str());
+}
+
+void UpdateMQTTCurvatureSelect(const char* uniquename,int value)
+{
+  Serial.println("UpdateMQTTCurvatureSelect");
+  JsonDocument json;
+
+  // Construct JSON config message
+  // json["value"] = value;
+
+  // char jsonstr[128];
+  // serializeJson(json, jsonstr);  // conf now contains the json
+
+  MQTT.publish((host+"/select/"+String(uniquename)+"/state").c_str(),getCurvatureStringFromInt(value).c_str(),mqttpersistence);
+}
+
 
 void UpdateMQTTBoilerSetpointMode()
 {
@@ -2256,6 +2313,7 @@ void PublishAllMQTTSensors()
   PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90);
   PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90);
   PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30);
+  PublishMQTTCurvatureSelect(Curvature_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {

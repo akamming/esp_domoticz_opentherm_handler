@@ -30,7 +30,7 @@ const char MinimumTempDifference_Name[] = "MinimumTempDifference";              
 const char FrostProtectionSetPoint_Name[] = "FrostProtectionSetPoint";          // Automatically heat when in frostprotection and below this temperature
 const char BoilerTempAtPlus20_Name[] = "BoilerTempAtPlus20";                    // for calculating when in weather dependent mode
 const char BoilerTempAtMinus10_Name[] = "BoilerTempAtMinus10";                  // for calculating when in weather dependent mode
-// const char Curvature_Name[]="Curavature";                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
+const char Curvature_Name[]="Curvature";                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 const char SwitchHeatingOffAt_Name[] = "SwitchHeatingOffAt";                    // Automatic switch off when in weather dependent mode when outside temp too high
 const char ReferenceRoomCompensation_Name[] = "ReferenceRoomCompensation";           // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
 
