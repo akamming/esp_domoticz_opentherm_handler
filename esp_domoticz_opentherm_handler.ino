@@ -107,6 +107,9 @@ float mqtt_BoilerTempAtMinus10 = 99;               // for calculating when in we
 float mqtt_Curvature=99;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 float mqtt_SwitchHeatingOffAt = 99;                // Automatic switch off when in weather dependent mode when outside temp too high
 float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
+float mqtt_kp=99;
+float mqtt_ki=99;
+float mqtt_kd=99;
 
 
 // ot actions (main will loop through these actions in this order)
@@ -805,6 +808,9 @@ void SaveConfig()
   json["Curvature"] = Curvature;
   json["SwitchHeatingOffAt"] = SwitchHeatingOffAt;
   json["ReferenceRoomCompensation"] = ReferenceRoomCompensation;
+  json["KP"] = KP;
+  json["KI"] = KI;
+  json["KD"] = KD;
 
   // save the new file
   File configFile = LittleFS.open(CONFIGFILE, "w");
@@ -841,8 +847,9 @@ void CommunicateSetpoint(const char* setpointName,float setpointValue,float *mqt
   }
 }
 
-void CommunicateNumber(const char* numberName,float Value,float *mqttValue) {
-  if (not (Value-*mqttValue>-0.1 and Value-*mqttValue<0.1)){ // value changed
+void CommunicateNumber(const char* numberName,float Value,float *mqttValue, float tolerance) {
+  // Debug("CommunicateNumber("+String(numberName)+","+String(Value)+","+String(*mqttValue)+","+String(tolerance)+"), where diff is "+String(Value-*mqttValue));
+  if (not (Value-*mqttValue>-tolerance and Value-*mqttValue<tolerance)){ // value changed
     UpdateMQTTNumber(numberName,Value);
     *mqttValue=Value;
   }
@@ -870,15 +877,17 @@ if (MQTT.connected()) {
     CommunicateSetpoint(DHW_Setpoint_Name,dhw_SetPoint,&mqtt_dhw_setpoint);
 
     // Communicatie the steering vars
-    CommunicateNumber(MinBoilerTemp_Name,MinBoilerTemp,&mqtt_minboilertemp);
-    CommunicateNumber(MaxBoilerTemp_Name,MaxBoilerTemp,&mqtt_maxboilertemp);
-    CommunicateNumber(MinimumTempDifference_Name,minimumTempDifference,&mqtt_minimumTempDifference);
-    CommunicateNumber(FrostProtectionSetPoint_Name,FrostProtectionSetPoint,&mqtt_FrostProtectionSetPoint);
-    CommunicateNumber(BoilerTempAtPlus20_Name,BoilerTempAtPlus20,&mqtt_BoilerTempAtPlus20);
-    CommunicateNumber(BoilerTempAtMinus10_Name,BoilerTempAtMinus10,&mqtt_BoilerTempAtMinus10);
-    CommunicateNumber(SwitchHeatingOffAt_Name,SwitchHeatingOffAt,&mqtt_SwitchHeatingOffAt);
-    CommunicateNumber(ReferenceRoomCompensation_Name,ReferenceRoomCompensation,&mqtt_ReferenceRoomCompensation);
-
+    CommunicateNumber(MinBoilerTemp_Name,MinBoilerTemp,&mqtt_minboilertemp,0.5);
+    CommunicateNumber(MaxBoilerTemp_Name,MaxBoilerTemp,&mqtt_maxboilertemp,0.5);
+    CommunicateNumber(MinimumTempDifference_Name,minimumTempDifference,&mqtt_minimumTempDifference,0.5);
+    CommunicateNumber(FrostProtectionSetPoint_Name,FrostProtectionSetPoint,&mqtt_FrostProtectionSetPoint,0.5);
+    CommunicateNumber(BoilerTempAtPlus20_Name,BoilerTempAtPlus20,&mqtt_BoilerTempAtPlus20,0.5);
+    CommunicateNumber(BoilerTempAtMinus10_Name,BoilerTempAtMinus10,&mqtt_BoilerTempAtMinus10,0.5);
+    CommunicateNumber(SwitchHeatingOffAt_Name,SwitchHeatingOffAt,&mqtt_SwitchHeatingOffAt,0.5);
+    CommunicateNumber(ReferenceRoomCompensation_Name,ReferenceRoomCompensation,&mqtt_ReferenceRoomCompensation,0.5);
+    CommunicateNumber(KP_Name,KP,&mqtt_kp,0.01);
+    CommunicateNumber(KI_Name,KI,&mqtt_ki,0.01);
+    CommunicateNumber(KD_Name,KD,&mqtt_kd,0.01);
     if (mqtt_Curvature!=Curvature) {
       UpdateMQTTCurvatureSelect(Curvature_Name,Curvature);
       mqtt_Curvature=Curvature;
@@ -1675,6 +1684,15 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
       ReferenceRoomCompensation=String(payloadstr).toFloat();
       DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(KP_Name))) {
+      KP=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(KI_Name))) {
+      KI=String(payloadstr).toFloat();
+      DelayedSaveConfig();
+    } else if (topicstr.equals(NumberCommandTopic(KD_Name))) {
+      KD=String(payloadstr).toFloat();
+      DelayedSaveConfig();
     } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
       Curvature=getCurvatureIntFromString(payloadstr);
       DelayedSaveConfig();
@@ -2098,7 +2116,7 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
   MQTT.publish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence);
 }
 
-void PublishMQTTNumber(const char* uniquename, int min, int max)
+void PublishMQTTNumber(const char* uniquename, int min, int max, float step, bool isSlider)
 {
   // Debug("PublishMQTTNumber");
   JsonDocument json;
@@ -2112,9 +2130,13 @@ void PublishMQTTNumber(const char* uniquename, int min, int max)
 
   json["min"] = min;
   json["max"] = max;
-  json["step"] = 0.5;
+  json["step"] = step;
   json["unit_of_measurement"] = "°C";
-  json["mode"] = "slider"; 
+  if (isSlider) {
+    json["mode"] = "slider"; 
+  } else {
+    json["mode"] = "box";
+  }
 
   JsonObject dev = json["dev"].to<JsonObject>();
   String MAC = WiFi.macAddress();
@@ -2314,15 +2336,18 @@ void PublishAllMQTTSensors()
   PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false);
   PublishMQTTSetpoint(Climate_Name,5,30,true);
 
-  // publish parameters
-  PublishMQTTNumber(MinBoilerTemp_Name,10,50);
-  PublishMQTTNumber(MaxBoilerTemp_Name,50,90);
-  PublishMQTTNumber(MinimumTempDifference_Name,0,20);
-  PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90);
-  PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90);
-  PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90);
-  PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90);
-  PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30);
+  // publish boiler parameters
+  PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true);
+  PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true);
+  PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true);
+  PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true);
+  PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true);
+  PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true);
+  PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true);
+  PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true);
+  PublishMQTTNumber(KP_Name,0,50,1,false);
+  PublishMQTTNumber(KI_Name,0,1,0.01,false);
+  PublishMQTTNumber(KD_Name,0,5,0.1,false);
   PublishMQTTCurvatureSelect(Curvature_Name);
 
   // Subscribe to temperature topic

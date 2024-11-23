@@ -33,6 +33,9 @@ const char BoilerTempAtMinus10_Name[] = "BoilerTempAtMinus10";                  
 const char Curvature_Name[]="Curvature";                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 const char SwitchHeatingOffAt_Name[] = "SwitchHeatingOffAt";                    // Automatic switch off when in weather dependent mode when outside temp too high
 const char ReferenceRoomCompensation_Name[] = "ReferenceRoomCompensation";           // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
+const char KP_Name[] = "KP";
+const char KI_Name[] = "KI";
+const char KD_Name[] = "KD";
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
