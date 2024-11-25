@@ -289,10 +289,9 @@ void handleCommand() {
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off , to indicate we are executing a command
 
   // for Debugging purposes
-  Serial.println("Handling Command: Number of args received: "+server.args());
+  Debug("Handling Command: Number of args received: "+server.args());
   for (int i = 0; i < server.args(); i++) {
-    Serial.println ("Argument "+String(i)+" -> "+server.argName(i)+": "+server.arg(i));
-
+    Debug ("Argument "+String(i)+" -> "+server.argName(i)+": "+server.arg(i));
   } 
 
   // Set DHWTemp
@@ -537,39 +536,67 @@ void handleSaveConfig() {
     server.send(500, "text/plain", Message.c_str());
     return;
   } else {
-    // if password was not changed: leave old password in file
-    if (json["mqttpass"]=="*****") {
-      json["mqttpass"]=mqttpass;
+
+    // mqtt config
+    usemqtt=json["usemqtt"] | usemqtt;
+    usemqttauthentication=json["usemqttauthentication"] | usemqttauthentication;
+    mqttpersistence=json["mqttretained"];
+    mqttport=json["mqttport"] | 1883;
+
+    if (json["mqttserver"].is<const char*>() ) {
+      mqttserver=json["mqttserver"].as<String>();
     }
 
-    // add/change the Climate settings
-    json["climateMode"] = climate_Mode;
-    json["climateSetpoint"] = climate_SetPoint;
-    json["weatherDependentMode"] = Weather_Dependent_Mode;
-    json["holidayMode"] = Holiday_Mode;
-
-    //save the custom parameters to FS
-    Debug("saving config");
-    File configFile = LittleFS.open(CONFIGFILE, "w");
-    if (!configFile) {
-      server.send(500, "text/plain", "failed to open config file for writing");
-      return;
-    } else {
-      
-      // Save the file!
-      serializeJson(json, configFile);
-      configFile.close();
-
-      // dump to response as well
-      // serializeJson(json, Message);
-      // server.send(200, "text/plain", Message.c_str());
-      server.send(200, "text/plain", "New Config Saved");
-      delay(500); // wait for server send to finish
-      ESP.restart(); // restart
-      
-      return;
-      //end save
+    if (json["mqttuser"].is<const char*>() ) {
+      mqttuser=json["mqttuser"].as<String>();
     }
+
+    if (json["mqttpass"]!="*****") {
+      mqttpass=json["mqttpass"].as<String>();
+    }
+
+    if (json["mqtttemptopic"].is<const char*>() ) {
+      mqtttemptopic=json["mqtttemptopic"].as<String>();
+    }
+    
+    //device config
+    inPin=json["inpin"] | inPin;
+    outPin=json["outpin"] | outPin;
+    OneWireBus=json["temppin"] | OneWireBus;
+
+    debug=json["debugtomqtt"] | true;
+
+    // PID Settings
+    KP = json["KP"] | KP;
+    KI = json["KI"] | KI;
+    KD = json["KD"] | KD;
+
+    // Boiler Control Settings
+    MinBoilerTemp = json["MinBoilerTemp"] | MinBoilerTemp;
+    MaxBoilerTemp = json["MaxBoilerTemp"] | MaxBoilerTemp;
+    minimumTempDifference = json["minimumTempDifference"] | minimumTempDifference;
+    FrostProtectionSetPoint = json["FrostProtectionSetPoint"] | FrostProtectionSetPoint;
+    BoilerTempAtPlus20 = json["BoilerTempAtPlus20"] | BoilerTempAtPlus20;
+    BoilerTempAtMinus10 = json["BoilerTempAtMinus10"] | BoilerTempAtMinus10;  
+    SwitchHeatingOffAt = json["SwitchHeatingOffAt"] | SwitchHeatingOffAt;
+    ReferenceRoomCompensation = json["ReferenceRoomCompensation"] | ReferenceRoomCompensation;
+    if (json["Curvature"].is<const char*>() ) {
+      Curvature=getCurvatureIntFromString(json["Curvature"] | "small");
+    }
+
+    // persistent climate mode
+    if (json["climateMode"].is<const char*>() ) {
+      climate_Mode = json["climateMode"].as<String>();
+    }
+    climate_SetPoint = json["climateSetpoint"] | climate_SetPoint;
+    Weather_Dependent_Mode = json["weatherDependentMode"] | Weather_Dependent_Mode;
+    Holiday_Mode = json["holidayMode"] | Holiday_Mode;
+
+    // Save and restart
+    SaveConfig();
+    server.send(200, "text/plain", "New Config Saved");
+    delay(500); // wait for server send to finish
+    ESP.restart(); // restart
   }
 }
 
@@ -769,29 +796,21 @@ void SaveConfig()
 {
   JsonDocument json;
 
-  // first: Try to load existing configfile into json structure (prevent overwriting settings, we just want to add/change the climate settings in the config)
-
-  if (LittleFS.exists(CONFIGFILE)) {
-    //file exists, reading and loading
-    Debug("reading config file");
-    File configFile = LittleFS.open(CONFIGFILE, "r");
-    if (configFile) {
-      Serial.println("opened config file");
-      size_t size = configFile.size();
-      // Allocate a buffer to store contents of the file.
-      std::unique_ptr<char[]> buf(new char[size]);
-
-      configFile.readBytes(buf.get(), size);
-
-      auto deserializeError = deserializeJson(json, buf.get());
-      if ( ! deserializeError ) {
-        Debug("parsed json");
-      } else {
-        Debug("failed to load json config");
-      }
-      configFile.close();
-    }
-  }
+  // mqtt config
+  json["usemqtt"] = usemqtt;
+  json["usemqttauthentication"] = usemqttauthentication;
+  json["mqttserver"] = mqttserver; 
+  json["mqttport"] = mqttport;
+  json["mqttuser"] = mqttuser;
+  json["mqttpass"] = mqttpass;
+  json["mqttretained"] = mqttpersistence;
+  json["mqtttemptopic"] = mqtttemptopic;
+  json["debugtomqtt"] = debug;
+  
+  //device config
+  json["inpin"] = inPin;
+  json["outpin"] = outPin;
+  json["temppin"] = OneWireBus;
 
   // add/change the Climate settings
   json["climateMode"] = climate_Mode;
@@ -1451,7 +1470,7 @@ const char* SetpointIntToString(int value) {
 void SetMQTTTemperature(float value) {
   // Handle actions if first time received
   if (!insideTemperatureReceived) {
-    Debug("resetting insidetemp matrix to "+String(value));
+    Debug("First temperature ("+String(value)+") received, ready for climate mode");
     // Set  InsideTempAt array at default value (currenttemp)
     for (int i=0;i<60;i++) {
       insideTempAt[i]=value;
@@ -1739,6 +1758,7 @@ void reconnect()
         mqttconnected = MQTT.connect(host.c_str());
       }
       if (mqttconnected) {
+        Debug("Succesfully connected, starting operations");
         PublishAllMQTTSensors();
         if (mqtttemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();

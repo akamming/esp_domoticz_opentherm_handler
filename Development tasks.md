@@ -1,2 +1,2 @@
 # TODO
-- refactor save config when uploading config from UI
+- password in ota upload
