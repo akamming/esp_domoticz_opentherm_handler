@@ -1043,13 +1043,15 @@ float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, fl
 void handleClimateProgram()
 {
   float  roomTemperature;
-  if (mqttTemperature==99) { // no temp received
+  if (mqtttemptopic.length()==0) { // use internal temp
     roomTemperature=currentTemperature; // use internal temp sensor
   } else {
     roomTemperature=mqttTemperature;
   }
-  
-  if (climate_Mode.equals("off") or Holiday_Mode==true) { 
+
+  if (climate_Mode.equals("off") or 
+      Holiday_Mode==true or 
+      (mqtttemptopic.length()!=0 and insideTemperatureReceived==false)) { 
     if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis) { // allow HTTP or MQTT commands when not in climate mode
       // Frost protection mode
       if (roomTemperature<FrostProtectionSetPoint) {
