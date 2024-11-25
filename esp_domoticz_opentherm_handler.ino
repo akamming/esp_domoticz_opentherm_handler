@@ -133,6 +133,7 @@ unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT com
 unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=0; // last climate heartbeat timestamp
+unsigned long t_last_tempreceived=0; // Time when last MQTT temp was received
 unsigned long t_save_config; // timestamp for delayed save
 unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
 bool ClimateConfigSaved=true;
@@ -1051,7 +1052,8 @@ void handleClimateProgram()
 
   if (climate_Mode.equals("off") or 
       Holiday_Mode==true or 
-      (mqtttemptopic.length()!=0 and insideTemperatureReceived==false)) { 
+      (mqtttemptopic.length()!=0 and insideTemperatureReceived==true and millis()-t_last_tempreceived>MQTTTemperatureTimeoutInMillis) or 
+      (mqtttemptopic.length()!=0 and insideTemperatureReceived==false) ){ 
     if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis) { // allow HTTP or MQTT commands when not in climate mode
       // Frost protection mode
       if (roomTemperature<FrostProtectionSetPoint) {
@@ -1456,7 +1458,9 @@ void SetMQTTTemperature(float value) {
     }
     insideTemperatureReceived=true; // Make sure we do this only once ;-)
   }
-  // Set mqttTemperature
+
+  // handle newly found mqttTemperature
+  t_last_tempreceived=millis();
   mqttTemperature=value; 
   InitPID();
 }

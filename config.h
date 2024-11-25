@@ -45,6 +45,7 @@ const int HTTPTimeoutInMillis = 10 * 1000;              // if no command was sen
 const int heartbeatTickInMillis = 1000;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
 const int MQTTDiscoveryHeartbeatInMillis = 10*60*1000;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
 const int ClimateHeartbeatInMillis = 1000;        // Interval to do calculate new PID values when in CLimate mode
+const int MQTTTemperatureTimeoutInMillis = 60*60*1000; // no climate mode calculations when temperature reading is older than this value
 float ThermostatTemperatureCalibration=0;         // set to a differenct value to zero is DS18B20 give a too high or low reading
 int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
