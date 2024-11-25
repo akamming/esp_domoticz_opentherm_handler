@@ -722,12 +722,12 @@ void readConfig()
         mqttuser=json["mqttuser"].as<String>();
         mqttpass=json["mqttpass"].as<String>();
         mqttpersistence=json["mqttretained"];
+        mqtttemptopic=json["mqtttemptopic"].as<String>();
         
         //device config
         inPin=json["inpin"] | 4;
         outPin=json["outpin"] | 5;
         OneWireBus=json["temppin"] | 14;
-        mqtttemptopic=json["mqtttemptopic"].as<String>();
 
         debug=json["debugtomqtt"] | true;
 
