@@ -139,7 +139,7 @@ You can make a very nice  heating control dashboard (see  example on top of this
   - add the MQTT integration
   - make sure your room temperature is available in MQTT, e.g. by using the automation below (paragraph sample Automation to export temperature to MQTT), but if the sensor is already on mqtt, you can ofcourse use it's native topic  
 - Configure your dashboard using the dashboard editor (see sample YAML below for the dashboard on top of this page)
-- ofcourse make sure in the settings of this firmware that the MQTT topic is the same as the one as your automation exports to.. 
+- ofcourse make sure in the settings of this firmware that the MQTT topic is the same as the one as your automation exports the room temperature to.. 
 
 #### sample Automation to export temperature to MQTT
 
