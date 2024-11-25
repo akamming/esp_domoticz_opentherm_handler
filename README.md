@@ -131,14 +131,38 @@ The device can be controlled either by the MQTT devices (see above) or by naviga
 
 ## Home Assistant Configuration
 
-You can make a very heating control dashboard (see  example on top of this readme) like this when using home assistant:
+You can make a very nice  heating control dashboard (see  example on top of this readme) like this when using home assistant:
 
 ### Howto
 - Install the device and connect to MQTT as described above under Installation
-- In Home Assistant: 
-- And configure your dashboard using the dashboard editor (see sample YAML below)
+- In Home Assistant:
+  - add the MQTT integration
+  - make sure your room temperature is available in MQTT, e.g. by using the automation below (paragraph sample Automation to export temperature to MQTT), but if the sensor is already on mqtt, you can ofcourse use it's native topic  
+- Configure your dashboard using the dashboard editor (see sample YAML below for the dashboard on top of this page)
+- ofcourse make sure in the settings of this firmware that the MQTT topic is the same as the one as your automation exports to.. 
 
-### Home Assistant Sample Dashboard Configuration YAML
+#### sample Automation to export temperature to MQTT
+
+```
+alias: <<name of your automation>>
+description: >-
+  <<description of your automation>> 
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.<<name of your room temperature sensor>>
+conditions: []
+actions:
+  - action: mqtt.publish
+    metadata: {}
+    data:
+      topic: <<the topic you want to use for exporting the temperature>>
+      payload: >-
+        { "value": "{{states("sensor.<<name of your temperature sensor>>") }}" }
+mode: single
+```
+
+#### Home Assistant Sample Dashboard Configuration YAML
 
 ```
 views:
@@ -212,3 +236,5 @@ views:
               - number.domesphelper_referenceroomcompensation
             title: Weersafhankelijke Stooklijn
 ```
+
+
