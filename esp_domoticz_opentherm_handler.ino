@@ -110,6 +110,7 @@ float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode
 float mqtt_kp=99;
 float mqtt_ki=99;
 float mqtt_kd=99;
+String mqtt_mqtttemptopic="xyzxyz";
 
 
 // ot actions (main will loop through these actions in this order)
@@ -875,6 +876,15 @@ void CommunicateNumber(const char* numberName,float Value,float *mqttValue, floa
   }
 }
 
+void CommunicateText(const char* TextName,String Value,String *mqttValue) {
+  if (not Value.equals(*mqttValue)){ // value changed
+    // Debug("CommunicateText("+String(TextName)+","+Value+","+*mqttValue+")");
+    UpdateMQTTText(TextName,Value.c_str());
+    *mqttValue=Value;
+  }
+}
+
+
 void CommunicateSteeringVarsToMQTT() {
 if (MQTT.connected()) {
     // Climate Mode
@@ -908,6 +918,7 @@ if (MQTT.connected()) {
     CommunicateNumber(KP_Name,KP,&mqtt_kp,0.01);
     CommunicateNumber(KI_Name,KI,&mqtt_ki,0.01);
     CommunicateNumber(KD_Name,KD,&mqtt_kd,0.01);
+    CommunicateText(MQTT_TempTopic_Name,mqtttemptopic,&mqtt_mqtttemptopic);
     if (mqtt_Curvature!=Curvature) {
       UpdateMQTTCurvatureSelect(Curvature_Name,Curvature);
       mqtt_Curvature=Curvature;
@@ -1578,7 +1589,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   strncpy(payloadstr,(char *)payload,length);
   payloadstr[length]='\0';
   if (!topicstr.equals(domoticzoutputtopic)) { // prevent flooding debug log with updates from domoticzdevices
-    Debug("Received command on topic ["+topicstr+"], content: ["+payloadstr+"]");
+    Debug("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
   }
 
   // Assume succesful command 
@@ -1721,6 +1732,11 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
       Curvature=getCurvatureIntFromString(payloadstr);
       DelayedSaveConfig();
+    } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
+      MQTT.unsubscribe(mqtttemptopic.c_str()); // unsubscribe from old topic
+      mqtttemptopic=payloadstr;
+      MQTT.subscribe(mqtttemptopic.c_str()); // subscribe to new topic
+      DelayedSaveConfig(); // save the config
 
     // Domoticz devices
     } else if (topicstr.equals(domoticzoutputtopic)) {
@@ -2196,6 +2212,46 @@ void UpdateMQTTNumber(const char* uniquename,float value)
   MQTT.publish((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence);
 }
 
+void PublishMQTTText(const char* uniquename)
+{
+  // Debug("PublishMQTTText");
+  JsonDocument json;
+
+  // Create message
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["stat_t"] = host+"/text/"+String(uniquename)+"/state";
+  json["cmd_t"] = host+"/text/"+String(uniquename)+"/set";
+  // json["stat_tpl"] = "{{value_json.value}}";
+
+
+  JsonObject dev = json["dev"].to<JsonObject>();
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+
+  char conf[1024];
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+  MQTT.subscribe((host+"/text/"+String(uniquename)+"/set").c_str());
+  // Debug("Publish to "+String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config");
+}
+
+void UpdateMQTTText(const char* uniquename,const char* value)
+{
+  // Debug("UpdateMQTTText");
+  JsonDocument json;
+
+  MQTT.publish((host+"/text/"+String(uniquename)+"/state").c_str(),value,mqttpersistence);
+}
+
+
 void PublishMQTTCurvatureSelect(const char* uniquename)
 {
   // Debug("PublishMQTTRefRoomCurvatureSelect");
@@ -2375,6 +2431,7 @@ void PublishAllMQTTSensors()
   PublishMQTTNumber(KI_Name,0,1,0.01,false);
   PublishMQTTNumber(KD_Name,0,5,0.1,false);
   PublishMQTTCurvatureSelect(Curvature_Name);
+  PublishMQTTText(MQTT_TempTopic_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
