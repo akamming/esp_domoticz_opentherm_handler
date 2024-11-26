@@ -62,8 +62,8 @@
         <label><input type="checkbox" name="usemqttauthentication" id="usemqttauthentication" onchange="onusemqttauthenticationchanged()" disabled>Use Authentication</label><br />
         Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
-        <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br />
-        temperature_topic <input type="text" class="user_input" id="mqtttemptopic" size="20" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br /><br/>
+        temperature_topic<br/> <input type="text" class="temptopic_input" id="mqtttemptopic" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br /><br/>
         <label><input type="checkbox" name="debugtomqtt" id="debugtomqtt" disabled>Debug messages to MQTT</label><br />
         <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
     </div>

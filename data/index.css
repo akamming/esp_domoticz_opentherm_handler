@@ -102,10 +102,15 @@ p
     text-align: left;
 }
 
-
 .user_input {
     border: 0px;
     width: 80px;
+    text-align: left;
+}
+
+.temptopic_input {
+    border: 0px;
+    width: 240px;
     text-align: left;
 }
 
