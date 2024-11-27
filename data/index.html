@@ -19,7 +19,7 @@
 
     <div class="outer_frame">
         <p>Thermostat</p><br />
-        Setpoint <input type="number" class="temp_input" id="climateSetpoint" size="10" step="0.5" onchange="onThermostatChanged()"><br />
+        Setpoint <input type="number" class="temp_input" id="climateSetpoint" size="10" step="0.5" onchange="onThermostatChanged()"> Actual <input type="number" class="temp_input" id="mqtttemperature" size="10" disabled><br /><br />
         <label>Mode <select name="climateMode" id="climateMode" onchange="onThermostatChanged()">
                 <option value="off">Off</option>
                 <option value="heat">Heating</option>
@@ -43,7 +43,6 @@
         <br />Actual<br />
         <label><input type="checkbox" name="heating" id="heating" disabled>heating</label><label><input type="checkbox" name="cooling" id="cooling" disabled>cooling</label><label><input type="checkbox" name="hotwater" id="hotwater" disabled>hotwater</label><br />
         <br /><b>Temperatures</b><br />
-        MQTT <input type="number" class="temp_input" id="mqtttemperature" size="10" disabled><br />
         Thermostat <input type="number" class="temp_input" id="thermostattemperature" size="10" disabled> Outside <input type="number" class="temp_input" id="outsidetemperature" size="10" disabled><br />
         Heating SP <input type="number" class="temp_input" id="boilersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="boilertemperature" size="10" disabled><br />
         Hotwater SP <input type="number" class="temp_input" id="hotwatersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="hotwatertemperature" size="10" disabled><br />
