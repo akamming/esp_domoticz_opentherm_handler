@@ -1787,6 +1787,18 @@ void reconnect()
   }
 }
 
+void addDeviceToJson(JsonDocument *json) {
+  JsonObject dev = (*json)["dev"].to<JsonObject>();
+  String MAC = WiFi.macAddress();
+  MAC.replace(":", "");
+  dev["ids"] = MAC;
+  dev["name"] = host;
+  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
+  dev["mdl"] = "d1_mini";
+  dev["mf"] = "espressif";
+  dev["cu"] = "http://"+WiFi.localIP().toString()+"/";  
+}
+
 void PublishMQTTDimmer(const char* uniquename)
 {
   Serial.println("PublishMQTTDimmer");
@@ -1800,14 +1812,7 @@ void PublishMQTTDimmer(const char* uniquename)
   json["schema"] = "json";
   json["brightness"] = true;
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
@@ -1847,15 +1852,7 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
   json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
-
+  addDeviceToJson(&json);
 
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
@@ -1892,15 +1889,7 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
     json["device_class"] =deviceclass;
   }
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
-
+  addDeviceToJson(&json);
 
   char conf[512];
   serializeJson(json, conf);  // conf now contains the json
@@ -1938,14 +1927,7 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   serializeJson(json, conf);  // buf now contains the json 
 
@@ -1980,14 +1962,7 @@ void PublishMQTTPressureSensor(const char* uniquename)
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   serializeJson(json, conf);  // buf now contains the json 
 
@@ -2024,14 +1999,7 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   serializeJson(json, conf);  // buf now contains the json 
 
@@ -2062,21 +2030,13 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   // Create message
   char conf[512];
   json["value_template"] =  "{{ value_json.value }}";
-  // json["device_class"] = "None";
   json["unit_of_measurement"] = "";
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   serializeJson(json, conf);  // buf now contains the json 
 
@@ -2127,14 +2087,7 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
   json["mode_stat_tpl"] =  "{{ {"+String(OFF)+": \"off\", "+String(HEAT)+": \"heat\", "+String(COOL)+": \"cool\", "+String(AUTO)+": \"auto\"}[value_json.value] | default('off') }}";
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   serializeJson(json, conf);  // buf now contains the json 
 
@@ -2168,7 +2121,6 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
   json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/number/"+String(uniquename)+"/state";
   json["cmd_t"] = host+"/number/"+String(uniquename)+"/set";
-  // json["stat_tpl"] = "{{value_json.value}}";
 
   json["min"] = min;
   json["max"] = max;
@@ -2180,14 +2132,7 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
     json["mode"] = "box";
   }
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   char conf[1024];
   serializeJson(json, conf);  // buf now contains the json 
@@ -2225,14 +2170,7 @@ void PublishMQTTText(const char* uniquename)
   // json["stat_tpl"] = "{{value_json.value}}";
 
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   char conf[1024];
   serializeJson(json, conf);  // buf now contains the json 
@@ -2271,14 +2209,7 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
   options.add("large");
   options.add("extralarge");
 
-  JsonObject dev = json["dev"].to<JsonObject>();
-  String MAC = WiFi.macAddress();
-  MAC.replace(":", "");
-  dev["ids"] = MAC;
-  dev["name"] = host;
-  dev["sw"] = String(host)+"_"+String(__DATE__)+"_"+String(__TIME__);
-  dev["mdl"] = "d1_mini";
-  dev["mf"] = "espressif";
+  addDeviceToJson(&json);
 
   char conf[1024];
   serializeJson(json, conf);  // buf now contains the json 
@@ -2387,6 +2318,7 @@ void updateTime() {
 void PublishAllMQTTSensors()
 {
   Serial.println("PublishAllMQTTSensors()");
+
   // Sensors
   PublishMQTTTemperatureSensor(Boiler_Temperature_Name);
   PublishMQTTTemperatureSensor(DHW_Temperature_Name);
