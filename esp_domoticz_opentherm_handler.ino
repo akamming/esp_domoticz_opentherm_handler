@@ -1731,15 +1731,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       KD=String(payloadstr).toFloat();
       DelayedSaveConfig();
     } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
-      if (jsonerror) {
-        Curvature=getCurvatureIntFromString(payloadstr);
-      } else {
-        if (doc["curvature"].is<const char*>()) {   // e.g. from zwavejsui
-          SetMQTTTemperature(doc["curvature"]);
-        } else {
-          Curvature=getCurvatureIntFromString(payloadstr);
-        }
-      }
+      Curvature=getCurvatureIntFromString(payloadstr);
       DelayedSaveConfig();
     } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
       MQTT.unsubscribe(mqtttemptopic.c_str()); // unsubscribe from old topic
