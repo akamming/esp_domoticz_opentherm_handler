@@ -721,7 +721,8 @@ int getCurvatureIntFromString(String value) {
   } else if (value=="extralarge") {
     return 40;
   } else {
-    return 10;
+    Debug("Unknown Curvature String: ["+value+"]");
+    return 10; // default value
   }
 }
 
@@ -1730,7 +1731,15 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       KD=String(payloadstr).toFloat();
       DelayedSaveConfig();
     } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
-      Curvature=getCurvatureIntFromString(payloadstr);
+      if (jsonerror) {
+        Curvature=getCurvatureIntFromString(payloadstr);
+      } else {
+        if (doc["curvature"].is<const char*>()) {   // e.g. from zwavejsui
+          SetMQTTTemperature(doc["curvature"]);
+        } else {
+          Curvature=getCurvatureIntFromString(payloadstr);
+        }
+      }
       DelayedSaveConfig();
     } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
       MQTT.unsubscribe(mqtttemptopic.c_str()); // unsubscribe from old topic
@@ -2201,6 +2210,7 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
   json["stat_t"] = host+"/select/"+String(uniquename)+"/state";
   json["cmd_t"] = host+"/select/"+String(uniquename)+"/set";
   json["platform"] = "select";
+  json["val_tpl"] = "{{ value_json.curvature }}";
 
   JsonArray options = json["options"].to<JsonArray>();
   options.add("none");
