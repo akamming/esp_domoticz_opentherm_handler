@@ -849,7 +849,6 @@ void SaveConfig()
   
 }
 
-
 // not defined  in opentherm lib, so declaring local
 float getOutsideTemperature() {
   unsigned long response = ot.sendRequest(ot.buildRequest(OpenThermRequestType::READ, OpenThermMessageID::Toutside, 0));
@@ -1398,7 +1397,6 @@ void handleOpenTherm()
           mqtt_FaultCode=FaultCode;
         }
       }
-
       
       OpenThermCommand=GetThermostatTemp;
       break;
@@ -2227,12 +2225,12 @@ void UpdateMQTTCurvatureSelect(const char* uniquename,int value)
   JsonDocument json;
 
   // Construct JSON config message
-  // json["value"] = value;
+  json["curvature"] = getCurvatureStringFromInt(value);
 
-  // char jsonstr[128];
-  // serializeJson(json, jsonstr);  // conf now contains the json
+  char jsonstr[128];
+  serializeJson(json, jsonstr);  // conf now contains the json
 
-  MQTT.publish((host+"/select/"+String(uniquename)+"/state").c_str(),getCurvatureStringFromInt(value).c_str(),mqttpersistence);
+  MQTT.publish((host+"/select/"+String(uniquename)+"/state").c_str(),jsonstr,mqttpersistence);
 }
 
 
