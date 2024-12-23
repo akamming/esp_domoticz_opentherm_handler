@@ -25,9 +25,10 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
 #include <PubSubClient.h>         // MQTT library
-#include "config.h"                 // Set Configuration
-#include <LittleFS.h>               // Filesystem
-
+#include "config.h"               // Set Configuration
+#include <LittleFS.h>             // Filesystem
+#include <NTPClient.h>            // for NTP Client
+#include <WiFiUdp.h>              // is needed by NTP client
 
 // vars to manage boiler
 bool enableCentralHeating = false;
@@ -152,17 +153,19 @@ bool debug=false;
 File fsUploadFile;
 
 // objects to be used by program
-ESP8266WebServer server(httpport);   //Web server object. Will be listening in port 80 (default for HTTP)
-OneWire oneWire(OneWireBus);  // for OneWire Bus
-DallasTemperature sensors(&oneWire); // for the temp sensor on one wire bus
-OpenTherm ot(inPin, outPin); // for communication with Opentherm adapter
-WiFiClient espClient;  // Needed for MQTT
-PubSubClient MQTT(espClient); // MQTT client
+ESP8266WebServer server(httpport);    //Web server object. Will be listening in port 80 (default for HTTP)
+OneWire oneWire(OneWireBus);          // for OneWire Bus
+DallasTemperature sensors(&oneWire);  // for the temp sensor on one wire bus
+OpenTherm ot(inPin, outPin);          // for communication with Opentherm adapter
+WiFiClient espClient;                 // Needed for MQTT
+PubSubClient MQTT(espClient);         // MQTT client
+WiFiUDP ntpUDP;                       // for NTP client
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000); //  Set the timeserver (incl offset and timeout)
 
 void Debug(String text) {
   if (debug) {
     if (MQTT.connected()) {
-      MQTT.publish((String(host)+"/debug").c_str(),text.c_str(),mqttpersistence);
+      MQTT.publish((String(host)+"/debug").c_str(),String(timeClient.getFormattedTime()+": "+text).c_str(),mqttpersistence);
     }
     Serial.println(text);
   }
@@ -415,6 +418,7 @@ void handleGetInfo()
     json["MQTTconnected"] = false;
   }
   json["mqttstate"] = MQTT.state();
+  json["currentTime"] = timeClient.getFormattedTime();
   json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
   json["compile_date"] = String(compile_date);
   
@@ -1790,11 +1794,16 @@ void reconnect()
         mqttconnected = MQTT.connect(host.c_str());
       }
       if (mqttconnected) {
-        Debug("Succesfully connected, starting operations");
+        Debug("Succesfully (re)connected, starting operations");
         PublishAllMQTTSensors();
         if (mqtttemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();
         }      
+        if (timeClient.forceUpdate()) {
+          Debug("Time was set");
+        } else {
+          Debug("Time was not set");
+        }
       } else {
         Serial.print("failed, rc=");
         Serial.print(MQTT.state());
@@ -2414,6 +2423,9 @@ void setup()
   wifiManager.setHostname(host.c_str());
   wifiManager.setConnectTimeout(180);
   wifiManager.autoConnect("Thermostat");
+
+  // start NTP client
+  timeClient.begin();
 
   if (MDNS.begin(host.c_str())) {
     Serial.println("MDNS responder started");
