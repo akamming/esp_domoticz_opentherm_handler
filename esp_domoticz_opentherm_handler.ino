@@ -985,8 +985,21 @@ if (MQTT.connected()) {
 }
 
 void InitPID()
-{
-  I=mqttTemperature;
+{ 
+  float roomTemperature;
+  if (mqtttemptopic.length()==0) { // use internal temp
+    roomTemperature=currentTemperature; // use internal temp sensor
+  } else {
+    roomTemperature=mqttTemperature;
+  }
+
+  // Set I (P and D are calculated, so no need to initialize)
+  I=roomTemperature;
+
+  // Reset InsideTempAt array at default value (currenttemp)
+  for (int i=0;i<60;i++) {
+    insideTempAt[i]=I;
+  }
 }
 
 void UpdatePID(float setpoint,float temperature)
@@ -1043,7 +1056,7 @@ void UpdatePID(float setpoint,float temperature)
       D=MaxBoilerTemp-P-I;
     }
   }
-  // Debug("PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
+  Debug("PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -1492,10 +1505,6 @@ void SetMQTTTemperature(float value) {
   // additional actions if first time received
   if (!insideTemperatureReceived) {
     Debug("First temperature ("+String(value)+") received, ready for climate mode");
-    // Set  InsideTempAt array at default value (currenttemp)
-    for (int i=0;i<60;i++) {
-      insideTempAt[i]=value;
-    }
     insideTemperatureReceived=true; // Make sure we do this only once ;-)
     InitPID();
   }
