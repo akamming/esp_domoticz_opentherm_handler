@@ -1043,6 +1043,7 @@ void UpdatePID(float setpoint,float temperature)
       D=MaxBoilerTemp-P-I;
     }
   }
+  // Debug("PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -1216,6 +1217,12 @@ void handleOpenTherm()
           if (HotWater!=mqtt_HotWater){ // value changed
             UpdateMQTTBinarySensor(HotWaterActive_Name,HotWater);
             mqtt_HotWater=HotWater;
+            // Reset PID is hotwater was switched off and climate mode is on
+            if ((!HotWater) and (!climate_Mode.equals("off")))
+            {
+              Debug("Switching off hotwater, initializing PID");
+              InitPID();
+            }            
           }
           if (modulation!=mqtt_modulation){ // value changed
             UpdateMQTTPercentageSensor(Modulation_Name,modulation);
@@ -1478,7 +1485,11 @@ const char* SetpointIntToString(int value) {
 }
 
 void SetMQTTTemperature(float value) {
-  // Handle actions if first time received
+  // handle newly found mqttTemperature
+  t_last_tempreceived=millis();
+  mqttTemperature=value; 
+
+  // additional actions if first time received
   if (!insideTemperatureReceived) {
     Debug("First temperature ("+String(value)+") received, ready for climate mode");
     // Set  InsideTempAt array at default value (currenttemp)
@@ -1486,12 +1497,9 @@ void SetMQTTTemperature(float value) {
       insideTempAt[i]=value;
     }
     insideTemperatureReceived=true; // Make sure we do this only once ;-)
+    InitPID();
   }
 
-  // handle newly found mqttTemperature
-  t_last_tempreceived=millis();
-  mqttTemperature=value; 
-  InitPID();
 }
 
 bool HandleBoilerMode(const char* mode) 
