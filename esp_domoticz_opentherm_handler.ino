@@ -988,8 +988,8 @@ if (MQTT.connected()) {
   }
 }
 
-void InitPID()
-{ 
+void resetI() 
+{
   float roomTemperature;
   if (mqtttemptopic.length()==0) { // use internal temp
     roomTemperature=currentTemperature; // use internal temp sensor
@@ -999,11 +999,21 @@ void InitPID()
 
   // Set I (P and D are calculated, so no need to initialize)
   I=roomTemperature;
+}
 
+void resetD()
+{
   // Reset InsideTempAt array at default value (currenttemp)
   for (int i=0;i<60;i++) {
     insideTempAt[i]=I;
   }
+}
+
+void InitPID()
+{ 
+  // No need to reset P, will be calculated, so only reset I and the matrix for D
+  resetI();
+  resetD();
 }
 
 void UpdatePID(float setpoint,float temperature)
@@ -1234,8 +1244,8 @@ void handleOpenTherm()
           if (HotWater!=mqtt_HotWater){ // value changed
             UpdateMQTTBinarySensor(HotWaterActive_Name,HotWater);
             mqtt_HotWater=HotWater;
-            // Reset PID is hotwater was switched off and climate mode is on
-            if ((!HotWater) and (!climate_Mode.equals("off")))
+            // Reset PID is hotwater was switched off
+            if (!HotWater)
             {
               Debug("Switching off hotwater, initializing PID");
               InitPID();
@@ -2474,7 +2484,7 @@ void setup()
   });
   
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("OTA: Error[%u]: ", error);
+    Debug("OTA: Error["+String(error)+"]:");
     if (error == OTA_AUTH_ERROR) {
       Debug("OTA: Auth Failed");
     } else if (error == OTA_BEGIN_ERROR) {
