@@ -112,7 +112,7 @@ float mqtt_kp=99;
 float mqtt_ki=99;
 float mqtt_kd=99;
 String mqtt_mqtttemptopic="xyzxyz";
-
+bool mqtt_debug=false;
 
 // ot actions (main will loop through these actions in this order)
 enum OTCommand { SetBoilerStatus, 
@@ -979,6 +979,13 @@ if (MQTT.connected()) {
       mqtt_Holiday_Mode=Holiday_Mode;
     }
 
+    // Holiday Mode
+    if (debug!=mqtt_debug) // value changed
+    {
+      UpdateMQTTSwitch(Debug_Name,debug);
+      mqtt_debug=debug;
+    }
+
     // Frost Protection Active
     if (FrostProtectionActive!=mqtt_FrostProtectionActive) // value changed
     {
@@ -1704,6 +1711,18 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         InitPID();
         DelayedSaveConfig();
       }
+
+    // Handle debug switch command
+    } else if (topicstr.equals(CommandTopic(Debug_Name))) {
+      if (jsonerror)  {
+        CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, payloadstr);
+      } else {
+        CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, doc["state"]);
+      }
+      if (CommandSucceeded) {
+        DelayedSaveConfig();
+      }
+
     } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
       boiler_SetPoint=String(payloadstr).toFloat();
 
@@ -1876,7 +1895,7 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
   MQTT.publish((host+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
-void PublishMQTTSwitch(const char* uniquename, bool controllable)
+void PublishMQTTSwitch(const char* uniquename)
 {
   Serial.println("PublishMQTTSwitch");
   JsonDocument json;
@@ -1896,9 +1915,7 @@ void PublishMQTTSwitch(const char* uniquename, bool controllable)
   MQTT.publish((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
 
   // subscribe if need to listen to commands
-  if (controllable) {
-    MQTT.subscribe((host+"/light/"+String(uniquename)+"/set").c_str());
-  }
+  MQTT.subscribe((host+"/light/"+String(uniquename)+"/set").c_str());
 }
 
 void UpdateMQTTSwitch(const char* uniquename, bool Value)
@@ -2375,11 +2392,12 @@ void PublishAllMQTTSensors()
   PublishMQTTBinarySensor(FrostProtectionActive_Name,"None");
 
   // Switches to control the boiler
-  PublishMQTTSwitch(EnableCentralHeating_Name,true);
-  PublishMQTTSwitch(EnableCooling_Name,true);
-  PublishMQTTSwitch(EnableHotWater_Name,true);
-  PublishMQTTSwitch(Weather_Dependent_Mode_Name,true);
-  PublishMQTTSwitch(Holiday_Mode_Name,true);
+  PublishMQTTSwitch(EnableCentralHeating_Name);
+  PublishMQTTSwitch(EnableCooling_Name);
+  PublishMQTTSwitch(EnableHotWater_Name);
+  PublishMQTTSwitch(Weather_Dependent_Mode_Name);
+  PublishMQTTSwitch(Holiday_Mode_Name);
+  PublishMQTTSwitch(Debug_Name);
 
   // Publish setpoints
   PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);

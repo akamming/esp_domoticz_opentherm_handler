@@ -37,6 +37,7 @@ const char KP_Name[] = "KP";
 const char KI_Name[] = "KI";
 const char KD_Name[] = "KD";
 const char MQTT_TempTopic_Name[] = "MQTTTemperatureTopic";
+const char Debug_Name[] = "DebugToMQTT";
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
