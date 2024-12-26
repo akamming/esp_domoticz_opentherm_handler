@@ -171,9 +171,9 @@ void Debug(String text) {
   }
 }
 
-void Error(const char* text) {
+void Error(String text) {
   if (MQTT.connected()) {
-    MQTT.publish((String(host)+"/error").c_str(),text,mqttpersistence);
+    UpdateMQTTText(Error_Name,text.c_str());
   }
   Serial.println(text);
 }
@@ -1481,7 +1481,7 @@ String NumberCommandTopic(const char* DeviceName){
 
 
 void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
-  MQTT.publish((String(host)+"/debug").c_str(),("ERROR: Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext)).c_str(),mqttpersistence);
+  Error("ERROR: Unknown Message ("+String(payloadstr)+") with length "+String(length)+" received on topic "+String(topic)+", with log "+String(logtext));
 }
 
 bool HandleClimateMode(const char* mode)
@@ -1822,8 +1822,9 @@ void reconnect()
         mqttconnected = MQTT.connect(host.c_str());
       }
       if (mqttconnected) {
-        Debug("Succesfully (re)connected, starting operations");
         PublishAllMQTTSensors();
+        Debug("Succesfully (re)connected, starting operations");
+        Error("None, all OK");
         if (mqtttemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();
         }      
@@ -2417,6 +2418,7 @@ void PublishAllMQTTSensors()
   PublishMQTTCurvatureSelect(Curvature_Name);
   PublishMQTTText(MQTT_TempTopic_Name);
   PublishMQTTText(Debug_Name);
+  PublishMQTTText(Error_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
