@@ -165,7 +165,7 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000); //  Set the ti
 void Debug(String text) {
   if (debug) {
     if (MQTT.connected()) {
-      MQTT.publish((String(host)+"/debug").c_str(),String(timeClient.getFormattedTime()+": "+text).c_str(),mqttpersistence);
+      UpdateMQTTText(Debug_Name,text.c_str());
     }
     Serial.println(text);
   }
@@ -882,7 +882,6 @@ void CommunicateNumber(const char* numberName,float Value,float *mqttValue, floa
 
 void CommunicateText(const char* TextName,String Value,String *mqttValue) {
   if (not Value.equals(*mqttValue)){ // value changed
-    // Debug("CommunicateText("+String(TextName)+","+Value+","+*mqttValue+")");
     UpdateMQTTText(TextName,Value.c_str());
     *mqttValue=Value;
   }
@@ -2221,7 +2220,6 @@ void PublishMQTTText(const char* uniquename)
   json["cmd_t"] = host+"/text/"+String(uniquename)+"/set";
   // json["stat_tpl"] = "{{value_json.value}}";
 
-
   addDeviceToJson(&json);
 
   char conf[1024];
@@ -2418,6 +2416,7 @@ void PublishAllMQTTSensors()
   PublishMQTTNumber(KD_Name,0,5,0.1,false);
   PublishMQTTCurvatureSelect(Curvature_Name);
   PublishMQTTText(MQTT_TempTopic_Name);
+  PublishMQTTText(Debug_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
