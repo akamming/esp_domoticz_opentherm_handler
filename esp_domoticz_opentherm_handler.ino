@@ -1251,11 +1251,11 @@ void handleOpenTherm()
             UpdateMQTTBinarySensor(HotWaterActive_Name,HotWater);
             mqtt_HotWater=HotWater;
             // Reset PID is hotwater was switched off
-            if (!HotWater)
-            {
-              Debug("Switching off hotwater, initializing PID");
-              InitPID();
-            }            
+            // if (!HotWater)
+            // {
+            //  Debug("Switching off hotwater, initializing PID");
+            //  InitPID();
+            //}            
           }
           if (modulation!=mqtt_modulation){ // value changed
             UpdateMQTTPercentageSensor(Modulation_Name,modulation);
