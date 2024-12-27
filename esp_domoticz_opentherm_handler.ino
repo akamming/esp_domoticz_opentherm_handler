@@ -38,7 +38,7 @@ float boiler_SetPoint = 0;
 float dhw_SetPoint = 65;
 float P=0;
 float I=0;
-float D=20;  
+float D=0;  
 
 // Current Temp on Thermostat
 float currentTemperature = 0;
@@ -111,6 +111,9 @@ float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode
 float mqtt_kp=99;
 float mqtt_ki=99;
 float mqtt_kd=99;
+float mqtt_p=99;
+float mqtt_i=99;
+float mqtt_d=99;
 String mqtt_mqtttemptopic="xyzxyz";
 bool mqtt_debug=false;
 
@@ -880,6 +883,15 @@ void CommunicateNumber(const char* numberName,float Value,float *mqttValue, floa
   }
 }
 
+void CommunicateNumberSensor(const char* numberName,float Value,float *mqttValue, float tolerance) {
+  // Debug("CommunicateNumber("+String(numberName)+","+String(Value)+","+String(*mqttValue)+","+String(tolerance)+"), where diff is "+String(Value-*mqttValue));
+  if (not (Value-*mqttValue>-tolerance and Value-*mqttValue<tolerance)){ // value changed
+    UpdateMQTTNumberSensor(numberName,Value);
+    *mqttValue=Value;
+  }
+}
+
+
 void CommunicateText(const char* TextName,String Value,String *mqttValue) {
   if (not Value.equals(*mqttValue)){ // value changed
     UpdateMQTTText(TextName,Value.c_str());
@@ -921,6 +933,9 @@ if (MQTT.connected()) {
     CommunicateNumber(KP_Name,KP,&mqtt_kp,0.01);
     CommunicateNumber(KI_Name,KI,&mqtt_ki,0.01);
     CommunicateNumber(KD_Name,KD,&mqtt_kd,0.01);
+    CommunicateNumberSensor(P_Name,P,&mqtt_p,0.01);
+    CommunicateNumberSensor(I_Name,I,&mqtt_i,0.01);
+    CommunicateNumberSensor(D_Name,D,&mqtt_d,0.01);
     CommunicateText(MQTT_TempTopic_Name,mqtttemptopic,&mqtt_mqtttemptopic);
     if (mqtt_Curvature!=Curvature) {
       UpdateMQTTCurvatureSelect(Curvature_Name,Curvature);
@@ -1999,6 +2014,40 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
   MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
 }
 
+void PublishMQTTNumberSensor(const char* uniquename)
+{
+  Serial.println("PublishMQTTGenericSensor");
+  JsonDocument json;
+
+  // Create message
+  char conf[768];
+  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["value_template"] =  "{{ value_json.value }}";
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+
+  addDeviceToJson(&json);
+
+  serializeJson(json, conf);  // buf now contains the json 
+
+  // publsh the Message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+}
+
+void UpdateMQTTNumberSensor(const char* uniquename, float value)
+{
+  Serial.println("UpdateMQTTGenericSensor");
+  JsonDocument json;
+
+  // Create message
+  char state[128];
+  json["value"] =  float(int(value*100))/100;   // ensures round to 1 decimal behind the comma
+  serializeJson(json, state);  // buf now contains the json 
+
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
+}
+
 void PublishMQTTPressureSensor(const char* uniquename)
 {
   Serial.println("PublishMQTTPressureSensor");
@@ -2380,6 +2429,10 @@ void PublishAllMQTTSensors()
   PublishMQTTPressureSensor(Pressure_Name);
   PublishMQTTPercentageSensor(Modulation_Name);
   PublishMQTTFaultCodeSensor(FaultCode_Name);
+  PublishMQTTNumberSensor(P_Name);
+  PublishMQTTNumberSensor(I_Name);
+  PublishMQTTNumberSensor(D_Name);
+  
 
   // binary sesnors sensors telling state
   PublishMQTTBinarySensor(FlameActive_Name,"None");
