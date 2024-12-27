@@ -2468,6 +2468,7 @@ void setup()
   server.on("/GetSensors",handleGetSensors);
   server.on("/info", handleGetInfo);
   server.on("/getconfig", handleGetConfig);
+  server.on("/config.json", handleGetConfig); // overide retrieving config.json, so the password is masked
   server.on("/saveconfig", handleSaveConfig);
   server.on("/removeconfig", handleRemoveConfig);
   server.on("/reset", handleReset);
