@@ -1171,18 +1171,21 @@ void handleClimateProgram()
         UpdatePID(climate_SetPoint,roomTemperature);
       }
 
-      // Calculate BoilerSetpoint
-      if (Weather_Dependent_Mode) {
-        // calculate Setpoint based on outside temp
-        boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature);
-        Debug("Weather dependent mode, setting setpoint to "+String(boiler_SetPoint));
-      } else {
-        // set Setpoint to PID
-        boiler_SetPoint=P+I+D;
+      if (Weather_Dependent_Mode and !HotWater) {
+        Debug("Weather dependent mode, setting setpoint to "+String(GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature)));
       }
 
       // reset timestamp
       t_last_climateheartbeat=millis();
+    }
+
+    // Calculate BoilerSetpoint
+    if (Weather_Dependent_Mode) {
+      // calculate Setpoint based on outside temp
+      boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature);
+    } else {
+      // set Setpoint to PID
+      boiler_SetPoint=P+I+D;
     }
 
     // Enable heating and/or cooling
@@ -2598,6 +2601,9 @@ void setup()
 // Loop Code
 void loop()
 {
+  // Update Timeclient
+  timeClient.update();
+
   // handle OTA
   ArduinoOTA.handle();
 
