@@ -168,7 +168,7 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000); //  Set the ti
 void Debug(String text) {
   if (debug) {
     if (MQTT.connected()) {
-      UpdateMQTTText(Debug_Name,text.c_str());
+      UpdateMQTTText(Debug_Name,(timeClient.getFormattedTime()+" "+text).c_str());
     }
     Serial.println(text);
   }
@@ -176,7 +176,7 @@ void Debug(String text) {
 
 void Error(String text) {
   if (MQTT.connected()) {
-    UpdateMQTTText(Error_Name,text.c_str());
+    UpdateMQTTText(Error_Name,(timeClient.getFormattedTime()+" "+text).c_str());
   }
   Serial.println(text);
 }
@@ -1091,7 +1091,7 @@ void UpdatePID(float setpoint,float temperature)
       D=MaxBoilerTemp-P-I;
     }
   }
-  Debug("PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
+  Debug("PID Mode, PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -1171,17 +1171,18 @@ void handleClimateProgram()
         UpdatePID(climate_SetPoint,roomTemperature);
       }
 
+      // Calculate BoilerSetpoint
+      if (Weather_Dependent_Mode) {
+        // calculate Setpoint based on outside temp
+        boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature);
+        Debug("Weather dependent mode, setting setpoint to "+String(boiler_SetPoint));
+      } else {
+        // set Setpoint to PID
+        boiler_SetPoint=P+I+D;
+      }
+
       // reset timestamp
       t_last_climateheartbeat=millis();
-    }
-
-    // Calculate BoilerSetpoint
-    if (Weather_Dependent_Mode) {
-      // calculate Setpoint based on outside temp
-      boiler_SetPoint=GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature);
-    } else {
-      // set Setpoint to PID
-      boiler_SetPoint=P+I+D;
     }
 
     // Enable heating and/or cooling
@@ -1848,6 +1849,7 @@ void reconnect()
         } else {
           Debug("Time was not set");
         }
+        Error("None, all OK");
       } else {
         Serial.print("failed, rc=");
         Serial.print(MQTT.state());
