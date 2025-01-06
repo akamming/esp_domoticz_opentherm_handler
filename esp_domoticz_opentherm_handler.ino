@@ -993,7 +993,7 @@ if (MQTT.connected()) {
       mqtt_Holiday_Mode=Holiday_Mode;
     }
 
-    // Holiday Mode
+    // Debug
     if (debug!=mqtt_debug) // value changed
     {
       UpdateMQTTSwitch(Debug_Name,debug);
@@ -1940,7 +1940,7 @@ void PublishMQTTSwitch(const char* uniquename)
 
 void UpdateMQTTSwitch(const char* uniquename, bool Value)
 {
-  Serial.println("UpdateMQTTSwitch");
+  // Serial.println("UpdateMQTTSwitch");
   // publish state message
   MQTT.publish((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence);
 }
@@ -2440,13 +2440,13 @@ void PublishAllMQTTSensors()
   
 
   // binary sesnors sensors telling state
-  PublishMQTTBinarySensor(FlameActive_Name,"None");
-  PublishMQTTBinarySensor(FaultActive_Name,"None");
-  PublishMQTTBinarySensor(DiagnosticActive_Name,"None");
-  PublishMQTTBinarySensor(CoolingActive_Name,"None");
-  PublishMQTTBinarySensor(CentralHeatingActive_Name,"None");
-  PublishMQTTBinarySensor(HotWaterActive_Name,"None");
-  PublishMQTTBinarySensor(FrostProtectionActive_Name,"None");
+  PublishMQTTBinarySensor(FlameActive_Name,"heat");
+  PublishMQTTBinarySensor(FaultActive_Name,"problem");
+  PublishMQTTBinarySensor(DiagnosticActive_Name,"problem");
+  PublishMQTTBinarySensor(CoolingActive_Name,"heat");
+  PublishMQTTBinarySensor(CentralHeatingActive_Name,"heat");
+  PublishMQTTBinarySensor(HotWaterActive_Name,"heat");
+  PublishMQTTBinarySensor(FrostProtectionActive_Name,"cold");
 
   // Switches to control the boiler
   PublishMQTTSwitch(EnableCentralHeating_Name);
