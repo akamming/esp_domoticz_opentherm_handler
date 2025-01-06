@@ -266,13 +266,13 @@ void SendHTTP(String command, String result) {
 }
 
 void handleResetWifiCredentials() {
-  Serial.println("Resetting Wifi Credentials");
+  Debug("Resetting Wifi Credentials");
   WiFiManager wifiManager;
   wifiManager.resetSettings();
   SendHTTP("ResetWifiCredentials","OK");
   delay(500);
 
-  Serial.println("Trigger watchdog to reset wemos");
+  Debug("Trigger watchdog to reset wemos");
   wdt_disable();
   wdt_enable(WDTO_15MS);
   while (1) {}
@@ -626,7 +626,7 @@ void handleRemoveConfig() {
 }
 
 void handleReset() {
-  Serial.println("handleReset");
+  Debug("handleReset");
   
   server.send(200, "text/plain", "Device Reset");
   delay(500); // wait for server send to finish
@@ -1506,18 +1506,22 @@ void LogMQTT(const char* topic, const char* payloadstr, const char* length, cons
 bool HandleClimateMode(const char* mode)
 {
   bool CommandSucceeded=true;
-  // Init PID calculater
-  InitPID();
-
-  if (String(mode).equals("off") or String(mode).equals("heat") or String(mode).equals("cool") or String(mode).equals("auto")) {
-  climate_Mode=mode;
-  DelayedSaveConfig();
-
+  if (String(mode).equals(String(climate_Mode))) {
+    Debug("Climate mode unchanged, ignoring command");
   } else {
-    Error("Unknown payload for Climate mode command");
-    // sendback current mode to requester, so trick program into making it think it has to communicatie
-    mqtt_climate_Mode="abcd"; // random value, so the program thinks it is changed next time it wants to communicate
-    CommandSucceeded=false;
+    // Init PID calculater
+    InitPID();
+
+    if (String(mode).equals("off") or String(mode).equals("heat") or String(mode).equals("cool") or String(mode).equals("auto")) {
+      Debug("Setting clime mode to "+String(mode));
+      climate_Mode=mode;
+      DelayedSaveConfig();
+    } else {
+      Error("Unknown payload for Climate mode command");
+      // sendback current mode to requester, so trick program into making it think it has to communicatie
+      mqtt_climate_Mode="abcd"; // random value, so the program thinks it is changed next time it wants to communicate
+      CommandSucceeded=false;
+    }
   }
   return CommandSucceeded;
 }
