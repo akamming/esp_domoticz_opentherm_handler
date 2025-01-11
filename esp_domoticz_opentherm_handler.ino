@@ -236,6 +236,11 @@ void SendHTTP(String command, String result) {
   json["weatherDependentMode"] = Weather_Dependent_Mode;
   json["HolidayMode"] = Holiday_Mode;
   json["FrostProtectionActive"] = FrostProtectionActive;
+
+  // Add PID 
+  json["P"] = P;
+  json["I"] = I;
+  json["D"] = D;
   
   // Add BoilerStatus
   json["CentralHeating"] = CentralHeating;
@@ -392,7 +397,7 @@ void handleCommand() {
 
   digitalWrite(LED_BUILTIN, LOW);    // turn the LED on , to indicate we executed the command
 
-  SendHTTP("SetDHWTemp",Statustext);
+  SendHTTP("HandleCommand",Statustext);
 }
 
 void handleGetInfo()
