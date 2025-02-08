@@ -2651,7 +2651,7 @@ void loop()
         }
       }
       
-      if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis) {
+      if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis and climate_Mode.equals("off")) {
           // No commands given for too long a time, so do nothing
           Serial.print("."); // Just print a dot, so we can see the software in still running
           digitalWrite(LED_BUILTIN, HIGH);    // switch the LED off, to indicate we lost connection
