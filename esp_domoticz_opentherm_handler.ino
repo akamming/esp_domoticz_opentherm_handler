@@ -1742,9 +1742,13 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     // Handle debug switch command
     } else if (topicstr.equals(CommandTopic(Debug_Name))) {
       if (jsonerror)  {
+        Debug("Debugging switched "+String(payloadstr));
         CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, payloadstr);
+        Debug("Debugging switched "+String(payloadstr));
       } else {
+        Debug("Debugging switched "+String(payloadstr));
         CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, doc["state"]);
+        Debug("Debugging switched "+String(doc["state"]));
       }
       if (CommandSucceeded) {
         DelayedSaveConfig();
