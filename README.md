@@ -151,7 +151,10 @@ triggers:
   - trigger: state
     entity_id:
       - sensor.<<name of your room temperature sensor>>
-conditions: []
+conditions:
+  - condition: template
+    value_template: >-
+      {{ states('<< name of your temperature sensor>>') not in ['unavailable', 'unknown', 'none'] }}
 actions:
   - action: mqtt.publish
     metadata: {}
