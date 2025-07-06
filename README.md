@@ -101,7 +101,7 @@ About the mqtt temperature topic: If you want to use a domoticz sensor to be use
 - Install Mosquitto (or another MQTT broker) of you did not yet install a MQTT broker
 - Setup both the "MQTT Client gateway with LAN interface" and the "MQTT Auto Discovery Client Gateway" in domoticz (only if these aren't configured yet) and for bth: Set the Adress, port (and optionally username/password) to match your MQTT server settings.   
 - Set the Publish Topic setting for the MQTT Client Gateway  to "Index (with Retain)". 
-- In the settings of this ESP firmware: Set the MQTT switch to on, and the MQTT temperature Topic to "domoticz/out/<idx of your temperature device>"
+- In the settings of this ESP firmware: Set the MQTT switch to on, and the MQTT temperature Topic to "domoticz/out/idx_of_your_temp_sensor
 
 ### Boiler settings:
 - MinBoilerTemp & MaxBoilerTemp: The thermostat will limit the setpoint for the boiler between these 2 values
@@ -110,6 +110,7 @@ About the mqtt temperature topic: If you want to use a domoticz sensor to be use
 - PID parameters: Leave to 30 (KP), 0.03 (KI) and 2.5(KD), unless you know what you are doing.  The software contains a regular PID controller (https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) So with KP, KI and KD you can tweak the mechanism to your needs   
 
 ### Weather dependent mode
+(weather dependent mode requires you have an external temp sensor attached to your boiler, supported by opentherm)
 - BoilerTempAtPlus20 and BoilerTempAtMinus10: Basic data for the boiler firing line
 - Curvature:  Can curve the boiler firing line (basically meaning the boiler setpoint will go up earlier)
 - Switchheatingoffat: Disable the heating when the outside temp is above this value 
@@ -151,7 +152,10 @@ triggers:
   - trigger: state
     entity_id:
       - sensor.<<name of your room temperature sensor>>
-conditions: []
+conditions:
+  - condition: template
+    value_template: >-
+      {{ states('<< name of your temperature sensor>>') not in ['unavailable', 'unknown', 'none'] }}
 actions:
   - action: mqtt.publish
     metadata: {}
