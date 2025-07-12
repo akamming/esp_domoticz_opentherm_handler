@@ -6,11 +6,16 @@
 # Use mqtt as input for external temperature (when in weather dependent mode)
 
 ## create outsideTemperatureTopic
-- create global var mqtt
-- create
+- create global var outsideTemperatureTopic
 - saveconfig
 - loadconfig
 - publishmqttstring
+- create global var mqtt outside temperaturetopic
 - process incoming values
+- publishtomqtt if outsidetemperaturetopic changed
+- show outsidetemperaturetopic in gui
+- send new outsidetemperaturetopic from gui
+- use mqttoutside temperature as outsidetemperature source if configured (instead of attached sensor)
+
 
 
