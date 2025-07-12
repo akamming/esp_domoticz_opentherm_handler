@@ -40,6 +40,7 @@ const char P_Name[] = "P";
 const char I_Name[] = "I";
 const char D_Name[] = "D";
 const char MQTT_TempTopic_Name[] = "MQTTTemperatureTopic";
+const char MQTT_OutsideTempTopic_Name[] = "MQTTOutsideTemperatureTopic";
 const char Debug_Name[] = "DebugToMQTT";
 const char Error_Name[] = "Error";
 
@@ -77,6 +78,7 @@ bool usemqttauthentication = false;                // Use MQTT Authentication
 String mqttuser = "";                             // MQTT Username
 String mqttpass = "";                             // MQTT Password
 String mqtttemptopic = "";                        // MQTT Topic which contains the current temperature
+String mqttoutsidetemptopic = "";                        // MQTT Topic which contains the current outside temperature
 String domoticzoutputtopic="domoticz/out";        // Topic where to listen to for domoticz sensors
 
 // Default values Climate Decice 

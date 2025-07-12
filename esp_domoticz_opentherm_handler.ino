@@ -45,6 +45,7 @@ float currentTemperature = 0;
 
 // Current Temp on mqtt
 float mqttTemperature = 99;
+float mqttOutsideTemperature = 99;
 
 // return values from boiler
 float dhw_Temperature = 0;
@@ -115,6 +116,7 @@ float mqtt_p=99;
 float mqtt_i=99;
 float mqtt_d=99;
 String mqtt_mqtttemptopic="xyzxyz";
+String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
 
 // ot actions (main will loop through these actions in this order)
@@ -139,6 +141,7 @@ unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP com
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=0; // last climate heartbeat timestamp
 unsigned long t_last_tempreceived=0; // Time when last MQTT temp was received
+unsigned long t_last_outsidetempreceived=0; // Time when last MQTT temp was received
 unsigned long t_save_config; // timestamp for delayed save
 unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
 bool ClimateConfigSaved=true;
@@ -490,6 +493,7 @@ void handleGetConfig()
   json["mqttport"] = mqttport;
   json["usemqttauthentication"] = usemqttauthentication;
   json["mqtttemptopic"] = mqtttemptopic;
+  json["mqttoutsidetemptopic"] = mqttoutsidetemptopic;
   json["mqttuser"] = mqttuser;
   json["mqttpass"] = "*****"; // This is the only not allowed password, password will only be saved if it is not 5 stars
   json["mqttretained"] = mqttpersistence;  
@@ -570,6 +574,10 @@ void handleSaveConfig() {
 
     if (json["mqtttemptopic"].is<const char*>() ) {
       mqtttemptopic=json["mqtttemptopic"].as<String>();
+    }
+    
+    if (json["mqttoutsidetemptopic"].is<const char*>() ) {
+      mqttoutsidetemptopic=json["mqttoutsidetemptopic"].as<String>();
     }
     
     //device config
@@ -764,6 +772,7 @@ void readConfig()
         mqttpass=json["mqttpass"].as<String>();
         mqttpersistence=json["mqttretained"];
         mqtttemptopic=json["mqtttemptopic"].as<String>();
+        mqttoutsidetemptopic=json["mqttoutsidetemptopic"].as<String>();
         
         //device config
         inPin=json["inpin"] | 4;
@@ -809,6 +818,7 @@ void readConfig()
 void SaveConfig()
 {
   JsonDocument json;
+  Debug("SaveConfig()");
 
   // mqtt config
   json["usemqtt"] = usemqtt;
@@ -819,6 +829,7 @@ void SaveConfig()
   json["mqttpass"] = mqttpass;
   json["mqttretained"] = mqttpersistence;
   json["mqtttemptopic"] = mqtttemptopic;
+  json["mqttoutsidetemptopic"] = mqttoutsidetemptopic;
   json["debugtomqtt"] = debug;
   
   //device config
@@ -942,6 +953,7 @@ if (MQTT.connected()) {
     CommunicateNumberSensor(I_Name,I,&mqtt_i,0.01);
     CommunicateNumberSensor(D_Name,D,&mqtt_d,0.01);
     CommunicateText(MQTT_TempTopic_Name,mqtttemptopic,&mqtt_mqtttemptopic);
+    CommunicateText(MQTT_OutsideTempTopic_Name,mqttoutsidetemptopic,&mqtt_mqttoutsidetemptopic);
     if (mqtt_Curvature!=Curvature) {
       UpdateMQTTCurvatureSelect(Curvature_Name,Curvature);
       mqtt_Curvature=Curvature;
@@ -1366,7 +1378,21 @@ void handleOpenTherm()
         }
       }
 
-      OpenThermCommand = GetOutsideTemp;
+      if (mqttoutsidetemptopic.length()>0) {
+        // If a topic is set, don't read attached sensor, use mqtt value and skip GetOutsideTemp command
+        outside_Temperature=mqttOutsideTemperature;
+        // Check if we have to send to MQTT
+        if (MQTT.connected()) {
+          float delta = mqtt_outside_Temperature-outside_Temperature;
+          if (delta<-0.1 or delta>0.1){ // value changed
+            UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
+            mqtt_outside_Temperature=outside_Temperature;
+          }
+        }
+        OpenThermCommand = GetPressure;
+      } else {
+        OpenThermCommand = GetOutsideTemp;
+      }
       break;
     }
       
@@ -1556,7 +1582,24 @@ void SetMQTTTemperature(float value) {
     insideTemperatureReceived=true; // Make sure we do this only once ;-)
     InitPID();
   }
+}
 
+void SetMQTTOutsideTemperature(float value) {
+  // handle newly found mqttTemperature
+  t_last_outsidetempreceived=millis();
+  mqttOutsideTemperature=value; 
+
+  // additional actions if first time received
+  if (!outsideTemperatureReceived) {
+    Debug("First outside temperature ("+String(value)+") received, ready for weather dependent mode");
+    outsideTemperatureReceived=true; // Make sure we do this only once ;-)
+
+  // this is our first measurement, initialize the array
+  for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
+    outsidetemp[i]=outside_Temperature;
+  }
+
+  }
 }
 
 bool HandleBoilerMode(const char* mode) 
@@ -1664,6 +1707,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     JsonDocument doc;
     DeserializationError jsonerror = deserializeJson(doc, payloadstr);
 
+    // climate mode
     if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
       if (jsonerror) {
         CommandSucceeded = HandleClimateMode(payloadstr);
@@ -1754,6 +1798,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         DelayedSaveConfig();
       }
 
+    // boiler setpoint command
     } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
       boiler_SetPoint=String(payloadstr).toFloat();
 
@@ -1772,6 +1817,20 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
           SetMQTTTemperature(String(doc["svalue1"]).toFloat());
         } else {
           SetMQTTTemperature(String(payloadstr).toFloat()); // Just try to convert to Float
+        }
+      }
+
+    // MQTT outsidetemperature received
+    } else if (topicstr.equals(mqttoutsidetemptopic)) {
+      if (jsonerror) {
+        SetMQTTOutsideTemperature(String(payloadstr).toFloat()); // Just try to convert
+      } else {
+        if (doc["value"].is<float>()) {   // e.g. from zwavejsui
+          SetMQTTOutsideTemperature(doc["value"]);
+        } else if (doc["svalue1"].is<const char*>()) { // e.g. from domoticz/out
+          SetMQTTOutsideTemperature(String(doc["svalue1"]).toFloat());
+        } else {
+          SetMQTTOutsideTemperature(String(payloadstr).toFloat()); // Just try to convert to Float
         }
       }
 
@@ -1817,6 +1876,12 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       mqtttemptopic=payloadstr;
       MQTT.subscribe(mqtttemptopic.c_str()); // subscribe to new topic
       DelayedSaveConfig(); // save the config
+    } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
+      Debug("Setting outsideTempTopic to "+String(payloadstr));
+      MQTT.unsubscribe(mqttoutsidetemptopic.c_str()); // unsubscribe from old topic
+      mqttoutsidetemptopic=payloadstr;
+      MQTT.subscribe(mqttoutsidetemptopic.c_str()); // subscribe to new topic
+      DelayedSaveConfig(); // save the config
 
     // Domoticz devices
     } else if (topicstr.equals(domoticzoutputtopic)) {
@@ -1824,6 +1889,9 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       // Debug("Received domoticz device reading: "+String(doc["idx"])+","+String(doc["name"]));
       if (mqtttemptopic.equals(doc["idx"].as<String>())) {
         SetMQTTTemperature(doc["svalue1"].as<float>());
+      }
+      if (mqttoutsidetemptopic.equals(doc["idx"].as<String>())) {
+        SetMQTTOutsideTemperature(doc["svalue1"].as<float>());
       }
 
     // Unrecognized  
@@ -2488,12 +2556,17 @@ void PublishAllMQTTSensors()
   PublishMQTTNumber(KD_Name,0,5,0.1,false);
   PublishMQTTCurvatureSelect(Curvature_Name);
   PublishMQTTText(MQTT_TempTopic_Name);
+  PublishMQTTText(MQTT_OutsideTempTopic_Name);
   PublishMQTTText(Debug_Name);
   PublishMQTTText(Error_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
     MQTT.subscribe(mqtttemptopic.c_str());
+  }
+  // Subscribe to outside temperature topic
+  if (mqttoutsidetemptopic.length()>0 and mqttoutsidetemptopic.toInt()==0) {
+    MQTT.subscribe(mqttoutsidetemptopic.c_str());
   }
 
   // reset the timer
