@@ -92,16 +92,16 @@ For connecting to wifi:
   
 ### MQTT settings 
 - MQTT should be switched on
-- MQTT temperature topic: should be either 
+- MQTT temperature topics: should be either 
   - the MQTT State topic of your temperature sensor 
   - The IDX of your domoticz device (it will listen to domoticz/out. Note, this is not recommended, cause the device than has to check every domoticz device update on if it's the temperature sensor, which will make the device very slow if domoticz has many device updates!)
-  - leave empty (it will use the internal dallastemperature sensor connected to the device, so the DS18B20 pin should be configured correctly. This is also not recommended, cause the temperature of the ESP influences the temperature sensor)
+  - leave empty (for reference room temp it will use the internal dallastemperature sensor connected to the device, so the DS18B20 pin should be configured correctly. This is also not recommended, cause the temperature of the ESP influences the temperature sensor. For outside temperature it will use the outside temperature as reported by the boiler (if a outside temp sensor is attached))
 
 About the mqtt temperature topic: If you want to use a domoticz sensor to be used, there are several options available, but this is the best way to do it:
 - Install Mosquitto (or another MQTT broker) of you did not yet install a MQTT broker
 - Setup both the "MQTT Client gateway with LAN interface" and the "MQTT Auto Discovery Client Gateway" in domoticz (only if these aren't configured yet) and for bth: Set the Adress, port (and optionally username/password) to match your MQTT server settings.   
 - Set the Publish Topic setting for the MQTT Client Gateway  to "Index (with Retain)". 
-- In the settings of this ESP firmware: Set the MQTT switch to on, and the MQTT temperature Topic to "domoticz/out/idx_of_your_temp_sensor
+- In the settings of this ESP firmware: Set the MQTT switch to on, and the MQTT temperature Topics to "domoticz/out/idx_of_your_temp_sensor
 
 ### Boiler settings:
 - MinBoilerTemp & MaxBoilerTemp: The thermostat will limit the setpoint for the boiler between these 2 values
