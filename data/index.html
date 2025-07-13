@@ -62,7 +62,8 @@
         Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
         <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br /><br/>
-        temperature_topic<br/> <input type="text" class="temptopic_input" id="mqtttemptopic" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br /><br/>
+        Inside Temperature Topic<br/> <input type="text" class="temptopic_input" id="mqttinsidetemptopic" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br /><br/>
+        Outside Temperature Topic<br/> <input type="text" class="temptopic_input" id="mqttoutsidetemptopic" size="32" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br /><br/>
         <label><input type="checkbox" name="debugtomqtt" id="debugtomqtt" disabled>Debug messages to MQTT</label><br />
         <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
     </div>
@@ -119,7 +120,8 @@
                 document.getElementById("mqttport").disabled = false;
                 document.getElementById("usemqttauthentication").disabled = false;
                 document.getElementById("mqttretained").disabled = false;
-                document.getElementById("mqtttemptopic").disabled = false;
+                document.getElementById("mqttinsidetemptopic").disabled = false;
+                document.getElementById("mqttoutsidetemptopic").disabled = false;
                 document.getElementById("debugtomqtt").disabled = false;
 
                 NewValue = true;
@@ -136,7 +138,8 @@
                 document.getElementById("mqttretained").disabled = true;
                 document.getElementById("mqttuser").disabled = true;
                 document.getElementById("mqttpass").disabled = true;
-                document.getElementById("mqtttemptopic").disabled = true;
+                document.getElementById("mqttinsidetemptopic").disabled = true;
+                document.getElementById("mqttoutsidetemptopic").disabled = true;
                 document.getElementById("debugtomqtt").disabled = true;
             }
         }
@@ -240,7 +243,8 @@
                     document.getElementById('usemqttauthentication').checked = json.usemqttauthentication;
                     document.getElementById('mqttuser').value = json.mqttuser;
                     document.getElementById('mqttpass').value = json.mqttpass;
-                    document.getElementById('mqtttemptopic').value = json.mqtttemptopic;
+                    document.getElementById('mqttinsidetemptopic').value = json.mqtttemptopic;
+                    document.getElementById('mqttoutsidetemptopic').value = json.mqttoutsidetemptopic;
                     document.getElementById('mqttretained').checked = json.mqttretained;
                     document.getElementById('debugtomqtt').checked = json.debugtomqtt;
 
@@ -311,7 +315,8 @@
                 obj.mqttport = +document.getElementById('mqttport').value;
                 obj.mqttuser = document.getElementById('mqttuser').value;
                 obj.mqttpass = document.getElementById('mqttpass').value;
-                obj.mqtttemptopic = document.getElementById('mqtttemptopic').value;
+                obj.mqtttemptopic = document.getElementById('mqttinsidetemptopic').value;
+                obj.mqttoutsidetemptopic = document.getElementById('mqttoutsidetemptopic').value;
                 obj.mqttretained = document.getElementById('mqttretained').checked;
                 obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
                 obj.debugtomqtt = document.getElementById('debugtomqtt').checked;
