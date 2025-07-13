@@ -1925,7 +1925,7 @@ void reconnect()
         PublishAllMQTTSensors();
         Debug("Succesfully (re)connected, starting operations");
         Error("None, all OK");
-        if (mqtttemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
+        if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();
         }      
         if (timeClient.forceUpdate()) {
