@@ -6,6 +6,7 @@ const char DHW_Temperature_Name[] = "DHW_Temperature";
 const char Return_Temperature_Name[] = "Return_Temperature";   
 const char Thermostat_Temperature_Name[] = "Thermostat_Temperature";   
 const char Outside_Temperature_Name[] = "Outside_Temperature";   
+const char OT_Outside_Temperature_Name[] = "OT_Outside_Temperature";   
 const char FlameActive_Name[] = "FlameActive";   
 const char FaultActive_Name[] = "FaultActive";   
 const char DiagnosticActive_Name[] = "DiagnosticActive";   

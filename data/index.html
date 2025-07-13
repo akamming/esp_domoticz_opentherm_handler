@@ -19,7 +19,8 @@
 
     <div class="outer_frame">
         <p>Thermostat</p><br />
-        Setpoint <input type="number" class="temp_input" id="climateSetpoint" size="10" step="0.5" onchange="onThermostatChanged()"> Actual <input type="number" class="temp_input" id="mqtttemperature" size="10" disabled><br /><br />
+        Setpoint <input type="number" class="temp_input" id="climateSetpoint" size="10" step="0.5" onchange="onThermostatChanged()"> Actual <input type="number" class="temp_input" id="mqtttemperature" size="10" disabled><br />
+        Outside Temperature Actual <input type="number" class="temp_input" id="otoutsidetemperature" size="10" disabled><br /><br />
         <label>Mode <select name="climateMode" id="climateMode" onchange="onThermostatChanged()">
                 <option value="off">Off</option>
                 <option value="heat">Heating</option>
@@ -192,6 +193,7 @@
                     document.getElementById('hotwatertemperature').value = json.DhwTemperature;
                     document.getElementById('thermostattemperature').value = json.ThermostatTemperature;
                     document.getElementById('outsidetemperature').value = json.OutsideTemperature;
+                    document.getElementById('otoutsidetemperature').value = json.OTOutsideTemperature;
                     document.getElementById('mqtttemperature').value = json.mqttTemperature;
                     document.getElementById('otstatus').value = json.OpenThermStatus;
                     document.getElementById('modulation').value = json.Modulation;

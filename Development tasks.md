@@ -21,13 +21,14 @@ String mqttoutsidetemptopic = "";                        // MQTT Topic which con
 - publishtomqtt if outsidetemperaturetopic changed --> Done
 - subscribto to state topic --> Done
 - mqttcallback op state topic --> Done
+- unsubscribe when topic removed --> Done
+- send new outsidetemperaturetopic from gui --> Done
+- use mqttoutside temperature as outsidetemperature source if configured (instead of attached sensor) --> Done
+- show outsidetemperaturetopic in gui --> Done
 
-- unsubscribe when topic removed
-- show outsidetemperaturetopic in gui
-- send new outsidetemperaturetopic from gui
-- use mqttoutside temperature as outsidetemperature source if configured (instead of attached sensor)
 - rename mqtt temperature to mqtt reference room temperature
 - update documentation
+- change mqtttemptopic to mqttinsidetemptopic
 
 
 

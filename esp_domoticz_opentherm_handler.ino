@@ -43,6 +43,9 @@ float D=0;
 // Current Temp on Thermostat
 float currentTemperature = 0;
 
+// Current Outside Temp for program Logic
+float outside_Temperature = 0;
+
 // Current Temp on mqtt
 float mqttTemperature = 99;
 float mqttOutsideTemperature = 99;
@@ -51,7 +54,7 @@ float mqttOutsideTemperature = 99;
 float dhw_Temperature = 0;
 float boiler_Temperature = 0;
 float return_Temperature = 0;
-float outside_Temperature = 0;
+float OT_outside_Temperature = 0;
 float modulation = 0;
 float pressure = 0;
 float flowrate = 0;
@@ -79,6 +82,7 @@ float mqtt_boiler_Temperature=100;
 float mqtt_dhw_Temperature=100;
 float mqtt_return_Temperature=100;
 float mqtt_outside_Temperature=100;
+float mqtt_OT_outside_Temperature=100;
 float mqtt_currentTemperature=100;
 float mqtt_mqttTemperature=100;
 bool mqtt_CentralHeating=true;
@@ -258,6 +262,7 @@ void SendHTTP(String command, String result) {
   json["DhwTemperature"] = float(int(dhw_Temperature*100))/100;    
   json["ReturnTemperature"] = float(int(return_Temperature*100))/100;
   json["OutsideTemperature"] = float(int(outside_Temperature*100))/100;
+  json["OTOutsideTemperature"] = float(int(OT_outside_Temperature*100))/100;
   json["Modulation"] = modulation;
   json["Pressure"] = pressure;
   json["Flowrate"] = flowrate;
@@ -1389,19 +1394,17 @@ void handleOpenTherm()
             mqtt_outside_Temperature=outside_Temperature;
           }
         }
-        OpenThermCommand = GetPressure;
-      } else {
-        OpenThermCommand = GetOutsideTemp;
       }
+      OpenThermCommand = GetOutsideTemp;
       break;
     }
       
     case GetOutsideTemp:
     {
-      outside_Temperature = getOutsideTemperature();
-      if(outside_Temperature==0) { // 0 can also mean no temperature reading, so do some extra checks
-        if (abs(outside_Temperature-mqtt_outside_Temperature)>0.5) { // ignore if zero was reported with a bif temp difference at that time
-          outside_Temperature=mqtt_outside_Temperature;
+      OT_outside_Temperature = getOutsideTemperature();
+      if(OT_outside_Temperature==0) { // 0 can also mean no temperature reading, so do some extra checks
+        if (abs(OT_outside_Temperature-mqtt_OT_outside_Temperature)>0.5) { // ignore if zero was reported with a bif temp difference at that time
+          OT_outside_Temperature=mqtt_OT_outside_Temperature;
         } else {
           if (!outsideTemperatureReceived) {
             // this is our first measurement, initialize the array
@@ -1420,13 +1423,17 @@ void handleOpenTherm()
             }
 
             // calculate the average
-            outside_Temperature=0;
+            OT_outside_Temperature=0;
             for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
-              outside_Temperature += outsidetemp[outsidetempcursor];
+              OT_outside_Temperature += outsidetemp[outsidetempcursor];
             }
-            outside_Temperature=outside_Temperature / NUMBEROFMEASUREMENTS;
+            OT_outside_Temperature=outside_Temperature / NUMBEROFMEASUREMENTS;
           }
         }
+      }
+
+      if (mqttoutsidetemptopic.length()==0) { // No topic set, so We are using the outside temp reported by openterm
+        outside_Temperature=OT_outside_Temperature;
       }
       
       // Check if we have to send to MQTT
@@ -1435,6 +1442,11 @@ void handleOpenTherm()
         if (delta<-0.1 or delta>0.1){ // value changed
           UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
           mqtt_outside_Temperature=outside_Temperature;
+        }
+        delta = mqtt_OT_outside_Temperature-OT_outside_Temperature;
+        if (delta<-0.1 or delta>0.1){ // value changed
+          UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name,OT_outside_Temperature);
+          mqtt_OT_outside_Temperature=OT_outside_Temperature;
         }
       }
 
@@ -2512,6 +2524,7 @@ void PublishAllMQTTSensors()
   PublishMQTTTemperatureSensor(Return_Temperature_Name);
   PublishMQTTTemperatureSensor(Thermostat_Temperature_Name);
   PublishMQTTTemperatureSensor(Outside_Temperature_Name);
+  PublishMQTTTemperatureSensor(OT_Outside_Temperature_Name);
   PublishMQTTPressureSensor(Pressure_Name);
   PublishMQTTPercentageSensor(Modulation_Name);
   PublishMQTTFaultCodeSensor(FaultCode_Name);
