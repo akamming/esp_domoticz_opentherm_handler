@@ -1439,12 +1439,12 @@ void handleOpenTherm()
       // Check if we have to send to MQTT
       if (MQTT.connected()) {
         float delta = mqtt_outside_Temperature-outside_Temperature;
-        if (delta<-0.1 or delta>0.1){ // value changed
+        if ((delta<-0.1 or delta>0.1) and outside_Temperature!=99){ // value changed
           UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
           mqtt_outside_Temperature=outside_Temperature;
         }
         delta = mqtt_OT_outside_Temperature-OT_outside_Temperature;
-        if (delta<-0.1 or delta>0.1){ // value changed
+        if ((delta<-0.1 or delta>0.1) and OT_outside_Temperature!=99){ // value changed
           UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name,OT_outside_Temperature);
           mqtt_OT_outside_Temperature=OT_outside_Temperature;
         }

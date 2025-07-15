@@ -25,9 +25,9 @@ String mqttoutsidetemptopic = "";                        // MQTT Topic which con
 - send new outsidetemperaturetopic from gui --> Done
 - use mqttoutside temperature as outsidetemperature source if configured (instead of attached sensor) --> Done
 - show outsidetemperaturetopic in gui --> Done
+- update documentation --> Done
 
 - rename mqtt temperature to mqtt reference room temperature
-- update documentation
 - change mqtttemptopic to mqttinsidetemptopic
 
 
