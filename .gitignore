@@ -1,0 +1,7 @@
+.vscode/
+.pio/
+.git/
+
+data/README*
+src/README*
+include/README*

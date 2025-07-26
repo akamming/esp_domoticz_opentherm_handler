@@ -487,57 +487,52 @@ void handleGetConfig()
   Serial.println("GetConfig");
   JsonDocument json;
 
-  // gpio config
-  json["inpin"] = inPin;
-  json["outpin"] = outPin;
-  json["temppin"] = OneWireBus;
-
-  // mqtt config
-  json["usemqtt"] = usemqtt;
-  json["mqttserver"] = mqttserver;
-  json["mqttport"] = mqttport;
-  json["usemqttauthentication"] = usemqttauthentication;
-  json["mqtttemptopic"] = mqtttemptopic;
-  json["mqttoutsidetemptopic"] = mqttoutsidetemptopic;
-  json["mqttuser"] = mqttuser;
-  json["mqttpass"] = "*****"; // This is the only not allowed password, password will only be saved if it is not 5 stars
-  json["mqttretained"] = mqttpersistence;  
-
-  // PID settings
-  json["KP"] = KP;
-  json["KI"] = KI;
-  json["KD"] = KD; 
-
-  // Boiler Control Settings
-  json["MinBoilerTemp"] = MinBoilerTemp;
-  json["MaxBoilerTemp"] = MaxBoilerTemp;
-  json["minimumTempDifference"] = minimumTempDifference;
-  json["FrostProtectionSetPoint"] = FrostProtectionSetPoint;
-  json["BoilerTempAtPlus20"] = BoilerTempAtPlus20;
-  json["BoilerTempAtMinus10"] = BoilerTempAtMinus10; 
-  json["Curvature"] = getCurvatureStringFromInt(Curvature);
-  json["CurvatureInt"] = Curvature;
-  json["SwitchHeatingOffAt"] = SwitchHeatingOffAt;
-  json["ReferenceRoomCompensation"] = ReferenceRoomCompensation;
-
-  // Add some General status info 
-  if (MQTT.connected())
-  {
-    json["MQTTconnected"] = true;
-  } else {
-    json["MQTTconnected"] = false;
+  // First load config from file
+  if (LittleFS.exists(CONFIGFILE)) {
+    File configFile = LittleFS.open(CONFIGFILE, "r");
+    if (configFile) {
+      DeserializationError error = deserializeJson(json, configFile);
+      configFile.close();
+      if (error) {
+        Serial.println("Failed to read config file");
+        server.send(500, "application/json", "{\"error\":\"Failed to read config file\"}");
+        return;
+      }
+    }
   }
-  json["MQTTState"] = MQTT.state();
-  json["debugtomqtt"]=debug;
 
+  // Mask password if present
+  if(json["mqttpass"].is<const char*>()) {
+    json["mqttpass"] = "*****";
+  }
+  
+  // Add runtime info
   json["heap"] = ESP.getFreeHeap();
   json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
 
-
-  // Send output
-  char buf[1024];
-  serializeJson(json, buf); 
-  server.send(200, "application/json", buf);       //Response to the HTTP request
+  // Send output with pretty formatting
+  char buf[2048];
+  serializeJsonPretty(json, buf);
+  server.send(200, "application/json", buf);
+}
+void handleConfigJsonFile() {
+  if (LittleFS.exists(CONFIGFILE)) {
+    File configFile = LittleFS.open(CONFIGFILE, "r");
+    if (configFile) {
+      JsonDocument json;
+      DeserializationError error = deserializeJson(json, configFile);
+      configFile.close();
+      if (!error) {
+        // Mask the password
+        json["mqttpass"] = "*****";
+        char buf[2048];
+        serializeJsonPretty(json, buf);
+        server.send(200, "application/json", buf);
+        return;
+      }
+    } 
+  }
+  server.send(404, "application/json", "{\"error\":\"config.json not found\"}");
 }
 
 void handleSaveConfig() {
@@ -2625,13 +2620,13 @@ void setup()
   server.on("/GetSensors",handleGetSensors);
   server.on("/info", handleGetInfo);
   server.on("/getconfig", handleGetConfig);
-  server.on("/config.json", handleGetConfig); // overide retrieving config.json, so the password is masked
   server.on("/saveconfig", handleSaveConfig);
   server.on("/removeconfig", handleRemoveConfig);
   server.on("/reset", handleReset);
   server.on("/command", handleCommand); 
   server.on("/upload", HTTP_GET, sendUploadForm);  
   server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
+  server.on("/config.json", handleConfigJsonFile); // serve config.json from file, masking password
   server.onNotFound(handleNotFound);
 
   // Initialize OTA
