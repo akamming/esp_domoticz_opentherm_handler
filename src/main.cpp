@@ -25,13 +25,13 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
 #include <PubSubClient.h>         // MQTT library
-#include "config.h"               // Set Configuration
+#include "domesphelper.h"               // Set Configuration
 #include <LittleFS.h>             // Filesystem
 #include <NTPClient.h>            // for NTP Client
 #include <WiFiUdp.h>              // is needed by NTP client
 
 // vars to manage boiler
-bool enableCentralHeating = false;
+bool enableCentralHeating = false; // define this as false, so we can set it to true in the config
 bool enableHotWater = true;
 bool enableCooling = false;
 float boiler_SetPoint = 0;

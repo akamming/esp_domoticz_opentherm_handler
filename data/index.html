@@ -288,60 +288,67 @@
         function saveSettings() {
             var server = document.getElementById('mqttserver').value;
             var usemqtt = document.getElementById('mqttenabled').checked;
+            var insideTempTopic = document.getElementById('mqttinsidetemptopic').value;
+            var outsideTempTopic = document.getElementById('mqttoutsidetemptopic').value;
+
             if (usemqtt && !isValidIP(server)) {
                 alert("MQTT Server has Invalid IP Adres!");
                 return;
-            } else {
-                // Sending and receiving data in JSON format using POST method
-                var xhttp = new XMLHttpRequest();
-                xhttp.open("POST", "http://" + location.hostname + "/saveconfig", true);
-                xhttp.setRequestHeader("Content-Type", "application/json");
-                xhttp.onreadystatechange = function () {
-                    if (xhttp.readyState === 4 && xhttp.status === 200) {
-                        alert("New Config sent, device is rebooting");
-                    } else {
-                        if (xhttp.readyState === 4) {
-                            alert("some error sending the config (" + xhttp.status + ")");
-                        }
-                    }
-                };
-                var obj = new Object();
-                // device config
-                obj.inpin = +document.getElementById('inpin').value;
-                obj.outpin = +document.getElementById('outpin').value;
-                obj.temppin = +document.getElementById('temppin').value;
-
-                // mqtt config
-                obj.usemqtt = document.getElementById('mqttenabled').checked;
-                obj.mqttserver = document.getElementById('mqttserver').value;
-                obj.mqttport = +document.getElementById('mqttport').value;
-                obj.mqttuser = document.getElementById('mqttuser').value;
-                obj.mqttpass = document.getElementById('mqttpass').value;
-                obj.mqtttemptopic = document.getElementById('mqttinsidetemptopic').value;
-                obj.mqttoutsidetemptopic = document.getElementById('mqttoutsidetemptopic').value;
-                obj.mqttretained = document.getElementById('mqttretained').checked;
-                obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
-                obj.debugtomqtt = document.getElementById('debugtomqtt').checked;
-
-                // boiler Config
-                obj.KP = +document.getElementById('KP').value;
-                obj.KI = +document.getElementById('KI').value;
-                obj.KD = +document.getElementById('KD').value;
-
-                // boiler Config
-                obj.MinBoilerTemp = +document.getElementById('MinBoilerTemp').value;
-                obj.MaxBoilerTemp = +document.getElementById('MaxBoilerTemp').value;
-                obj.minimumTempDifference = +document.getElementById('minimumTempDifference').value;
-                obj.FrostProtectionSetPoint = +document.getElementById('FrostProtectionSetPoint').value;
-                obj.BoilerTempAtPlus20 = +document.getElementById('BoilerTempAtPlus20').value;
-                obj.BoilerTempAtMinus10 = +document.getElementById('BoilerTempAtMinus10').value;
-                obj.Curvature = document.getElementById('Curvature').value;
-                obj.SwitchHeatingOffAt = +document.getElementById('SwitchHeatingOffAt').value;
-                obj.ReferenceRoomCompensation = +document.getElementById('ReferenceRoomCompensation').value;
-
-                var data = JSON.stringify(obj);
-                xhttp.send(data);
             }
+            // New validation: temperature topics must not be the same
+            if (insideTempTopic === outsideTempTopic) {
+                alert("Inside Temperature Topic and Outside Temperature Topic must not be the same. Please enter different topics for each.");
+                return;
+            }
+            // Sending and receiving data in JSON format using POST method
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", "http://" + location.hostname + "/saveconfig", true);
+            xhttp.setRequestHeader("Content-Type", "application/json");
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState === 4 && xhttp.status === 200) {
+                    alert("New Config sent, device is rebooting");
+                } else {
+                    if (xhttp.readyState === 4) {
+                        alert("some error sending the config (" + xhttp.status + ")");
+                    }
+                }
+            };
+            var obj = new Object();
+            // device config
+            obj.inpin = +document.getElementById('inpin').value;
+            obj.outpin = +document.getElementById('outpin').value;
+            obj.temppin = +document.getElementById('temppin').value;
+
+            // mqtt config
+            obj.usemqtt = document.getElementById('mqttenabled').checked;
+            obj.mqttserver = document.getElementById('mqttserver').value;
+            obj.mqttport = +document.getElementById('mqttport').value;
+            obj.mqttuser = document.getElementById('mqttuser').value;
+            obj.mqttpass = document.getElementById('mqttpass').value;
+            obj.mqtttemptopic = insideTempTopic;
+            obj.mqttoutsidetemptopic = outsideTempTopic;
+            obj.mqttretained = document.getElementById('mqttretained').checked;
+            obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
+            obj.debugtomqtt = document.getElementById('debugtomqtt').checked;
+
+            // boiler Config
+            obj.KP = +document.getElementById('KP').value;
+            obj.KI = +document.getElementById('KI').value;
+            obj.KD = +document.getElementById('KD').value;
+
+            // boiler Config
+            obj.MinBoilerTemp = +document.getElementById('MinBoilerTemp').value;
+            obj.MaxBoilerTemp = +document.getElementById('MaxBoilerTemp').value;
+            obj.minimumTempDifference = +document.getElementById('minimumTempDifference').value;
+            obj.FrostProtectionSetPoint = +document.getElementById('FrostProtectionSetPoint').value;
+            obj.BoilerTempAtPlus20 = +document.getElementById('BoilerTempAtPlus20').value;
+            obj.BoilerTempAtMinus10 = +document.getElementById('BoilerTempAtMinus10').value;
+            obj.Curvature = document.getElementById('Curvature').value;
+            obj.SwitchHeatingOffAt = +document.getElementById('SwitchHeatingOffAt').value;
+            obj.ReferenceRoomCompensation = +document.getElementById('ReferenceRoomCompensation').value;
+
+            var data = JSON.stringify(obj);
+            xhttp.send(data);
         }
 
         function onThermostatChanged() {

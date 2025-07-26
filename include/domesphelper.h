@@ -105,4 +105,94 @@ float SwitchHeatingOffAt = 19;                // Automatic switch off when in we
 float ReferenceRoomCompensation = 3;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
 
 // uploadform
-const char HTTP_UPLOAD_FORM[] PROGMEM = "<form method=\"post\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"name\"><input class=\"button\" type=\"submit\" value=\"Upload\"></form>";
+const char HTTP_UPLOAD_FORM[] PROGMEM = 
+    "<form method=\"post\" enctype=\"multipart/form-data\">"
+    "<input type=\"file\" name=\"name\">"
+    "<input class=\"button\" type=\"submit\" value=\"Upload\">"
+    "</form><br/>"
+    "<a href=\"/\">Back to main page</a>";
+
+
+// Function prototypes
+
+void Debug(String text);
+void Error(String text);
+void IRAM_ATTR handleInterrupt();
+void SendHTTP(String command, String result);
+void handleResetWifiCredentials();
+void handleGetSensors();
+void handleCommand();
+void handleGetInfo();
+void sendUploadForm();
+void handleFileUpload();
+void handleGetConfig();
+void handleSaveConfig();
+void handleRemoveConfig();
+void handleReset();
+bool endsWith(const char* what, const char* withwhat);
+bool serveFile(const char url[]);
+void handleNotFound();
+String getCurvatureStringFromInt(int i);
+int getCurvatureIntFromString(String value);
+void readConfig();
+void SaveConfig();
+float getOutsideTemperature();
+float getDHWFlowrate();
+void CommunicateSetpoint(const char* setpointName, float setpointValue, float *mqttValue);
+void CommunicateNumber(const char* numberName, float Value, float *mqttValue, float tolerance);
+void CommunicateNumberSensor(const char* numberName, float Value, float *mqttValue, float tolerance);
+void CommunicateText(const char* TextName, String Value, String *mqttValue);
+void CommunicateSteeringVarsToMQTT();
+void resetI();
+void resetD();
+void InitPID();
+void UpdatePID(float setpoint, float temperature);
+float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature);
+void handleClimateProgram();
+void handleOpenTherm();
+String CommandTopic(const char* DeviceName);
+String SetpointCommandTopic(const char* DeviceName);
+String NumberCommandTopic(const char* DeviceName);
+void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext);
+bool HandleClimateMode(const char* mode);
+const char* SetpointIntToString(int value);
+void SetMQTTTemperature(float value);
+void SetMQTTOutsideTemperature(float value);
+bool HandleBoilerMode(const char* mode);
+bool HandleDHWMode(const char* mode);
+void DelayedSaveConfig();
+bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode);
+bool handleClimateSetpoint(float setpoint);
+void MQTTcallback(char* topic, byte* payload, unsigned int length);
+void SubScribeToDomoticz();
+void reconnect();
+void addDeviceToJson(JsonDocument *json);
+void PublishMQTTDimmer(const char* uniquename);
+void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod);
+void PublishMQTTSwitch(const char* uniquename);
+void UpdateMQTTSwitch(const char* uniquename, bool Value);
+void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass);
+void UpdateMQTTBinarySensor(const char* uniquename, bool Value);
+void PublishMQTTTemperatureSensor(const char* uniquename);
+void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature);
+void PublishMQTTNumberSensor(const char* uniquename);
+void UpdateMQTTNumberSensor(const char* uniquename, float value);
+void PublishMQTTPressureSensor(const char* uniquename);
+void UpdateMQTTPressureSensor(const char* uniquename, float pressure);
+void PublishMQTTPercentageSensor(const char* uniquename);
+void UpdateMQTTPercentageSensor(const char* uniquename, float percentage);
+void PublishMQTTFaultCodeSensor(const char* uniquename);
+void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode);
+void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool includeCooling);
+void UpdateMQTTSetpointTemperature(const char* uniquename, float value);
+void PublishMQTTNumber(const char* uniquename, int min, int max, float step, bool isSlider);
+void UpdateMQTTNumber(const char* uniquename, float value);
+void PublishMQTTText(const char* uniquename);
+void UpdateMQTTText(const char* uniquename, const char* value);
+void PublishMQTTCurvatureSelect(const char* uniquename);
+void UpdateMQTTCurvatureSelect(const char* uniquename, int value);
+void UpdateMQTTBoilerSetpointMode();
+void UpdateMQTTSetpointMode(const char* uniquename, int value);
+void UpdateMQTTSetpoint(const char* uniquename, float temperature);
+void updateTime();
+void PublishAllMQTTSensors();
