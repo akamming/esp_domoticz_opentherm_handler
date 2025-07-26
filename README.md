@@ -54,26 +54,45 @@ Additional 3 more devices :
 ### Hardware
 - Connect your OpenTherm adapter to the Wemos D1 mini and the boiler, according to http://ihormelnyk.com/opentherm_adapter. 
 
-### Firmware
-- Connect your Wemos D1 to the USB of your laptop/pc
-- A new com port should now be available on your system. If not, install CH340 drivers (https://www.wemos.cc/en/latest/ch340_driver.html) 
-- Install Arduino IDE (https://www.arduino.cc/en/software). 
-- Within Arduino IDE, 
-    - Add support of your ESP8266 board by adding https://arduino.esp8266.com/stable/package_esp8266com_index.json  in the Arduino board management settings (menu File, Settings, "more boardmanager urls")
-    - Install the following libraries if they are not present on your system (menu Tools / Manage Libraries in Arduino IDE): 
-        - WiFiManager by Tzapu
-        - OpenTherm by Ihor Melnyk
-        - ArduinoJson (be Benoit Blanchon)
-        - DallasTemperature (by Miles Burton)
-        - OneWire (by Paul Stoffregen)
-        - PubSubClient (by Nick O'Leary)
-    - do a "git clone https://github.com/akamming/esp_domoticz_opentherm_handler"
-    - using arduino open the .ino file in the cloned dir
-    - Open the board manager (menu Tools / Board / Board Manager)
-    - Search for ESP8266 and click install, then close
-    - Select your Board type, "LOLIN(WEMOS) D1 R2 & mini" if you use a Wemos D1 but in principle any ESP8266 board should work (menu Tools/Board)
-    - Select the com Port to which your wemos is connected (menu Tools / Port)
-    - Upload the firmware to your Wemos (menu Sketch / Upload)
+### Firmware Upload (PlatformIO Recommended)
+
+- Install [Visual Studio Code](https://code.visualstudio.com/)
+- In VSCode, open the Extensions view (`Ctrl+Shift+X`), search for "PlatformIO IDE" and install it.
+- Open this project folder in VSCode.
+- Connect your Wemos D1 mini to your computer via USB.
+- The **first time** you upload the firmware, use the COM port (USB connection):
+    - Make sure the correct COM port is selected in PlatformIO (check the bottom bar or `platformio.ini`).
+    - Click the "Upload" button in the PlatformIO toolbar, **or**
+    - Open the VSCode terminal and run:
+      ```
+      pio run -e d1_mini -t upload
+      ```
+- After the initial upload, the device will connect to WiFi (see "First Time setup" below).
+- For **subsequent updates**, you can use OTA (Over-the-Air) updates:
+    - Edit `platformio.ini` if needed:
+        - Set the correct IP address for OTA updates (`upload_port = <your_device_ip>`)
+        - Set the OTA password if you use one (`upload_flags = --auth=<your_ota_password>`)
+    - Click the "Upload" button in the PlatformIO toolbar, **or**
+    - Run:
+      ```
+      pio run -e d1_mini -t upload
+      ```
+    - Make sure your device is connected to WiFi and reachable at the IP address you set.
+
+**Supported hardware:**  
+Only ESP8266-based devices are supported.  
+If you use a different ESP8266 board (not Wemos D1 mini), you must change the `board` option in `platformio.ini` to match your hardware.  
+See the official PlatformIO documentation for available board options:  
+https://docs.platformio.org/en/latest/platforms/espressif8266.html#boards
+
+For more information about configuring `platformio.ini`, see:  
+https://docs.platformio.org/page/projectconf.html
+
+**Important note about uploading firmware:**  
+Uploading new firmware will overwrite your current configuration on the device.  
+If you want to keep your configuration, you should first download your config file by navigating to [http://domesphelper.local/config.json](http://domesphelper.local/config.json) in your browser.  
+Save this file in your project's `data` directory.  
+When you upload new code (using PlatformIO), all files in the `data` directory will also be uploaded to the device, so your configuration will be restored
 
 ### First Time setup
 For connecting to wifi:
