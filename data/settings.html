@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width">
+    <title>Instellingen & volledige bediening</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body onload="loadSettings();">
+    <div class="header">ESP OpenTherm Control - Instellingen & volledige bediening</div>
+    <div class="outer_frame">
+        <p>General Status</p><br />
+        <label><input type="checkbox" name="mqttconnected" id="mqttconnected" disabled>MQTT Connected</label>, state <input type="number" class="pin_input" id="mqttstate" size="10" disabled><br /><br />
+        Controlled by <input type="text" class="port_input" id="controlledby" size="10" disabled><br />   
+        <br />
+        Uptime<br /><input type="text" class="uptime_input" id="uptime" size="10" disabled><br />
+    </div>
+    <div class="outer_frame">
+        <p>Thermostat</p><br />
+        Setpoint <input type="number" class="temp_input" id="climateSetpoint" size="10" step="0.5" onchange="onThermostatChanged()"> Actual <input type="number" class="temp_input" id="mqtttemperature" size="10" disabled><br />
+        Outside Temperature Actual <input type="number" class="temp_input" id="otoutsidetemperature" size="10" disabled><br /><br />
+        <label>Mode <select name="climateMode" id="climateMode" onchange="onThermostatChanged()">
+                <option value="off">Off</option>
+                <option value="heat">Heating</option>
+                <option value="cool">Cooling</option>
+                <option value="auto">Auto</option>
+            </select></label><br />
+        <label><input type="checkbox" name="weatherDependentMode" id="weatherDependentMode" onchange="onThermostatChanged()">weatherDependentMode</label><br />
+        <label><input type="checkbox" name="HolidayMode" id="HolidayMode" onchange="onThermostatChanged()">HolidayMode</label><br /><br />
+        <label><input type="checkbox" name="FrostProtectionActive" id="FrostProtectionActive" disabled>FrostProtectionActive</label><br />
+        <br />
+        <a href="index.html">Back to Thermostat</a>
+    </div>
+    <div class="outer_frame">
+        <p>Opentherm Status <input type="text" class="hn_input" id="otstatus" size="10" disabled></p><br />
+        Take Control: <label class="switch"><input type="checkbox" id="takecontrol" onchange="ontakecontrolchanged()"><span class="slider round"></span></label>
+        <br /><br />
+        General (<input type="number" class="temp_input" id="statuscode" size="10" disabled>)<br />
+        <label><input type="checkbox" name="flame" id="flame" disabled>flame</label><label><input type="checkbox" name="fault" id="fault" disabled>fault</label><label><input type="checkbox" name="diagnostic" id="diagnostic" disabled>diagnostic</label><br />
+        Modulation <input type="range" class="modulation_input" id="modulation" min="0" max="100" size="10"  disabled><br />
+        <br />Enable<br />
+        <label><input type="checkbox" name="enableheating" id="enableheating" disabled>heating</label><label><input type="checkbox" name="enablecooling" id="enablecooling" disabled>cooling</label><label><input type="checkbox" name="enablehotwater" id="enablehotwater" disabled>hotwater</label><br />
+        <br />Actual<br />
+        <label><input type="checkbox" name="heating" id="heating" disabled>heating</label><label><input type="checkbox" name="cooling" id="cooling" disabled>cooling</label><label><input type="checkbox" name="hotwater" id="hotwater" disabled>hotwater</label><br />
+        <br /><b>Temperatures</b><br />
+        Thermostat <input type="number" class="temp_input" id="thermostattemperature" size="10" disabled> Outside <input type="number" class="temp_input" id="outsidetemperature" size="10" disabled><br />
+        Heating SP <input type="number" class="temp_input" id="boilersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="boilertemperature" size="10" disabled><br />
+        Hotwater SP <input type="number" class="temp_input" id="hotwatersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="hotwatertemperature" size="10" disabled><br />
+    </div>
+    <div class="outer_frame">
+        <p>Device Config</p><br />
+        <b>GPIO</b><br />
+        OT Input     <input type="number" class="pin_input" id="inpin" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        OT Output    <input type="number" class="pin_input" id="outpin" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        DS18B20 <input type="number" class="pin_input" id="temppin" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <br /><b>MQTT</b><br />
+        <label><input type="checkbox" name="mqttenabled" id="mqttenabled" onchange="onmqttenabledchanged()">Enabled</label><br />
+        Server <input type="text" class="hn_input" id="mqttserver" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        Port <input type="number" class="port_input" id="mqttport" size="10" disabled><br />
+        <label><input type="checkbox" name="usemqttauthentication" id="usemqttauthentication" onchange="onusemqttauthenticationchanged()" disabled>Use Authentication</label><br />
+        Username <input type="text" class="user_input" id="mqttuser" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        Password <input type="password" class="user_input" id="mqttpass" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
+        <label><input type="checkbox" name="mqttretained" id="mqttretained" disabled>Retained Messages</label><br /><br/>
+        Inside Temperature Topic<br/> <input type="text" class="temptopic_input" id="mqttinsidetemptopic" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br /><br/>
+        Outside Temperature Topic<br/> <input type="text" class="temptopic_input" id="mqttoutsidetemptopic" size="32" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br /><br/>
+        <label><input type="checkbox" name="debugtomqtt" id="debugtomqtt" disabled>Debug messages to MQTT</label><br />
+        <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
+    </div>
+    <div class="outer_frame">
+        <p>Boiler Config</p><br />
+        <b>Generic</b><br />
+        Minimum Boiler Temp <input type="number" class="pin_input" id="MinBoilerTemp" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Maximum Boiler Temp <input type="number" class="pin_input" id="MaxBoilerTemp" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Minimum Temp Difference <input type="number" class="pin_input" id="minimumTempDifference" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        FrostProtection SetPoint <input type="number" class="pin_input" id="FrostProtectionSetPoint" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <br />
+        <b>PID parameters</b><br />
+        Proportional Gain (KP) <input type="number" class="pin_input" id="KP" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Integral Gain (KI) <input type="number" class="pin_input" id="KI" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        Derative Gain (KD) <input type="number" class="pin_input" id="KD" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <br />
+        <b>Weather Dependent Mode</b><br />
+        BoilerTempAtPlus20 <input type="number" class="pin_input" id="BoilerTempAtPlus20" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        BoilerTempAtMinus10 <input type="number" class="pin_input" id="BoilerTempAtMinus10" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <label for="Curvature">Curvature </label><select name="Curvature" id="Curvature"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="extralarge">Extra Large</option></select><br />
+        SwitchHeatingOffAt <input type="number" class="pin_input" id="SwitchHeatingOffAt" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        RefRoomCompensation <input type="number" class="pin_input" id="ReferenceRoomCompensation" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
+    </div>
+    <div class="outer_frame">
+        <p>Maintenance</p>
+        <div class="buttondiv">
+            <button class="colorbutton" onclick="reset()">Restart without saving</button>
+            <button class="colorbutton" onclick="resetWifiCredentials()">Reset WiFi Credentials</button>
+            <button class="colorbutton" onclick="factoryReset()">Restore Default Settings</button><br /><br />
+            <a href="upload">Click here to upload files</a>
+        </div>
+    </div>
+    <br />
+    <div style="text-align:center; margin-bottom:20px;">
+        <a href="index.html">Back to Thermostat</a>
+    </div>
+    <script>
+        function ontakecontrolchanged() {
+            NewValue = true;
+            if (document.getElementById('takecontrol').checked) {
+                NewValue = false;
+            }
+            document.getElementById("enableheating").disabled = NewValue;
+            document.getElementById("enablecooling").disabled = NewValue;
+            document.getElementById("enablehotwater").disabled = NewValue;
+            document.getElementById("boilersetpoint").disabled = NewValue;
+            document.getElementById("hotwatersetpoint").disabled = NewValue;
+        }
+
+        function onmqttenabledchanged() {
+            if (document.getElementById('mqttenabled').checked) {
+                document.getElementById("mqttserver").disabled = false;
+                document.getElementById("mqttport").disabled = false;
+                document.getElementById("usemqttauthentication").disabled = false;
+                document.getElementById("mqttretained").disabled = false;
+                document.getElementById("mqttinsidetemptopic").disabled = false;
+                document.getElementById("mqttoutsidetemptopic").disabled = false;
+                document.getElementById("debugtomqtt").disabled = false;
+
+                NewValue = true;
+                if (document.getElementById('usemqttauthentication').checked) {
+                    NewValue = false;
+                }
+                document.getElementById("mqttuser").disabled = NewValue;
+                document.getElementById("mqttpass").disabled = NewValue;
+            } else {
+                document.getElementById("mqttserver").disabled = true;
+                document.getElementById("mqttport").disabled = true;
+                document.getElementById("usemqttauthentication").disabled = true;
+                document.getElementById("mqttretained").disabled = true;
+                document.getElementById("mqttuser").disabled = true;
+                document.getElementById("mqttpass").disabled = true;
+                document.getElementById("mqttinsidetemptopic").disabled = true;
+                document.getElementById("mqttoutsidetemptopic").disabled = true;
+                document.getElementById("debugtomqtt").disabled = true;
+            }
+        }
+
+        function onusemqttauthenticationchanged() {
+            NewValue = true;
+            if (document.getElementById('usemqttauthentication').checked) {
+                NewValue = false;
+            }
+            document.getElementById("mqttuser").disabled = NewValue;
+            document.getElementById("mqttpass").disabled = NewValue;
+        }
+
+        function Boolean(Value) {
+            if (Value.toLowerCase() === "on") {
+                return true
+            } else {
+                return false
+            }
+        }
+
+        function BooleanToString(Value) {
+            if (Value == true) {
+                return "On";
+            } else {
+                return "Off";
+            }
+        }
+
+        function loadSensors() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    const json = JSON.parse(xhttp.responseText);
+                    document.getElementById('otstatus').value = json.OpenThermStatus;
+                    document.getElementById('flame').checked = json.Flame;
+                    document.getElementById('fault').checked = json.Fault;
+                    document.getElementById('diagnostic').checked = json.Diagnostic;
+                    document.getElementById('enableheating').checked = json.EnableCentralHeating;
+                    document.getElementById('enablecooling').checked = json.EnableCooling;
+                    document.getElementById('enablehotwater').checked = json.EnableHotWater;
+                    document.getElementById('heating').checked = json.CentralHeating;
+                    document.getElementById('cooling').checked = json.Cooling;
+                    document.getElementById('hotwater').checked = json.HotWater;
+                    document.getElementById('boilersetpoint').value = json.BoilerSetpoint;
+                    document.getElementById('boilertemperature').value = json.BoilerTemperature;
+                    document.getElementById('hotwatersetpoint').value = json.DHWSetpoint;
+                    document.getElementById('hotwatertemperature').value = json.DhwTemperature;
+                    document.getElementById('thermostattemperature').value = json.ThermostatTemperature;
+                    document.getElementById('outsidetemperature').value = json.OutsideTemperature;
+                    document.getElementById('otoutsidetemperature').value = json.OTOutsideTemperature;
+                    document.getElementById('mqtttemperature').value = json.mqttTemperature;
+                    document.getElementById('otstatus').value = json.OpenThermStatus;
+                    document.getElementById('modulation').value = json.Modulation;
+                    document.getElementById('statuscode').value = json.FaultCode;
+                    document.getElementById('controlledby').value = json.ControlledBy;
+                    document.getElementById('mqttconnected').checked = json.MQTTconnected;
+                    document.getElementById('mqttstate').value = json.MQTTstate;
+                    document.getElementById('uptime').value = json.uptime;
+                    document.getElementById('climateSetpoint').value = json.climateSetpoint;
+                    document.getElementById('climateMode').value = json.climateMode;
+                    document.getElementById('weatherDependentMode').checked = json.weatherDependentMode;
+                    document.getElementById('HolidayMode').checked = json.HolidayMode;
+                    document.getElementById('FrostProtectionActive').checked = json.FrostProtectionActive;
+                }
+            };
+            if (document.getElementById('takecontrol').checked == false) {
+                xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
+            } else {
+                xhttp.open("GET",
+                    "http://" + location.hostname +
+                    "/command?DHWTemperature=" + document.getElementById('hotwatersetpoint').value +
+                    "&BoilerTemperature=" + document.getElementById('boilersetpoint').value +
+                    "&Cooling=" + BooleanToString(document.getElementById('enablecooling').checked) +
+                    "&CentralHeating=" + BooleanToString(document.getElementById('enableheating').checked) +
+                    "&HotWater=" + BooleanToString(document.getElementById('enablehotwater').checked),
+                    true
+                );
+            }
+            xhttp.send();
+            setTimeout(loadSensors, 5000);
+        }
+
+        function loadConfig() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    const json = JSON.parse(xhttp.responseText);
+                    document.getElementById('inpin').value = +json.inpin;
+                    document.getElementById('outpin').value = +json.outpin;
+                    document.getElementById('temppin').value = +json.temppin;
+                    document.getElementById('mqttenabled').checked = json.usemqtt;
+                    document.getElementById('mqttserver').value = json.mqttserver;
+                    document.getElementById('mqttport').value = +json.mqttport;
+                    document.getElementById('usemqttauthentication').checked = json.usemqttauthentication;
+                    document.getElementById('mqttuser').value = json.mqttuser;
+                    document.getElementById('mqttpass').value = json.mqttpass;
+                    document.getElementById('mqttinsidetemptopic').value = json.mqtttemptopic;
+                    document.getElementById('mqttoutsidetemptopic').value = json.mqttoutsidetemptopic;
+                    document.getElementById('mqttretained').checked = json.mqttretained;
+                    document.getElementById('debugtomqtt').checked = json.debugtomqtt;
+                    document.getElementById('KP').value = +json.KP;
+                    document.getElementById('KI').value = +json.KI;
+                    document.getElementById('KD').value = +json.KD;
+                    document.getElementById('MinBoilerTemp').value = +json.MinBoilerTemp;
+                    document.getElementById('MaxBoilerTemp').value = +json.MaxBoilerTemp;
+                    document.getElementById('minimumTempDifference').value = +json.minimumTempDifference;
+                    document.getElementById('FrostProtectionSetPoint').value = +json.FrostProtectionSetPoint;
+                    document.getElementById('BoilerTempAtPlus20').value = +json.BoilerTempAtPlus20;
+                    document.getElementById('BoilerTempAtMinus10').value = +json.BoilerTempAtMinus10;
+                    document.getElementById('Curvature').value = json.Curvature;
+                    document.getElementById('SwitchHeatingOffAt').value = +json.SwitchHeatingOffAt;
+                    document.getElementById('ReferenceRoomCompensation').value = +json.ReferenceRoomCompensation;
+                    onmqttenabledchanged();
+                }
+            };
+            xhttp.open("GET", "http://" + location.hostname + "/getconfig", true);
+            xhttp.send();
+        }
+
+        function isValidIP(ip) {
+            var s = ip.split('.');
+            if (s.length != 4) return false;
+            for (var i = 0; i < 3; i++) {
+                if (s[i] == '') return false;
+                if (isNaN(s[i])) return false;
+                var n = parseInt(s[i]);
+                if (n < 0 || n > 255) return false;
+            }
+            return true;
+        }
+
+        function saveSettings() {
+            var server = document.getElementById('mqttserver').value;
+            var usemqtt = document.getElementById('mqttenabled').checked;
+            var insideTempTopic = document.getElementById('mqttinsidetemptopic').value;
+            var outsideTempTopic = document.getElementById('mqttoutsidetemptopic').value;
+            if (usemqtt && !isValidIP(server)) {
+                alert("MQTT Server has Invalid IP Adres!");
+                return;
+            }
+            if (insideTempTopic === outsideTempTopic) {
+                alert("Inside Temperature Topic and Outside Temperature Topic must not be the same. Please enter different topics for each.");
+                return;
+            }
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", "http://" + location.hostname + "/saveconfig", true);
+            xhttp.setRequestHeader("Content-Type", "application/json");
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState === 4 && xhttp.status === 200) {
+                    alert("New Config sent, device is rebooting");
+                } else {
+                    if (xhttp.readyState === 4) {
+                        alert("some error sending the config (" + xhttp.status + ")");
+                    }
+                }
+            };
+            var obj = new Object();
+            obj.inpin = +document.getElementById('inpin').value;
+            obj.outpin = +document.getElementById('outpin').value;
+            obj.temppin = +document.getElementById('temppin').value;
+            obj.usemqtt = document.getElementById('mqttenabled').checked;
+            obj.mqttserver = document.getElementById('mqttserver').value;
+            obj.mqttport = +document.getElementById('mqttport').value;
+            obj.mqttuser = document.getElementById('mqttuser').value;
+            obj.mqttpass = document.getElementById('mqttpass').value;
+            obj.mqtttemptopic = insideTempTopic;
+            obj.mqttoutsidetemptopic = outsideTempTopic;
+            obj.mqttretained = document.getElementById('mqttretained').checked;
+            obj.usemqttauthentication = document.getElementById('usemqttauthentication').checked;
+            obj.debugtomqtt = document.getElementById('debugtomqtt').checked;
+            obj.KP = +document.getElementById('KP').value;
+            obj.KI = +document.getElementById('KI').value;
+            obj.KD = +document.getElementById('KD').value;
+            obj.MinBoilerTemp = +document.getElementById('MinBoilerTemp').value;
+            obj.MaxBoilerTemp = +document.getElementById('MaxBoilerTemp').value;
+            obj.minimumTempDifference = +document.getElementById('minimumTempDifference').value;
+            obj.FrostProtectionSetPoint = +document.getElementById('FrostProtectionSetPoint').value;
+            obj.BoilerTempAtPlus20 = +document.getElementById('BoilerTempAtPlus20').value;
+            obj.BoilerTempAtMinus10 = +document.getElementById('BoilerTempAtMinus10').value;
+            obj.Curvature = document.getElementById('Curvature').value;
+            obj.SwitchHeatingOffAt = +document.getElementById('SwitchHeatingOffAt').value;
+            obj.ReferenceRoomCompensation = +document.getElementById('ReferenceRoomCompensation').value;
+            var data = JSON.stringify(obj);
+            xhttp.send(data);
+        }
+
+        function onThermostatChanged() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET",
+                    "http://" + location.hostname +
+                    "/command?climateMode=" + document.getElementById('climateMode').value +
+                    "&climateSetpoint=" + document.getElementById('climateSetpoint').value +
+                    "&weatherDependentMode=" + BooleanToString(document.getElementById('weatherDependentMode').checked) +
+                    "&holidayMode=" + BooleanToString(document.getElementById('HolidayMode').checked),
+                    true
+                );
+            xhttp.send();
+        }
+
+        function reset() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET", "http://" + location.hostname + "/reset", true);
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState === 4 && xhttp.status === 200) {
+                    alert("device is rebooting");
+                    loadConfig();
+                } else {
+                    if (xhttp.readyState === 4) {
+                        alert("some error resetting the device (" + xhttp.status + ")");
+                    }
+                }
+            };
+            xhttp.send();
+        }
+
+        function resetWifiCredentials() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET", "http://" + location.hostname + "/ResetWifiCredentials", true);
+            if (xhttp.readyState === 4 && xhttp.status === 200) {
+                alert("Wifi credential reset send. Device is rebooting. Connect to the device using your wifi client and enter 192.168.4.1 in your webbrowser to access the device");
+            } else {
+                if (xhttp.readyState === 4) {
+                    alert("some error resetting wifi credentials (" + xhttp.status + ")");
+                }
+            }
+            xhttp.send();
+        }
+
+        function factoryReset() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET", "http://" + location.hostname + "/removeconfig", true);
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState === 4 && xhttp.status === 200) {
+                    alert("Config removed, device is rebooting");
+                    loadConfig();
+                } else {
+                    if (xhttp.readyState === 4) {
+                        alert("some error removing the config (" + xhttp.status + ")");
+                    }
+                }
+            };
+            xhttp.send();
+        }
+
+        function loadSettings() {
+            loadConfig();
+            loadSensors();
+        }
+    </script>
+</body>
+</html>

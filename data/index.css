@@ -1,3 +1,37 @@
+/* Thermostat Only Page Styles */
+.thermo-flex {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.thermo-canvas-wrap {
+    position: relative;
+    width: 220px;
+    height: 220px;
+}
+.thermo-canvas {
+    margin-bottom: 10px;
+    touch-action: none;
+}
+.thermo-label0 {
+    position: absolute;
+    left: 38px;
+    top: 192px;
+    font-size: 14px;
+}
+.thermo-label30 {
+    position: absolute;
+    right: 38px;
+    top: 192px;
+    font-size: 14px;
+}
+.thermo-setpoint {
+    width: 180px;
+    display: none;
+}
+.thermo-info {
+    margin-top: 10px;
+}
 body {
     background: #95a4f0;
     font-family: HelveticaNeue-UltraLight, Helvetica, sans-serif;

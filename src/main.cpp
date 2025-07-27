@@ -446,7 +446,7 @@ void sendUploadForm()
 {
   Serial.println("sendUploadForm");
 
-  server.send(200, "text/html", (String("Use this form to upload index.html, favicon.ico and index.css<BR /><BR />")+String(HTTP_UPLOAD_FORM)).c_str());       //Response to the HTTP request
+  server.send(200, "text/html; charset=UTF-8", (String("Use this form to upload index.html, favicon.ico and index.css<BR /><BR />")+String(HTTP_UPLOAD_FORM)).c_str());       //Response to the HTTP request
 }
 
 void handleFileUpload(){ // upload a new file to the SPIFFS
@@ -472,8 +472,8 @@ void handleFileUpload(){ // upload a new file to the SPIFFS
       fsUploadFile.close();                               // Close the file again
       Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
       // server.send(200, "text/plain", "File succesfully uploaded");
-      server.send(200, "text/html", (String(upload.filename)+
-                                      String(" succesfully uploaded (")+
+      server.send(200, "text/html; charset=UTF-8", (String(upload.filename)+
+                                      String(" succesfully uploaded (")+ 
                                       String(upload.totalSize)+String(" bytes), do you want to upload another file?<BR /><BR />")+
                                       String(HTTP_UPLOAD_FORM)).c_str()); // send form to upload another file
     } else {
@@ -674,7 +674,7 @@ bool serveFile(const char url[])
   {
     File file = LittleFS.open(path, "r");
     if (server.hasArg("download")) server.streamFile(file, "application/octet-stream");
-    else if (endsWith(path,".htm") or endsWith(path,".html")) server.streamFile(file, "text/html");
+    else if (endsWith(path,".htm") or endsWith(path,".html")) server.streamFile(file, "text/html; charset=UTF-8");
     else if (endsWith(path,".css") ) server.streamFile(file, "text/css");
     else if (endsWith(path,".png") ) server.streamFile(file, "image/png");
     else if (endsWith(path,".gif") ) server.streamFile(file, "image/gif");
@@ -708,7 +708,7 @@ void handleNotFound()
 
     message += "<BR /><a href=\"upload\">Click here to upload index.html, favicon.ico and index.css</a>";
     
-    server.send(404, "text/html", message.c_str());
+    server.send(404, "text/html; charset=UTF-8", message.c_str());
   }
 }
 
