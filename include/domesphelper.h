@@ -1,3 +1,33 @@
+// Default configuration constants for main.cpp
+const bool   DEFAULT_USEMQTT = false;
+const bool   DEFAULT_USEMQTTAUTH = false;
+const char*  DEFAULT_MQTTSERVER = "";
+const int    DEFAULT_MQTTPORT = 1883;
+const char*  DEFAULT_MQTTUSER = "";
+const char*  DEFAULT_MQTTPASS = "";
+const bool   DEFAULT_MQTTPERSISTENCE = false;
+const char*  DEFAULT_MQTTTEMP_TOPIC = "";
+const char*  DEFAULT_MQTTOUTSIDETEMP_TOPIC = "";
+const int    DEFAULT_INPIN = 4;
+const int    DEFAULT_OUTPIN = 5;
+const int    DEFAULT_ONEWIREBUS = 14;
+const bool   DEFAULT_DEBUG = true;
+const int    DEFAULT_KP = 30;
+const float  DEFAULT_KI = 0.01f;
+const float  DEFAULT_KD = 2.5f;
+const int    DEFAULT_MINBOILERTEMP = 10;
+const int    DEFAULT_MAXBOILERTEMP = 50;
+const int    DEFAULT_MINIMUMTEMPDIFFERENCE = 3;
+const int    DEFAULT_FROSTPROTECTIONSETPOINT = 6;
+const int    DEFAULT_BOILERTEMPATPLUS20 = 20;
+const int    DEFAULT_BOILERTEMPATMINUS10 = 50;
+const char*  DEFAULT_CURVATURE_STRING = "small";
+const int    DEFAULT_SWITCHHEATINGOFFAT = 19;
+const int    DEFAULT_REFERENCEROOMCOMPENSATION = 3;
+const char*  DEFAULT_CLIMATE_MODE = "off";
+const int    DEFAULT_CLIMATE_SETPOINT = 20;
+const bool   DEFAULT_WEATHERDEPENDENTMODE = false;
+const bool   DEFAULT_HOLIDAYMODE = false;
 // Use this file to store all application constants and default config values (can be overruled with webgui)
 
 // device names for mqtt autodiscovery

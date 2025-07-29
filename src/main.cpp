@@ -25,7 +25,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
 #include <PubSubClient.h>         // MQTT library
-#include "domesphelper.h"               // Set Configuration
+#include "domesphelper.h"               // Set Configuration and default constants
 #include <LittleFS.h>             // Filesystem
 #include <NTPClient.h>            // for NTP Client
 #include <WiFiUdp.h>              // is needed by NTP client
@@ -273,9 +273,10 @@ void SendHTTP(String command, String result) {
   json["mqttTemperature"] = float(int(mqttTemperature*100))/100;
 
    // Send output
-  char buf[1024];
-  serializeJson(json, buf); 
-  server.send(200, "application/json", buf);       //Response to the HTTP request
+  size_t jsonLen = measureJson(json) + 1;
+  std::unique_ptr<char[]> buf(new char[jsonLen]);
+  serializeJson(json, buf.get(), jsonLen);
+  server.send(200, "application/json", buf.get());       //Response to the HTTP request
 }
 
 void handleResetWifiCredentials() {
@@ -515,6 +516,7 @@ void handleGetConfig()
   serializeJsonPretty(json, buf);
   server.send(200, "application/json", buf);
 }
+
 void handleConfigJsonFile() {
   if (LittleFS.exists(CONFIGFILE)) {
     File configFile = LittleFS.open(CONFIGFILE, "r");
@@ -754,65 +756,95 @@ void readConfig()
     File configFile = LittleFS.open(CONFIGFILE, "r");
     if (configFile) {
       size_t size = configFile.size();
-      // Allocate a buffer to store contents of the file.
       std::unique_ptr<char[]> buf(new char[size]);
-
       configFile.readBytes(buf.get(), size);
-
       JsonDocument json;
       auto deserializeError = deserializeJson(json, buf.get());
       serializeJson(json, Serial);
-      if ( ! deserializeError ) {
+      if (!deserializeError) {
         // mqtt config
-        usemqtt=json["usemqtt"] | false;
-        usemqttauthentication=json["usemqttauthentication"] | false;
-        mqttserver=json["mqttserver"].as<String>();
-        mqttport=json["mqttport"] | 1883;
-        mqttuser=json["mqttuser"].as<String>();
-        mqttpass=json["mqttpass"].as<String>();
-        mqttpersistence=json["mqttretained"];
-        mqtttemptopic=json["mqtttemptopic"].as<String>();
-        mqttoutsidetemptopic=json["mqttoutsidetemptopic"].as<String>();
-        
-        //device config
-        inPin=json["inpin"] | 4;
-        outPin=json["outpin"] | 5;
-        OneWireBus=json["temppin"] | 14;
+        usemqtt = json["usemqtt"].is<bool>() ? json["usemqtt"].as<bool>() : DEFAULT_USEMQTT;
+        usemqttauthentication = json["usemqttauthentication"].is<bool>() ? json["usemqttauthentication"].as<bool>() : DEFAULT_USEMQTTAUTH;
+        mqttserver = json["mqttserver"].is<String>() ? json["mqttserver"].as<String>() : String(DEFAULT_MQTTSERVER);
+        mqttport = json["mqttport"].is<int>() ? json["mqttport"].as<int>() : DEFAULT_MQTTPORT;
+        mqttuser = json["mqttuser"].is<String>() ? json["mqttuser"].as<String>() : String(DEFAULT_MQTTUSER);
+        mqttpass = json["mqttpass"].is<String>() ? json["mqttpass"].as<String>() : String(DEFAULT_MQTTPASS);
+        mqttpersistence = json["mqttretained"].is<bool>() ? json["mqttretained"].as<bool>() : DEFAULT_MQTTPERSISTENCE;
+        mqtttemptopic = json["mqtttemptopic"].is<String>() ? json["mqtttemptopic"].as<String>() : String(DEFAULT_MQTTTEMP_TOPIC);
+        mqttoutsidetemptopic = json["mqttoutsidetemptopic"].is<String>() ? json["mqttoutsidetemptopic"].as<String>() : String(DEFAULT_MQTTOUTSIDETEMP_TOPIC);
 
-        debug=json["debugtomqtt"] | true;
+        //device config
+        inPin = json["inpin"].is<int>() ? json["inpin"].as<int>() : DEFAULT_INPIN;
+        outPin = json["outpin"].is<int>() ? json["outpin"].as<int>() : DEFAULT_OUTPIN;
+        OneWireBus = json["temppin"].is<int>() ? json["temppin"].as<int>() : DEFAULT_ONEWIREBUS;
+
+        debug = json["debugtomqtt"].is<bool>() ? json["debugtomqtt"].as<bool>() : DEFAULT_DEBUG;
 
         // PID Settings
-        KP = json["KP"] | 30;
-        KI = json["KI"] | 0.01;
-        KD = json["KD"] | 2.5;
+        KP = json["KP"].is<int>() ? json["KP"].as<int>() : DEFAULT_KP;
+        KI = json["KI"].is<float>() ? json["KI"].as<float>() : DEFAULT_KI;
+        KD = json["KD"].is<float>() ? json["KD"].as<float>() : DEFAULT_KD;
 
         // Boiler Control Settings
-        MinBoilerTemp = json["MinBoilerTemp"] | 10;
-        MaxBoilerTemp = json["MaxBoilerTemp"] | 50;
-        minimumTempDifference = json["minimumTempDifference"] | 3;
-        FrostProtectionSetPoint = json["FrostProtectionSetPoint"] | 6;
-        BoilerTempAtPlus20 = json["BoilerTempAtPlus20"] | 20;
-        BoilerTempAtMinus10 = json["BoilerTempAtMinus10"] | 50;  
-        Curvature=getCurvatureIntFromString(json["Curvature"] | "small");
-        SwitchHeatingOffAt = json["SwitchHeatingOffAt"] | 19;
-        ReferenceRoomCompensation = json["ReferenceRoomCompensation"] | 3;
+        MinBoilerTemp = json["MinBoilerTemp"].is<int>() ? json["MinBoilerTemp"].as<int>() : DEFAULT_MINBOILERTEMP;
+        MaxBoilerTemp = json["MaxBoilerTemp"].is<int>() ? json["MaxBoilerTemp"].as<int>() : DEFAULT_MAXBOILERTEMP;
+        minimumTempDifference = json["minimumTempDifference"].is<int>() ? json["minimumTempDifference"].as<int>() : DEFAULT_MINIMUMTEMPDIFFERENCE;
+        FrostProtectionSetPoint = json["FrostProtectionSetPoint"].is<int>() ? json["FrostProtectionSetPoint"].as<int>() : DEFAULT_FROSTPROTECTIONSETPOINT;
+        BoilerTempAtPlus20 = json["BoilerTempAtPlus20"].is<int>() ? json["BoilerTempAtPlus20"].as<int>() : DEFAULT_BOILERTEMPATPLUS20;
+        BoilerTempAtMinus10 = json["BoilerTempAtMinus10"].is<int>() ? json["BoilerTempAtMinus10"].as<int>() : DEFAULT_BOILERTEMPATMINUS10;
+        Curvature = getCurvatureIntFromString(json["Curvature"].is<String>() ? json["Curvature"].as<String>() : String(DEFAULT_CURVATURE_STRING));
+        SwitchHeatingOffAt = json["SwitchHeatingOffAt"].is<int>() ? json["SwitchHeatingOffAt"].as<int>() : DEFAULT_SWITCHHEATINGOFFAT;
+        ReferenceRoomCompensation = json["ReferenceRoomCompensation"].is<int>() ? json["ReferenceRoomCompensation"].as<int>() : DEFAULT_REFERENCEROOMCOMPENSATION;
 
         // persistent climate mode
-        climate_Mode = json["climateMode"].as<String>();
-        if (climate_Mode.equals("null")) { //if not present, null will be the value, so change to off
-          climate_Mode="off";
+        climate_Mode = json["climateMode"].is<String>() ? json["climateMode"].as<String>() : String(DEFAULT_CLIMATE_MODE);
+        if (climate_Mode.equals("null")) {
+          climate_Mode = String(DEFAULT_CLIMATE_MODE);
         }
-        climate_SetPoint = json["climateSetpoint"] | 20;
-        Weather_Dependent_Mode = json["weatherDependentMode"] | false;
-        Holiday_Mode = json["holidayMode"] | false;
-
-        // close the file
+        climate_SetPoint = json["climateSetpoint"].is<int>() ? json["climateSetpoint"].as<int>() : DEFAULT_CLIMATE_SETPOINT;
+        Weather_Dependent_Mode = json["weatherDependentMode"].is<bool>() ? json["weatherDependentMode"].as<bool>() : DEFAULT_WEATHERDEPENDENTMODE;
+        Holiday_Mode = json["holidayMode"].is<bool>() ? json["holidayMode"].as<bool>() : DEFAULT_HOLIDAYMODE;
         configFile.close();
+        return;
       }
+      configFile.close();
     } else {
-        Debug("failed to load json config");
+      Debug("failed to load json config");
     }
   }
+
+  // If config file does not exist, initialize all variables with defaults
+  usemqtt = DEFAULT_USEMQTT;
+  usemqttauthentication = DEFAULT_USEMQTTAUTH;
+  mqttserver = DEFAULT_MQTTSERVER;
+  mqttport = DEFAULT_MQTTPORT;
+  mqttuser = DEFAULT_MQTTUSER;
+  mqttpass = DEFAULT_MQTTPASS;
+  mqttpersistence = DEFAULT_MQTTPERSISTENCE;
+  mqtttemptopic = DEFAULT_MQTTTEMP_TOPIC;
+  mqttoutsidetemptopic = DEFAULT_MQTTOUTSIDETEMP_TOPIC;
+  inPin = DEFAULT_INPIN;
+  outPin = DEFAULT_OUTPIN;
+  OneWireBus = DEFAULT_ONEWIREBUS;
+  debug = DEFAULT_DEBUG;
+  KP = DEFAULT_KP;
+  KI = DEFAULT_KI;
+  KD = DEFAULT_KD;
+  MinBoilerTemp = DEFAULT_MINBOILERTEMP;
+  MaxBoilerTemp = DEFAULT_MAXBOILERTEMP;
+  minimumTempDifference = DEFAULT_MINIMUMTEMPDIFFERENCE;
+  FrostProtectionSetPoint = DEFAULT_FROSTPROTECTIONSETPOINT;
+  BoilerTempAtPlus20 = DEFAULT_BOILERTEMPATPLUS20;
+  BoilerTempAtMinus10 = DEFAULT_BOILERTEMPATMINUS10;
+  Curvature = getCurvatureIntFromString(DEFAULT_CURVATURE_STRING);
+  SwitchHeatingOffAt = DEFAULT_SWITCHHEATINGOFFAT;
+  ReferenceRoomCompensation = DEFAULT_REFERENCEROOMCOMPENSATION;
+  climate_Mode = DEFAULT_CLIMATE_MODE;
+  climate_SetPoint = DEFAULT_CLIMATE_SETPOINT;
+  Weather_Dependent_Mode = DEFAULT_WEATHERDEPENDENTMODE;
+  Holiday_Mode = DEFAULT_HOLIDAYMODE;
+  // Save the new config file with defaults
+  SaveConfig();
 }
 
 void SaveConfig()
