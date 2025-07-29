@@ -1,5 +1,3 @@
-# esp_domoticz_opentherm_handler
-custom made EPS8266 firmware for OpenTherm Adapter (http://ihormelnyk.com/opentherm_adapter). Connects to Home Assistant and Domoticz using MQTT autodiscovery, but can also be controled with HTTP or the builtin UI
 
 Home Assistant Example:
 ![hadashboard](https://github.com/akamming/esp_domoticz_opentherm_handler/blob/master/ha%20dashboard%20example.png)
@@ -88,10 +86,18 @@ https://docs.platformio.org/en/latest/platforms/espressif8266.html#boards
 For more information about configuring `platformio.ini`, see:  
 https://docs.platformio.org/page/projectconf.html
 
-**Important note about uploading firmware:**  
+## Uploading GUI files to the device
+
+You can easily upload web interface files (HTML, CSS, JS, etc.) to your device using PlatformIO:
+
+1. Place all files you want to upload in the `data` directory of your project.
+2. In PlatformIO, use the **Upload File System Image** task (via the sidebar or via `Ctrl+Shift+P` > PlatformIO: Upload File System Image).
+3. The files will be sent via OTA to the LittleFS filesystem on your device.
+
+**Important on  uploading GUI files using the OTA uploader:**  
 Uploading new firmware will overwrite your current configuration on the device.  
 If you want to keep your configuration, you should first download your config file by navigating to [http://domesphelper.local/config.json](http://domesphelper.local/config.json) in your browser.  
-Save this file in your project's `data` directory.  
+Save this file in your project's `data` directory. Make sure you set the MQTT password again (this is masked for security reasons if you retrieve it from the device)  
 When you upload new code (using PlatformIO), all files in the `data` directory will also be uploaded to the device, so your configuration will be restored
 
 ### First Time setup
@@ -101,7 +107,7 @@ For connecting to wifi:
 - follow instructions to connect the ESP to correct WiFi network
 - After the ESP is connected, connect to your normal Wifi Access Point again 
 - Enter http://domesphelper.local, http://domesphelper or http://domesphelper.home  (whatever your local domain is in your network) in your browser to connect to the device. 
-- If all went correct you should now see a "File not found" error including some buttons to upload files (go to next step), on that page: Upload index.html, index.css and favicon.ico
+- Optional (if you didn't use the OTA FS uploader) If all went correct you should now see a "File not found" error including some buttons to upload files (go to next step), on that page: Upload index.html, settings.html, index.css and favicon.ico
 
 ## Configuration
 (After you've complete the installation, see above): 

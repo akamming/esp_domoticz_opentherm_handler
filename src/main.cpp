@@ -446,7 +446,7 @@ void sendUploadForm()
 {
   Serial.println("sendUploadForm");
 
-  server.send(200, "text/html; charset=UTF-8", (String("Use this form to upload index.html, favicon.ico and index.css<BR /><BR />")+String(HTTP_UPLOAD_FORM)).c_str());       //Response to the HTTP request
+  server.send(200, "text/html; charset=UTF-8", (String("Use this form to upload files<BR /><BR />")+String(HTTP_UPLOAD_FORM)).c_str());       //Response to the HTTP request
 }
 
 void handleFileUpload(){ // upload a new file to the SPIFFS
@@ -706,7 +706,7 @@ void handleNotFound()
       message += server.argName(i)+"="+server.arg(i)+"<BR />";
     }
 
-    message += "<BR /><a href=\"upload\">Click here to upload index.html, favicon.ico and index.css</a>";
+    message += "<BR /><a href=\"upload\">Click here to upload the gui files</a>";
     
     server.send(404, "text/html; charset=UTF-8", message.c_str());
   }
