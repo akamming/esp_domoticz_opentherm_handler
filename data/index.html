@@ -19,6 +19,7 @@
             <div class="thermo-info">
                 <span>Actual: <span id="mqtttemperatureLabel">--</span> °C</span> |
                 <span>Outside: <span id="otoutsidetemperatureLabel">--</span> °C</span>
+                <span id="errorMessage" style="color: red; font-weight: bold; margin-left: 10px;"></span>
             </div>
         </div>
         <label>Mode <select name="climateMode" id="climateMode" onchange="onThermostatChanged()">
@@ -174,6 +175,18 @@
                     document.getElementById('weatherDependentMode').checked = json.weatherDependentMode;
                     document.getElementById('HolidayMode').checked = json.HolidayMode;
                     document.getElementById('FrostProtectionActive').checked = json.FrostProtectionActive;
+                    // Error handling logic
+                    let errorMsg = "";
+                    if (json.OpenThermStatus !== "OK") {
+                        errorMsg = "No connection to boiler. Please check the OpenTherm wiring and configuration.";
+                    } else if (json.MQTTconnected !== "true" || json.MQTTstate !== 0) {
+                        errorMsg = "MQTT connection failed. Please check your MQTT settings.";
+                    } else if (json.mqttTemperature === 0 || json.mqttTemperature === 99) {
+                        errorMsg = "Indoor temperature not found. Please check your MQTT settings.";
+                    } else if (json.OutsideTemperature === 0 || json.OutsideTemperature === 99) {
+                        errorMsg = "Outdoor temperature not found. Please check your MQTT settings and/or ensure an outdoor sensor is connected to your boiler.";
+                    }
+                    document.getElementById('errorMessage').textContent = errorMsg;
                     drawSetpointRing();
                 }
             };

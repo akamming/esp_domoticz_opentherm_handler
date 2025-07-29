@@ -278,7 +278,7 @@
                 alert("MQTT Server has Invalid IP Adres!");
                 return;
             }
-            if (insideTempTopic === outsideTempTopic) {
+            if (usemqtt && insideTempTopic === outsideTempTopic) {
                 alert("Inside Temperature Topic and Outside Temperature Topic must not be the same. Please enter different topics for each.");
                 return;
             }
