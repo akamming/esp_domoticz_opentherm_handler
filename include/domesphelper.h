@@ -8,9 +8,6 @@ const char*  DEFAULT_MQTTPASS = "";
 const bool   DEFAULT_MQTTPERSISTENCE = false;
 const char*  DEFAULT_MQTTTEMP_TOPIC = "";
 const char*  DEFAULT_MQTTOUTSIDETEMP_TOPIC = "";
-const int    DEFAULT_INPIN = 4;
-const int    DEFAULT_OUTPIN = 5;
-const int    DEFAULT_ONEWIREBUS = 14;
 const bool   DEFAULT_DEBUG = true;
 const int    DEFAULT_KP = 30;
 const float  DEFAULT_KI = 0.01f;
@@ -97,9 +94,6 @@ const int COOL = 11;
 const int AUTO = 21;
 
 // Default Config values
-int inPin = 4;                                    // pin number for opentherm adapter connection, 2 for Arduino, 4 for ESP8266 (D2), 21 for ESP32
-int outPin = 5;                                   // pin number for opentherm adapter connection, 3 for Arduino, 5 for ESP8266 (D1), 22 for ESP32
-int OneWireBus = 14;                              // Data wire is connected to 14 pin on the OpenTherm Shield (Temperature sensor)
 bool usemqtt = false;                              // Set to True if you want to use MQTT
 bool mqttpersistence = false;                     // Set to True if you want persistence messages (true ensures devices are recognized right away after reboot of home automation tool, but then you cannot delete the devices anymore (will keep reappearing)
                                                   //             false causes devices only to work after discovery messages are sent (see MQTT descovery heatbeat)

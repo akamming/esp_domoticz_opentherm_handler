@@ -164,9 +164,9 @@ File fsUploadFile;
 
 // objects to be used by program
 ESP8266WebServer server(httpport);    //Web server object. Will be listening in port 80 (default for HTTP)
-OneWire oneWire(OneWireBus);          // for OneWire Bus
+OneWire oneWire(14);                  // for OneWire Bus. Data wire is connected to 14 pin on the OpenTherm Shield (Temperature sensor)
 DallasTemperature sensors(&oneWire);  // for the temp sensor on one wire bus
-OpenTherm ot(inPin, outPin);          // for communication with Opentherm adapter
+OpenTherm ot(4,5);                    // pin number for opentherm adapter connection, 2/3 for Arduino, 4/5 for ESP8266 (D2), 21/22 for ESP32
 WiFiClient espClient;                 // Needed for MQTT
 PubSubClient MQTT(espClient);         // MQTT client
 WiFiUDP ntpUDP;                       // for NTP client
@@ -582,11 +582,6 @@ void handleSaveConfig() {
       mqttoutsidetemptopic=json["mqttoutsidetemptopic"].as<String>();
     }
     
-    //device config
-    inPin=json["inpin"] | inPin;
-    outPin=json["outpin"] | outPin;
-    OneWireBus=json["temppin"] | OneWireBus;
-
     debug=json["debugtomqtt"] | true;
 
     // PID Settings
@@ -773,11 +768,6 @@ void readConfig()
         mqtttemptopic = json["mqtttemptopic"].is<String>() ? json["mqtttemptopic"].as<String>() : String(DEFAULT_MQTTTEMP_TOPIC);
         mqttoutsidetemptopic = json["mqttoutsidetemptopic"].is<String>() ? json["mqttoutsidetemptopic"].as<String>() : String(DEFAULT_MQTTOUTSIDETEMP_TOPIC);
 
-        //device config
-        inPin = json["inpin"].is<int>() ? json["inpin"].as<int>() : DEFAULT_INPIN;
-        outPin = json["outpin"].is<int>() ? json["outpin"].as<int>() : DEFAULT_OUTPIN;
-        OneWireBus = json["temppin"].is<int>() ? json["temppin"].as<int>() : DEFAULT_ONEWIREBUS;
-
         debug = json["debugtomqtt"].is<bool>() ? json["debugtomqtt"].as<bool>() : DEFAULT_DEBUG;
 
         // PID Settings
@@ -823,9 +813,6 @@ void readConfig()
   mqttpersistence = DEFAULT_MQTTPERSISTENCE;
   mqtttemptopic = DEFAULT_MQTTTEMP_TOPIC;
   mqttoutsidetemptopic = DEFAULT_MQTTOUTSIDETEMP_TOPIC;
-  inPin = DEFAULT_INPIN;
-  outPin = DEFAULT_OUTPIN;
-  OneWireBus = DEFAULT_ONEWIREBUS;
   debug = DEFAULT_DEBUG;
   KP = DEFAULT_KP;
   KI = DEFAULT_KI;
@@ -864,11 +851,6 @@ void SaveConfig()
   json["mqttoutsidetemptopic"] = mqttoutsidetemptopic;
   json["debugtomqtt"] = debug;
   
-  //device config
-  json["inpin"] = inPin;
-  json["outpin"] = outPin;
-  json["temppin"] = OneWireBus;
-
   // add/change the Climate settings
   json["climateMode"] = climate_Mode;
   json["climateSetpoint"] = climate_SetPoint;

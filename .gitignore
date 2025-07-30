@@ -3,5 +3,6 @@
 .git/
 
 data/README*
+data/config.json
 src/README*
 include/README*

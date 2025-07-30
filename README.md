@@ -1,4 +1,3 @@
-
 Home Assistant Example:
 ![hadashboard](https://github.com/akamming/esp_domoticz_opentherm_handler/blob/master/ha%20dashboard%20example.png)
 (see sample YAML on the bottom of this document)
@@ -50,7 +49,11 @@ Additional 3 more devices :
 ## Installation
 
 ### Hardware
-- Connect your OpenTherm adapter to the Wemos D1 mini and the boiler, according to http://ihormelnyk.com/opentherm_adapter. 
+- Connect your OpenTherm adapter to the Wemos D1 mini and the boiler, according to http://ihormelnyk.com/opentherm_adapter.
+- **Pin connections:**
+  - OpenTherm adapter: Connect to **pins 4 and 5** on the Wemos D1 mini
+  - Temperature sensor (DS18B20): Connect to **pin 14** on the Wemos D1 mini
+- **Note:** If you need to use different pins, you must modify the pin definitions in the code before uploading the sketch.
 
 ### Firmware Upload (PlatformIO Recommended)
 

@@ -47,11 +47,7 @@
         Hotwater SP <input type="number" class="temp_input" id="hotwatersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="hotwatertemperature" size="10" disabled><br />
     </div>
     <div class="outer_frame">
-        <p>Device Config</p><br />
-        <b>GPIO</b><br />
-        OT Input     <input type="number" class="pin_input" id="inpin" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
-        OT Output    <input type="number" class="pin_input" id="outpin" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
-        DS18B20 <input type="number" class="pin_input" id="temppin" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <p>Device Config</p>
         <br /><b>MQTT</b><br />
         <label><input type="checkbox" name="mqttenabled" id="mqttenabled" onchange="onmqttenabledchanged()">Enabled</label><br />
         Server <input type="text" class="hn_input" id="mqttserver" size="10" value="Loading..." onClick="this.setSelectionRange(0, this.value.length)" disabled><br />
@@ -225,9 +221,6 @@
             xhttp.onreadystatechange = function () {
                 if (xhttp.readyState == 4 && xhttp.status == 200) {
                     const json = JSON.parse(xhttp.responseText);
-                    document.getElementById('inpin').value = +json.inpin;
-                    document.getElementById('outpin').value = +json.outpin;
-                    document.getElementById('temppin').value = +json.temppin;
                     document.getElementById('mqttenabled').checked = json.usemqtt;
                     document.getElementById('mqttserver').value = json.mqttserver;
                     document.getElementById('mqttport').value = +json.mqttport;
@@ -295,9 +288,6 @@
                 }
             };
             var obj = new Object();
-            obj.inpin = +document.getElementById('inpin').value;
-            obj.outpin = +document.getElementById('outpin').value;
-            obj.temppin = +document.getElementById('temppin').value;
             obj.usemqtt = document.getElementById('mqttenabled').checked;
             obj.mqttserver = document.getElementById('mqttserver').value;
             obj.mqttport = +document.getElementById('mqttport').value;
