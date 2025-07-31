@@ -1335,11 +1335,133 @@ void handleGetOutSideTemp(){
       UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
       mqtt_outside_Temperature=outside_Temperature;
     }
-    
+
     delta = mqtt_OT_outside_Temperature-OT_outside_Temperature;
     if ((delta != 0) and OT_outside_Temperature!=99){ // value changed
       UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name,OT_outside_Temperature);
       mqtt_OT_outside_Temperature=OT_outside_Temperature;
+    }
+  }
+}
+
+void handleSetBoilerTemperature()
+{
+  // Set the boiler temperature
+  ot.setBoilerTemperature(boiler_SetPoint);
+}
+
+void handleSetDHWSetpoint()
+{
+  // Set the DHW setpoint
+  ot.setDHWSetpoint(dhw_SetPoint);
+}
+
+void handleGetBoilerTemperature()
+{
+  // Get the boiler temperature
+  boiler_Temperature = ot.getBoilerTemperature();
+
+  // Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    float delta = mqtt_boiler_Temperature-boiler_Temperature;
+    if (delta<-0.09 or delta>0.09){ // value changed
+      UpdateMQTTTemperatureSensor(Boiler_Temperature_Name,boiler_Temperature);
+      UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature);
+      mqtt_boiler_Temperature=boiler_Temperature;
+    }
+  }
+}
+
+void handleGetDHWTemperature()
+{
+  // Get the DHW temperature
+  dhw_Temperature = ot.getDHWTemperature();
+
+  // Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    float delta = mqtt_dhw_Temperature-dhw_Temperature;
+    if (delta<-0.09 or delta>0.09){ // value changed
+      UpdateMQTTTemperatureSensor(DHW_Temperature_Name,dhw_Temperature);
+      UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature);
+      mqtt_dhw_Temperature=dhw_Temperature;
+    }
+  }
+}
+
+void handleGetReturnTemperature()
+{
+  // Get the return temperature
+  return_Temperature = ot.getReturnTemperature();
+
+  // Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    float delta = mqtt_return_Temperature-return_Temperature;
+    if (delta<-0.09 or delta>0.09){ // value changed
+      UpdateMQTTTemperatureSensor(Return_Temperature_Name,return_Temperature);
+      mqtt_return_Temperature=return_Temperature;
+    }
+  }
+}
+
+void handleGetPressure()
+{
+  // Get the pressure from OpenTherm
+  pressure = ot.getPressure();
+
+  // Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    float delta = mqtt_pressure-pressure;
+    if (delta<-0.009 or delta>0.009){ // value changed
+      UpdateMQTTPressureSensor(Pressure_Name,pressure);
+      mqtt_pressure=pressure;
+    }
+  }
+}
+
+void handleGetFlowRate()
+{
+  // Get the DHW flow rate from OpenTherm
+  flowrate = getDHWFlowrate();
+
+  /** Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    float delta = mqtt_flowrate-flowrate;
+    if (delta<-0.01 or delta>0.01){ // value changed
+      UpdateMQTTFlowRateSensor(FlowRate_Name,flowrate);
+      mqtt_flowrate=flowrate;
+    }
+  } */
+}
+
+void handleGetFaultCode()
+{
+  // Get the fault code from OpenTherm
+  FaultCode = ot.getFault();
+
+  // Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    if (FaultCode!=mqtt_FaultCode){ // value changed
+      UpdateMQTTFaultCodeSensor(FaultCode_Name,FaultCode);
+      mqtt_FaultCode=FaultCode;
+    }
+  }
+}
+
+void handleGetThermostatTemperature()
+{
+  // Get the thermostat temperature from the DS18B20 sensor
+  sensors.requestTemperatures(); // Send the command to get temperature readings 
+  currentTemperature = sensors.getTempCByIndex(0);
+
+  // Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    float delta = mqtt_currentTemperature-currentTemperature;
+    if (delta<-0.09 or delta>0.09){ // value changed
+      UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name,currentTemperature);
+      mqtt_currentTemperature=currentTemperature;
+      if (mqtttemptopic.length()==0) { // temptopic empty, use internal temperature
+        SetMQTTTemperature(currentTemperature);
+      }
     }
   }
 }
@@ -1358,8 +1480,7 @@ void handleOpenTherm()
     
     case SetBoilerTemp:
     {
-      // set setpoint
-      ot.setBoilerTemperature(boiler_SetPoint);
+      handleSetBoilerTemperature();
 
       OpenThermCommand = SetDHWTemp;
       break;
@@ -1367,7 +1488,7 @@ void handleOpenTherm()
 
     case SetDHWTemp:
     {
-      ot.setDHWSetpoint(dhw_SetPoint);
+      handleSetDHWSetpoint();
 
        OpenThermCommand = GetBoilerTemp;
       break;
@@ -1375,17 +1496,7 @@ void handleOpenTherm()
 
     case GetBoilerTemp:
     {
-      boiler_Temperature = ot.getBoilerTemperature();
-
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        float delta = mqtt_boiler_Temperature-boiler_Temperature;
-        if (delta<-0.1 or delta>0.1){ // value changed
-          UpdateMQTTTemperatureSensor(Boiler_Temperature_Name,boiler_Temperature);
-          UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature);
-          mqtt_boiler_Temperature=boiler_Temperature;
-        }
-      }
+      handleGetBoilerTemperature();
 
       OpenThermCommand = GetDHWTemp;
       break;
@@ -1393,17 +1504,7 @@ void handleOpenTherm()
 
     case GetDHWTemp:
     {
-      dhw_Temperature = ot.getDHWTemperature();
-
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        float delta = mqtt_dhw_Temperature-dhw_Temperature;
-        if (delta<-0.1 or delta>0.1){ // value changed
-          UpdateMQTTTemperatureSensor(DHW_Temperature_Name,dhw_Temperature);
-          UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature);
-          mqtt_dhw_Temperature=dhw_Temperature;
-        }
-      }
+      handleGetDHWTemperature();
 
       OpenThermCommand = GetReturnTemp;
       break;
@@ -1411,16 +1512,7 @@ void handleOpenTherm()
       
     case GetReturnTemp:
     {
-      return_Temperature = ot.getReturnTemperature();
-
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        float delta = mqtt_return_Temperature-return_Temperature;
-        if (delta<-0.1 or delta>0.1){ // value changed
-          UpdateMQTTTemperatureSensor(Return_Temperature_Name,return_Temperature);
-          mqtt_return_Temperature=return_Temperature;
-        }
-      }
+      handleGetReturnTemperature();
 
       OpenThermCommand = GetOutsideTemp;
       break;
@@ -1435,16 +1527,7 @@ void handleOpenTherm()
       
     case GetPressure: 
     {
-      pressure = ot.getPressure();
-
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        float delta = mqtt_pressure-pressure;
-        if (delta<-0.01 or delta>0.01){ // value changed
-          UpdateMQTTPressureSensor(Pressure_Name,pressure);
-          mqtt_pressure=pressure;
-        }
-      }
+      handleGetPressure(); // Get the pressure from OpenTherm
 
       OpenThermCommand = GetFlowRate;
       break;
@@ -1454,30 +1537,13 @@ void handleOpenTherm()
     {
       flowrate = getDHWFlowrate();
 
-      /* Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        float delta = mqtt_flowrate-flowrate;
-        if (delta<-0.01 or delta>0.01){ // value changed
-          UpdateMQTTPressureSensor(Pressure_Name,pressure);
-          mqtt_pressure=pressure;
-        }
-      } */
-
       OpenThermCommand = GetFaultCode;
       break;
     }
  
     case GetFaultCode:
     {
-      FaultCode = ot.getFault();
-
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        if (FaultCode!=mqtt_FaultCode){ // value changed
-          UpdateMQTTFaultCodeSensor(FaultCode_Name,FaultCode);
-          mqtt_FaultCode=FaultCode;
-        }
-      }
+      handleGetFaultCode(); // Get the fault code from OpenTherm
       
       OpenThermCommand=GetThermostatTemp;
       break;
@@ -1485,26 +1551,12 @@ void handleOpenTherm()
 
     case GetThermostatTemp:
     {
-      sensors.requestTemperatures(); // Send the command to get temperature readings 
-      currentTemperature = sensors.getTempCByIndex(0);
-
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        float delta = mqtt_currentTemperature-currentTemperature;
-        if (delta<-0.1 or delta>0.1){ // value changed
-          UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name,currentTemperature);
-          mqtt_currentTemperature=currentTemperature;
-          if (mqtttemptopic.length()==0) { // temptopic empty, use internal temperature
-            SetMQTTTemperature(currentTemperature);
-          }
-        }
-      }
+      handleGetThermostatTemperature(); // Get the thermostat temperature from the DS18B20 sensor
 
       OpenThermCommand=SetBoilerStatus;
       
       break;
     }
-
   }
 }
 
