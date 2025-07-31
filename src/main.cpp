@@ -889,12 +889,14 @@ void SaveConfig()
 // not defined  in opentherm lib, so declaring local
 float getOutsideTemperature() {
   unsigned long response = ot.sendRequest(ot.buildRequest(OpenThermRequestType::READ, OpenThermMessageID::Toutside, 0));
-  return ot.isValidResponse(response) ? ot.getFloat(response) : 0;
+  float temp = ot.isValidResponse(response) ? ot.getFloat(response) : 0;
+  return round(temp * 10.0) / 10.0; // round to 1 decimal place
 }
 
 float getDHWFlowrate() {
   unsigned long response = ot.sendRequest(ot.buildRequest(OpenThermMessageType::READ_DATA, OpenThermMessageID::DHWFlowRate, 0));
-  return ot.isValidResponse(response) ? ot.getFloat(response) : 0;
+  float temp = ot.isValidResponse(response) ? ot.getFloat(response) : 0;
+  return round(temp * 10.0) / 10.0; // round to 1 decimal place
 }
 
 void CommunicateSetpoint(const char* setpointName,float setpointValue,float *mqttValue) {
@@ -1249,6 +1251,99 @@ void handleClimateProgram()
   }
 }
 
+void handleSetBoilerStatus() {
+  // enable/disable heating, hotwater, heating and get status from opentherm connection and boiler (if it can be reached)
+  unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
+  responseStatus = ot.getLastResponseStatus();
+  if (responseStatus == OpenThermResponseStatus::SUCCESS) {
+    // Yes we have a connection, update statuses
+    Serial.println("Central Heating: " + String(ot.isCentralHeatingActive(response) ? "on" : "off"));
+    Serial.println("Hot Water: " + String(ot.isHotWaterActive(response) ? "on" : "off"));
+    Serial.println("Cooling: " + String(ot.isCoolingActive(response) ? "on" : "off"));
+    Serial.println("Flame: " + String(ot.isFlameOn(response) ? "on" : "off"));
+    Flame=ot.isFlameOn(response);
+    CentralHeating=ot.isCentralHeatingActive(response);
+    HotWater=ot.isHotWaterActive(response);
+    Cooling=ot.isCoolingActive(response);
+    Fault=ot.isFault(response);
+    Diagnostic=ot.isDiagnostic(response);
+
+    // modulation is reported on the switches, so make sure we have modulation value as well
+    modulation = ot.getModulation();
+
+    // Check if we have to send to MQTT for steering vars
+    if (MQTT.connected()) {
+      if (Flame!=mqtt_Flame){ // value changed
+        UpdateMQTTBinarySensor(FlameActive_Name,Flame);
+        mqtt_Flame=Flame;
+      }
+      if (Fault!=mqtt_Fault){ // value changed
+        UpdateMQTTBinarySensor(FaultActive_Name,Fault);
+        mqtt_Fault=Fault;
+      }
+      if (Diagnostic!=mqtt_Diagnostic){ // value changed
+        UpdateMQTTBinarySensor(DiagnosticActive_Name,Diagnostic);
+        mqtt_Diagnostic=Diagnostic;
+      }
+      if (Cooling!=mqtt_Cooling){ // value changed
+        UpdateMQTTBinarySensor(CoolingActive_Name,Cooling);
+        mqtt_Cooling=Cooling;
+      }
+      if (CentralHeating!=mqtt_CentralHeating){ // value changed
+        UpdateMQTTBinarySensor(CentralHeatingActive_Name,CentralHeating);
+        mqtt_CentralHeating=CentralHeating;
+      }
+      if (HotWater!=mqtt_HotWater){ // value changed
+        UpdateMQTTBinarySensor(HotWaterActive_Name,HotWater);
+        mqtt_HotWater=HotWater;
+      }
+      if (modulation!=mqtt_modulation){ // value changed
+        UpdateMQTTPercentageSensor(Modulation_Name,modulation);
+        mqtt_modulation=modulation; // remember mqtt modulation value
+      }
+    }
+    // Execute the next command in the next call
+  } else if (responseStatus == OpenThermResponseStatus::NONE) {
+      Serial.println("Opentherm Error: OpenTherm is not initialized");
+  } else if (responseStatus == OpenThermResponseStatus::INVALID) {
+      Serial.println("Opentherm Error: Invalid response " + String(response, HEX));
+  } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
+      Serial.println("Opentherm Error: Response timeout");
+  }  else {
+      Serial.println("Opentherm Error: unknown error");
+  }
+}
+
+void handleGetOutSideTemp(){
+  // Get the outside temperature from OpenTherm
+  OT_outside_Temperature = getOutsideTemperature();
+
+  // set the outside temperature to calculate (depending on the)
+  if (mqttoutsidetemptopic.length()>0) {
+    Debug("Using MQTT Outside Temperature: "+String(mqttOutsideTemperature));
+    // If a topic is set, don't read attached sensor, use mqtt value and skip GetOutsideTemp command
+    outside_Temperature=mqttOutsideTemperature;
+  } else {
+    // No topic set, so we are using the outside temp reported by OpenTherm
+    outside_Temperature=OT_outside_Temperature;
+  }
+
+  // Check if we have to send to MQTT
+  if (MQTT.connected()) {
+    float delta = mqtt_outside_Temperature-outside_Temperature;
+    if ((delta != 0) and outside_Temperature!=99){ // value changed
+      UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
+      mqtt_outside_Temperature=outside_Temperature;
+    }
+    
+    delta = mqtt_OT_outside_Temperature-OT_outside_Temperature;
+    if ((delta != 0) and OT_outside_Temperature!=99){ // value changed
+      UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name,OT_outside_Temperature);
+      mqtt_OT_outside_Temperature=OT_outside_Temperature;
+    }
+  }
+}
+
 void handleOpenTherm()
 {
   // Handle commands
@@ -1256,73 +1351,8 @@ void handleOpenTherm()
   {
     case SetBoilerStatus:
     {
-      // enable/disable heating, hotwater, heating and get status from opentherm connection and boiler (if it can be reached)
-      unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
-      responseStatus = ot.getLastResponseStatus();
-      if (responseStatus == OpenThermResponseStatus::SUCCESS) {
-        // Yes we have a connection, update statuses
-        Serial.println("Central Heating: " + String(ot.isCentralHeatingActive(response) ? "on" : "off"));
-        Serial.println("Hot Water: " + String(ot.isHotWaterActive(response) ? "on" : "off"));
-        Serial.println("Cooling: " + String(ot.isCoolingActive(response) ? "on" : "off"));
-        Serial.println("Flame: " + String(ot.isFlameOn(response) ? "on" : "off"));
-        Flame=ot.isFlameOn(response);
-        CentralHeating=ot.isCentralHeatingActive(response);
-        HotWater=ot.isHotWaterActive(response);
-        Cooling=ot.isCoolingActive(response);
-        Fault=ot.isFault(response);
-        Diagnostic=ot.isDiagnostic(response);
-
-        // modulation is reported on the switches, so make sure we have modulation value as well
-        modulation = ot.getModulation();
-
-        // Check if we have to send to MQTT for steering vars
-        if (MQTT.connected()) {
-          if (Flame!=mqtt_Flame){ // value changed
-            UpdateMQTTBinarySensor(FlameActive_Name,Flame);
-            mqtt_Flame=Flame;
-          }
-          if (Fault!=mqtt_Fault){ // value changed
-            UpdateMQTTBinarySensor(FaultActive_Name,Fault);
-            mqtt_Fault=Fault;
-          }
-          if (Diagnostic!=mqtt_Diagnostic){ // value changed
-            UpdateMQTTBinarySensor(DiagnosticActive_Name,Diagnostic);
-            mqtt_Diagnostic=Diagnostic;
-          }
-          if (Cooling!=mqtt_Cooling){ // value changed
-            UpdateMQTTBinarySensor(CoolingActive_Name,Cooling);
-            mqtt_Cooling=Cooling;
-          }
-          if (CentralHeating!=mqtt_CentralHeating){ // value changed
-            UpdateMQTTBinarySensor(CentralHeatingActive_Name,CentralHeating);
-            mqtt_CentralHeating=CentralHeating;
-          }
-          if (HotWater!=mqtt_HotWater){ // value changed
-            UpdateMQTTBinarySensor(HotWaterActive_Name,HotWater);
-            mqtt_HotWater=HotWater;
-            // Reset PID is hotwater was switched off
-            // if (!HotWater)
-            // {
-            //  Debug("Switching off hotwater, initializing PID");
-            //  InitPID();
-            //}            
-          }
-          if (modulation!=mqtt_modulation){ // value changed
-            UpdateMQTTPercentageSensor(Modulation_Name,modulation);
-            mqtt_modulation=modulation; // remember mqtt modulation value
-          }
-        }
-        // Execute the next command in the next call
-        OpenThermCommand = SetBoilerTemp;
-      } else if (responseStatus == OpenThermResponseStatus::NONE) {
-          Serial.println("Opentherm Error: OpenTherm is not initialized");
-      } else if (responseStatus == OpenThermResponseStatus::INVALID) {
-          Serial.println("Opentherm Error: Invalid response " + String(response, HEX));
-      } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
-          Serial.println("Opentherm Error: Response timeout");
-      }  else {
-          Serial.println("Opentherm Error: unknown error");
-      }
+      handleSetBoilerStatus();
+      OpenThermCommand = SetBoilerTemp;
       break;
     }
     
@@ -1392,73 +1422,13 @@ void handleOpenTherm()
         }
       }
 
-      if (mqttoutsidetemptopic.length()>0) {
-        // If a topic is set, don't read attached sensor, use mqtt value and skip GetOutsideTemp command
-        outside_Temperature=mqttOutsideTemperature;
-        // Check if we have to send to MQTT
-        if (MQTT.connected()) {
-          float delta = mqtt_outside_Temperature-outside_Temperature;
-          if (delta<-0.1 or delta>0.1){ // value changed
-            UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
-            mqtt_outside_Temperature=outside_Temperature;
-          }
-        }
-      }
       OpenThermCommand = GetOutsideTemp;
       break;
     }
       
     case GetOutsideTemp:
     {
-      OT_outside_Temperature = getOutsideTemperature();
-      if(OT_outside_Temperature==0) { // 0 can also mean no temperature reading, so do some extra checks
-        if (abs(OT_outside_Temperature-mqtt_OT_outside_Temperature)>0.5) { // ignore if zero was reported with a bif temp difference at that time
-          OT_outside_Temperature=mqtt_OT_outside_Temperature;
-        } else {
-          if (!outsideTemperatureReceived) {
-            // this is our first measurement, initialize the array
-            for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
-              outsidetemp[i]=outside_Temperature;
-            }
-            outsideTemperatureReceived=true;
-          } else {
-            // Not the first measurement fill in new value in array
-            outsidetemp[outsidetempcursor]=outside_Temperature;
-
-            // move the cursor in the array
-            outsidetempcursor++;
-            if (outsidetempcursor>=NUMBEROFMEASUREMENTS) {
-              outsidetempcursor=0;
-            }
-
-            // calculate the average
-            OT_outside_Temperature=0;
-            for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
-              OT_outside_Temperature += outsidetemp[outsidetempcursor];
-            }
-            OT_outside_Temperature=outside_Temperature / NUMBEROFMEASUREMENTS;
-          }
-        }
-      }
-
-      if (mqttoutsidetemptopic.length()==0) { // No topic set, so We are using the outside temp reported by openterm
-        outside_Temperature=OT_outside_Temperature;
-      }
-      
-      // Check if we have to send to MQTT
-      if (MQTT.connected()) {
-        float delta = mqtt_outside_Temperature-outside_Temperature;
-        if ((delta<-0.1 or delta>0.1) and outside_Temperature!=99){ // value changed
-          UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
-          mqtt_outside_Temperature=outside_Temperature;
-        }
-        delta = mqtt_OT_outside_Temperature-OT_outside_Temperature;
-        if ((delta<-0.1 or delta>0.1) and OT_outside_Temperature!=99){ // value changed
-          UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name,OT_outside_Temperature);
-          mqtt_OT_outside_Temperature=OT_outside_Temperature;
-        }
-      }
-
+      handleGetOutSideTemp(); // Get the outside temperature from OpenTherm
       OpenThermCommand = GetPressure;
       break;
     }
@@ -1615,10 +1585,10 @@ void SetMQTTOutsideTemperature(float value) {
     Debug("First outside temperature ("+String(value)+") received, ready for weather dependent mode");
     outsideTemperatureReceived=true; // Make sure we do this only once ;-)
 
-  // this is our first measurement, initialize the array
-  for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
-    outsidetemp[i]=outside_Temperature;
-  }
+    // this is our first measurement, initialize the array
+    for (int i=0;i<NUMBEROFMEASUREMENTS;i++) {
+      outsidetemp[i]=outside_Temperature;
+    }
 
   }
 }
