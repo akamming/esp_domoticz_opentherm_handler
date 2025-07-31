@@ -123,21 +123,8 @@ String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
 
-// ot actions (main will loop through these actions in this order)
-enum OTCommand { SetBoilerStatus, 
-                 SetBoilerTemp, 
-                 SetDHWTemp, 
-                 GetBoilerTemp,  
-                 GetDHWTemp, 
-                 GetReturnTemp, 
-                 GetOutsideTemp, 
-                 GetPressure, 
-                 GetFlowRate,
-                 GetFaultCode, 
-                 GetThermostatTemp 
-               } OpenThermCommand ;
-
 // vars for program logic
+int OpenThermCommandIndex = 0; // index of the OpenTherm command we are processing
 const char compile_date[] = __DATE__ " " __TIME__;  // Make sure we can output compile date
 unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat timestamp, init on previous heartbeat, so processing start right away
 unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT command timestamp. init on previous timeout value, so processing start right away
@@ -1466,99 +1453,30 @@ void handleGetThermostatTemperature()
   }
 }
 
-void handleOpenTherm()
-{
-  // Handle commands
-  switch (OpenThermCommand)
-  {
-    case SetBoilerStatus:
-    {
-      handleSetBoilerStatus();
-      OpenThermCommand = SetBoilerTemp;
-      break;
-    }
-    
-    case SetBoilerTemp:
-    {
-      handleSetBoilerTemperature();
+void handleOpenTherm() {
 
-      OpenThermCommand = SetDHWTemp;
-      break;
-    }
+  // Array of  handler functions to choose from, lokaal in de functie
+  typedef void (*OTHandlerFunc)();
+  OTHandlerFunc otHandlers[] = {
+    handleSetBoilerStatus,
+    handleSetBoilerTemperature,
+    handleSetDHWSetpoint,
+    handleGetBoilerTemperature,
+    handleGetDHWTemperature,
+    handleGetReturnTemperature,
+    handleGetOutSideTemp,
+    handleGetPressure,
+    handleGetFlowRate,
+    handleGetFaultCode,
+    handleGetThermostatTemperature
+  };
+  const int OTHandlerCount = sizeof(otHandlers) / sizeof(otHandlers[0]);
 
-    case SetDHWTemp:
-    {
-      handleSetDHWSetpoint();
-
-       OpenThermCommand = GetBoilerTemp;
-      break;
-    }
-
-    case GetBoilerTemp:
-    {
-      handleGetBoilerTemperature();
-
-      OpenThermCommand = GetDHWTemp;
-      break;
-    }
-
-    case GetDHWTemp:
-    {
-      handleGetDHWTemperature();
-
-      OpenThermCommand = GetReturnTemp;
-      break;
-    }
-      
-    case GetReturnTemp:
-    {
-      handleGetReturnTemperature();
-
-      OpenThermCommand = GetOutsideTemp;
-      break;
-    }
-      
-    case GetOutsideTemp:
-    {
-      handleGetOutSideTemp(); // Get the outside temperature from OpenTherm
-      OpenThermCommand = GetPressure;
-      break;
-    }
-      
-    case GetPressure: 
-    {
-      handleGetPressure(); // Get the pressure from OpenTherm
-
-      OpenThermCommand = GetFlowRate;
-      break;
-    }
-
-    case GetFlowRate: 
-    {
-      flowrate = getDHWFlowrate();
-
-      OpenThermCommand = GetFaultCode;
-      break;
-    }
- 
-    case GetFaultCode:
-    {
-      handleGetFaultCode(); // Get the fault code from OpenTherm
-      
-      OpenThermCommand=GetThermostatTemp;
-      break;
-    }
-
-    case GetThermostatTemp:
-    {
-      handleGetThermostatTemperature(); // Get the thermostat temperature from the DS18B20 sensor
-
-      OpenThermCommand=SetBoilerStatus;
-      
-      break;
-    }
-  }
+  // Dispatcher: voer de juiste handler uit en verhoog de index
+  otHandlers[OpenThermCommandIndex]();
+  OpenThermCommandIndex = (OpenThermCommandIndex + 1) % OTHandlerCount;
 }
+
 
 String CommandTopic(const char* DeviceName){
   return String(host)+String("/light/")+String(DeviceName)+String("/set");
@@ -1976,7 +1894,6 @@ void reconnect()
         } else {
           Debug("Time was not set");
         }
-        Error("None, all OK");
       } else {
         Serial.print("failed, rc=");
         Serial.print(MQTT.state());
