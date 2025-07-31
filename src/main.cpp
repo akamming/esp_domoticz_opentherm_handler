@@ -1650,218 +1650,210 @@ bool handleClimateSetpoint(float setpoint) {
   return true;
 }
 
+String extractRelevantStringFromPayload(const char* payload) {
+  // Definieer de relevante sleutels
+  const char* keys[] = { "value", "state", "temperature", "svalue", "svalue1" };
+  const int keyCount = sizeof(keys) / sizeof(keys[0]);
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, payload);
+  if (error) {
+    // Geen JSON, geef originele payload terug
+    return String(payload);
+  }
+
+  // Probeer relevante keys te vinden
+  for (int i = 0; i < keyCount; i++) {
+    if (doc[keys[i]].is<float>()) return String(doc[keys[i]].as<float>());
+    if (doc[keys[i]].is<const char*>()) return String(doc[keys[i]].as<const char*>());
+    if (doc[keys[i]].is<int>()) return String(doc[keys[i]].as<int>());
+  }
+
+  // Geen relevante key gevonden, probeer root value
+  if (doc.is<float>()) return String(doc.as<float>());
+  if (doc.is<const char*>()) return String(doc.as<const char*>());
+  if (doc.is<int>()) return String(doc.as<int>());
+
+  // fallback: geef hele JSON als string
+  String result;
+  serializeJson(doc, result);
+  return result;
+}
+
+int getIdxFromPayload(const char* payload) {
+  // Parse the JSON payload to extract the idx value
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, payload);
+  if (error) {
+    Debug("Failed to parse JSON payload: " + String(error.c_str()));
+    return -1; // Return -1 if parsing fails
+  }
+  
+  // Check if idx exists and is an integer
+  if (doc["idx"].is<int>()) {
+    return doc["idx"].as<int>();
+  }
+  
+  Debug("No valid idx found in payload");
+  return -1; // Return -1 if idx is not found or not an integer
+}
+
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
   String topicstr=String(topic);
   char payloadstr[1024];
   strncpy(payloadstr,(char *)payload,length);
   payloadstr[length]='\0';
+
+  String value = extractRelevantStringFromPayload(payloadstr);
+
+  Debug ("extracted relevant string from payload: "+String(payloadstr)+" was: "+value);
+
   if (!topicstr.equals(domoticzoutputtopic)) { // prevent flooding debug log with updates from domoticzdevices
     Debug("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
   }
 
   // Assume succesful command 
-  bool CommandSucceeded=true;
+  bool CommandSucceeded=false;
   
   if (millis()-t_last_http_command>HTTPTimeoutInMillis) { // only execute mqtt commands if not commanded by http
-    // decode payload
-    JsonDocument doc;
-    DeserializationError jsonerror = deserializeJson(doc, payloadstr);
+
+    // Domoticz devices
+    if (topicstr.equals(domoticzoutputtopic)) {
+      // See if it was the device we needed
+      int idx = getIdxFromPayload(payloadstr);
+      Debug("Received domoticz device reading: "+String(idx)+","+String(payloadstr));
+      if (mqtttemptopic.equals(String(idx))) {
+        SetMQTTTemperature(value.toFloat());
+      }
+      if (mqttoutsidetemptopic.equals(String(idx))) {
+        SetMQTTOutsideTemperature(value.toFloat());
+      }
 
     // climate mode
-    if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
-      if (jsonerror) {
-        CommandSucceeded = HandleClimateMode(payloadstr);
-      } else {
-        CommandSucceeded = HandleClimateMode(SetpointIntToString(int(doc["value"])));
-      }
-      
+    } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+      CommandSucceeded=HandleClimateMode(value.c_str());
+
     // Climate setpoint temperature command
     } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
-      handleClimateSetpoint(String(payloadstr).toFloat());
+      handleClimateSetpoint(value.toFloat());
 
     // Boiler Setpoint mode receive
     } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
-      if (jsonerror) {
-        CommandSucceeded=HandleBoilerMode(payloadstr);
-      } else {
-        CommandSucceeded=HandleBoilerMode(SetpointIntToString(int(doc["value"])));
-      }
+      CommandSucceeded=HandleBoilerMode(value.c_str());
 
     // DHW Setpoint mode receive
     } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
-      if (jsonerror) {
-        CommandSucceeded=HandleDHWMode(payloadstr);
-      } else {
-        CommandSucceeded=HandleDHWMode(SetpointIntToString(int(doc["value"])));
-      }
+      CommandSucceeded=HandleDHWMode(value.c_str());
 
     // Handle Enable Hotwater switch command
     } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
-      if (jsonerror)  {
-        CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, payloadstr);
-      } else {
-        CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, doc["state"]);
-      }
+      CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, value.c_str());
 
     // Handle EnableCooling switch command
     } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
-      if (jsonerror) {
-        CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, payloadstr);
-      } else {
-        CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, doc["state"]);
-      }
+      CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, value.c_str());
 
     // Enable Central Heating switch command
     } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
-      if (jsonerror) {
-        CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, payloadstr);
-      } else {
-        CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, doc["state"]);
-      }
+      CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, value.c_str());
 
     // Weather Dependent Mode command
     } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
-      if (jsonerror) {
-        CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, payloadstr);
-      } else {
-        CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, doc["state"]);
-      }
+      CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, value.c_str());
       if (CommandSucceeded) {
         InitPID();
-        DelayedSaveConfig();
       }
 
     // Holiday Mode command
     } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
-      if (jsonerror) {
-        CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, payloadstr);
-      } else {
-        CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, doc["state"]);
-      }        
+      CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, value.c_str());
       if (CommandSucceeded) {
         InitPID();
-        DelayedSaveConfig();
       }
 
     // Handle debug switch command
     } else if (topicstr.equals(CommandTopic(Debug_Name))) {
-      if (jsonerror)  {
-        Debug("Debugging switched "+String(payloadstr));
-        CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, payloadstr);
-        Debug("Debugging switched "+String(payloadstr));
-      } else {
-        Debug("Debugging switched "+String(payloadstr));
-        CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, doc["state"]);
-        Debug("Debugging switched "+String(doc["state"]));
-      }
-      if (CommandSucceeded) {
-        DelayedSaveConfig();
-      }
+      Debug("Received debug command: "+value);
+      CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, value.c_str());
+      Debug("Debugging switched "+String(value));
 
     // boiler setpoint command
     } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
       boiler_SetPoint=String(payloadstr).toFloat();
+      CommandSucceeded=true; // we handled the command
 
     // DHW Setpoint temperature commands
     } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
       dhw_SetPoint=String(payloadstr).toFloat();
+      CommandSucceeded=true; // we handled the command
 
     // MQTT temperature received
     } else if (topicstr.equals(mqtttemptopic)) {
-      if (jsonerror) {
-        SetMQTTTemperature(String(payloadstr).toFloat()); // Just try to convert
-      } else {
-        if (doc["value"].is<float>()) {   // e.g. from zwavejsui
-          SetMQTTTemperature(doc["value"]);
-        } else if (doc["svalue1"].is<const char*>()) { // e.g. from domoticz/out
-          SetMQTTTemperature(String(doc["svalue1"]).toFloat());
-        } else {
-          SetMQTTTemperature(String(payloadstr).toFloat()); // Just try to convert to Float
-        }
-      }
+      SetMQTTTemperature(value.toFloat()); // Just try to convert
 
     // MQTT outsidetemperature received
     } else if (topicstr.equals(mqttoutsidetemptopic)) {
-      if (jsonerror) {
-        SetMQTTOutsideTemperature(String(payloadstr).toFloat()); // Just try to convert
-      } else {
-        if (doc["value"].is<float>()) {   // e.g. from zwavejsui
-          SetMQTTOutsideTemperature(doc["value"]);
-        } else if (doc["svalue1"].is<const char*>()) { // e.g. from domoticz/out
-          SetMQTTOutsideTemperature(String(doc["svalue1"]).toFloat());
-        } else {
-          SetMQTTOutsideTemperature(String(payloadstr).toFloat()); // Just try to convert to Float
-        }
-      }
+      SetMQTTOutsideTemperature(value.toFloat()); // Just try to convert
 
     // Boiler Vars
     } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
-      MinBoilerTemp=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      MinBoilerTemp=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(MaxBoilerTemp_Name))) {
-      MaxBoilerTemp=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      MaxBoilerTemp=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(MinimumTempDifference_Name))) {
-      minimumTempDifference=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      minimumTempDifference=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(FrostProtectionSetPoint_Name))) {
-      FrostProtectionSetPoint=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      FrostProtectionSetPoint=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtPlus20_Name))) {
-      BoilerTempAtPlus20=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      BoilerTempAtPlus20=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtMinus10_Name))) {
-      BoilerTempAtMinus10=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      BoilerTempAtMinus10=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(SwitchHeatingOffAt_Name))) {
-      SwitchHeatingOffAt=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      SwitchHeatingOffAt=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
-      ReferenceRoomCompensation=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      ReferenceRoomCompensation=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(KP_Name))) {
-      KP=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      KP=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(KI_Name))) {
-      KI=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      KI=value.toFloat();
+      CommandSucceeded=true;
     } else if (topicstr.equals(NumberCommandTopic(KD_Name))) {
       KD=String(payloadstr).toFloat();
-      DelayedSaveConfig();
+      CommandSucceeded=true;
     } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
       Curvature=getCurvatureIntFromString(payloadstr);
-      DelayedSaveConfig();
+      CommandSucceeded=true;
     } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
       MQTT.unsubscribe(mqtttemptopic.c_str()); // unsubscribe from old topic
-      mqtttemptopic=payloadstr;
+      mqtttemptopic=value;
       MQTT.subscribe(mqtttemptopic.c_str()); // subscribe to new topic
-      DelayedSaveConfig(); // save the config
+      CommandSucceeded=true; // save the config
     } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
       Debug("Setting outsideTempTopic to "+String(payloadstr));
       MQTT.unsubscribe(mqttoutsidetemptopic.c_str()); // unsubscribe from old topic
-      mqttoutsidetemptopic=payloadstr;
+      mqttoutsidetemptopic=value;
       MQTT.subscribe(mqttoutsidetemptopic.c_str()); // subscribe to new topic
-      DelayedSaveConfig(); // save the config
+      CommandSucceeded=true; // save the config
 
-    // Domoticz devices
-    } else if (topicstr.equals(domoticzoutputtopic)) {
-      // See if it was the device we needed
-      // Debug("Received domoticz device reading: "+String(doc["idx"])+","+String(doc["name"]));
-      if (mqtttemptopic.equals(doc["idx"].as<String>())) {
-        SetMQTTTemperature(doc["svalue1"].as<float>());
-      }
-      if (mqttoutsidetemptopic.equals(doc["idx"].as<String>())) {
-        SetMQTTOutsideTemperature(doc["svalue1"].as<float>());
-      }
 
     // Unrecognized  
     } else {
       LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
-      CommandSucceeded=false;
     }
+
     if (CommandSucceeded) {
       // we received a succesful mqtt command, so someone is communicating correctly
+      DelayedSaveConfig(); // save the config
       t_last_mqtt_command=millis();
     }
   }
