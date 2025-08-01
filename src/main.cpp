@@ -286,6 +286,19 @@ void handleGetSensors() {
   SendHTTP("GetSensors","OK");
 }
 
+// Generieke handler voor het aan- of uitzetten van een functie via HTTP argument
+void handleHTTPToggle(const String& argName, bool& targetVar, const String& enableText = "On") {
+  if (server.arg(argName) != "") {
+    if (server.arg(argName).equalsIgnoreCase(enableText)) {
+      if (!targetVar) Debug("Enabling " + argName);
+      targetVar = true;
+    } else {
+      if (targetVar) Debug("Disabling " + argName);
+      targetVar = false;
+    }
+  }
+}
+
 void handleCommand() {
   String Statustext="Unknown Command";
 
@@ -316,41 +329,14 @@ void handleCommand() {
     Statustext="OK";
   }
 
-  // Enable/Disable Cooling
-  if (server.arg("Cooling")!="") {
-    Statustext="OK";
-    if (server.arg("Cooling").equalsIgnoreCase("On")) {
-      Serial.println("Enabling Cooling");
-      enableCooling= true;
-    } else {
-      Serial.println("Disabling Cooling");
-      enableCooling=false;
-    }
-  }
+  // handle http toggle commands
+  handleHTTPToggle("CentralHeating", enableCentralHeating);
+  handleHTTPToggle("HotWater", enableHotWater);
+  handleHTTPToggle("Cooling", enableCooling);
+  handleHTTPToggle("weatherDependentMode", Weather_Dependent_Mode);
+  handleHTTPToggle("holidayMode", Holiday_Mode);
 
-  // Enable/Disable Central Heating
-  if (server.arg("CentralHeating")!="") {
-    Statustext="OK";
-    if (server.arg("CentralHeating").equalsIgnoreCase("On")) {
-      Serial.println("Enabling Central Heating");
-      enableCentralHeating=true;
-    } else {
-      Serial.println("Disabling Central Heating");
-      enableCentralHeating=false;
-    }
-  }
-
-  // Enable/Disable HotWater
-  if (server.arg("HotWater")!="") {
-    Statustext="OK";
-    if (server.arg("HotWater").equalsIgnoreCase("On")) {
-      Serial.println("Enabling Domestic Hot Water");
-      enableHotWater=true;
-    } else {
-      Serial.println("Disabling Domestic Hot Water");
-      enableHotWater=false;
-    }
-  }
+  Debug("Weather Dependent Mode: "+String(Weather_Dependent_Mode));
 
   // Set Climate Mode
   if (server.arg("climateMode")!="") {
@@ -364,30 +350,6 @@ void handleCommand() {
     Serial.println("Setting Climate Setpoint to "+server.arg("climateSetpoint"));
     handleClimateSetpoint(server.arg("climateSetpoint").toFloat());
     Statustext="OK";
-  }
-
-  // Enable/Disable WeatherDependentMode
-  if (server.arg("weatherDependentMode")!="") {
-    Statustext="OK";
-    if (server.arg("weatherDependentMode").equalsIgnoreCase("On")) {
-      Serial.println("Enabling WeatherDependentMode");
-      Weather_Dependent_Mode=true;
-    } else {
-      Serial.println("Disabling WeatherDependentMode");
-      Weather_Dependent_Mode=false;
-    }
-  }
-
-  // Enable/Disable HolidayMode
-  if (server.arg("holidayMode")!="") {
-    Statustext="OK";
-    if (server.arg("holidayMode").equalsIgnoreCase("On")) {
-      Serial.println("Enabling holidayMode");
-      Holiday_Mode=true;
-    } else {
-      Serial.println("Disabling Holiday Mode");
-      Holiday_Mode=false;
-    }
   }
 
 
@@ -1698,6 +1660,28 @@ int getIdxFromPayload(const char* payload) {
   return -1; // Return -1 if idx is not found or not an integer
 }
 
+// Handler voor domoticz device readings
+void handleDomoticzOutputTopic(const String& value, const char* payloadstr) {
+  int idx = getIdxFromPayload(payloadstr);
+  Debug("Received domoticz device reading: "+String(idx)+","+String(payloadstr));
+  if (mqtttemptopic.equals(String(idx))) {
+    SetMQTTTemperature(value.toFloat());
+  }
+  if (mqttoutsidetemptopic.equals(String(idx))) {
+    SetMQTTOutsideTemperature(value.toFloat());
+  }
+}
+
+// Genereieke handler om een MQTT topic te wijzigen en opnieuw te subscriben
+bool handleMQTTTopicChange(String& topicVar, const String& newValue) {
+  if (topicVar.length() > 0) {
+    MQTT.unsubscribe(topicVar.c_str()); // Unsubscribe van oude topic
+  }
+  topicVar = newValue;
+  MQTT.subscribe(topicVar.c_str());    // Subscribe op nieuwe topic
+  return true; // Config moet worden opgeslagen
+}
+
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
   String topicstr=String(topic);
@@ -1706,8 +1690,6 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   payloadstr[length]='\0';
 
   String value = extractRelevantStringFromPayload(payloadstr);
-
-  Debug ("extracted relevant string from payload: "+String(payloadstr)+" was: "+value);
 
   if (!topicstr.equals(domoticzoutputtopic)) { // prevent flooding debug log with updates from domoticzdevices
     Debug("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
@@ -1720,15 +1702,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
     // Domoticz devices
     if (topicstr.equals(domoticzoutputtopic)) {
-      // See if it was the device we needed
-      int idx = getIdxFromPayload(payloadstr);
-      Debug("Received domoticz device reading: "+String(idx)+","+String(payloadstr));
-      if (mqtttemptopic.equals(String(idx))) {
-        SetMQTTTemperature(value.toFloat());
-      }
-      if (mqttoutsidetemptopic.equals(String(idx))) {
-        SetMQTTOutsideTemperature(value.toFloat());
-      }
+      handleDomoticzOutputTopic(value, payloadstr);
 
     // climate mode
     } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
@@ -1736,7 +1710,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
     // Climate setpoint temperature command
     } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
-      handleClimateSetpoint(value.toFloat());
+      CommandSucceeded = handleClimateSetpoint(value.toFloat());
 
     // Boiler Setpoint mode receive
     } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
@@ -1834,19 +1808,13 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       Curvature=getCurvatureIntFromString(payloadstr);
       CommandSucceeded=true;
     } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
-      MQTT.unsubscribe(mqtttemptopic.c_str()); // unsubscribe from old topic
-      mqtttemptopic=value;
-      MQTT.subscribe(mqtttemptopic.c_str()); // subscribe to new topic
-      CommandSucceeded=true; // save the config
-    } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
+      CommandSucceeded = handleMQTTTopicChange(mqtttemptopic, value);
+    }
+    else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
       Debug("Setting outsideTempTopic to "+String(payloadstr));
-      MQTT.unsubscribe(mqttoutsidetemptopic.c_str()); // unsubscribe from old topic
-      mqttoutsidetemptopic=value;
-      MQTT.subscribe(mqttoutsidetemptopic.c_str()); // subscribe to new topic
-      CommandSucceeded=true; // save the config
+      CommandSucceeded = handleMQTTTopicChange(mqttoutsidetemptopic, value);
 
-
-    // Unrecognized  
+    // Unknown topic (this code should never be reached, indicates programming logic error)  
     } else {
       LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
     }
