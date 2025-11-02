@@ -71,6 +71,7 @@ const char MQTT_TempTopic_Name[] = "MQTTTemperatureTopic";
 const char MQTT_OutsideTempTopic_Name[] = "MQTTOutsideTemperatureTopic";
 const char Debug_Name[] = "DebugToMQTT";
 const char Error_Name[] = "Error";
+const char IP_Address_Name[] = "Device_IP_Address";
 
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image

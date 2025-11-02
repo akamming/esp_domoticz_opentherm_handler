@@ -122,6 +122,7 @@ float mqtt_d=99;
 String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
+String currentIP = "";  // Houd het huidige IP bij om alleen bij verandering te updaten
 
 // vars for program logic
 int OpenThermCommandIndex = 0; // index of the OpenTherm command we are processing
@@ -2484,6 +2485,7 @@ void PublishAllMQTTSensors()
   PublishMQTTText(MQTT_OutsideTempTopic_Name);
   PublishMQTTText(Debug_Name);
   PublishMQTTText(Error_Name);
+  PublishMQTTText(IP_Address_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
@@ -2656,6 +2658,15 @@ void loop()
         if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis)
         {
           PublishAllMQTTSensors();
+        }
+      }
+
+      if (MQTT.connected()) {
+        String newIP = WiFi.localIP().toString();
+        if (!currentIP.equals(newIP)) {
+          currentIP=newIP;
+          UpdateMQTTText(IP_Address_Name,currentIP.c_str());
+          Debug("IP address changed to "+currentIP);
         }
       }
       
