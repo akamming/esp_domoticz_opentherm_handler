@@ -1834,6 +1834,10 @@ void SubScribeToDomoticz() {
 void reconnect()
 {
   if (usemqtt) {
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.print("WiFi not connected, can't connect to MQTT broker");
+      return;
+    }
     if (!MQTT.connected()) {
       Serial.print("Attempting MQTT connection...");
       bool mqttconnected;
@@ -2602,6 +2606,12 @@ void setup()
   // MQTT
   MQTT.setServer(mqttserver.c_str(), mqttport); // server details
   MQTT.setBufferSize(1024); // discovery messages are longer than default max buffersize(!)
+
+// Limit blocking times on sockets to reduce stalls during network issues
+  espClient.setTimeout(1000);   // WiFiClient read timeout in ms
+  MQTT.setSocketTimeout(2);     // PubSubClient socket timeout in seconds (default ~15)
+  MQTT.setKeepAlive(15);        // Shorter keepalive to detect dead connections faster
+
   MQTT.setCallback(MQTTcallback); // listen to callbacks
 }
 
