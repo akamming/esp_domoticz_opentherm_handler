@@ -1281,13 +1281,13 @@ void handleGetOutSideTemp(){
   // Check if we have to send to MQTT
   if (MQTT.connected()) {
     float delta = mqtt_outside_Temperature-outside_Temperature;
-    if ((delta != 0) and outside_Temperature!=99){ // value changed
+    if ((delta != 0) and outside_Temperature!=99 and outside_Temperature!=0){ // value changed
       UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
       mqtt_outside_Temperature=outside_Temperature;
     }
 
     delta = mqtt_OT_outside_Temperature-OT_outside_Temperature;
-    if ((delta != 0) and OT_outside_Temperature!=99){ // value changed
+    if ((delta != 0) and OT_outside_Temperature!=99 and OT_outside_Temperature!=0){ // value changed
       UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name,OT_outside_Temperature);
       mqtt_OT_outside_Temperature=OT_outside_Temperature;
     }
