@@ -163,7 +163,7 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000); //  Set the ti
 void Debug(String text) {
   if (debug) {
     if (MQTT.connected()) {
-      UpdateMQTTText(Debug_Name,(timeClient.getFormattedTime()+" "+text).c_str());
+      UpdateMQTTTextSensor(Debug_Name,(timeClient.getFormattedTime()+" "+text).c_str());
     }
     Serial.println(text);
   }
@@ -171,7 +171,7 @@ void Debug(String text) {
 
 void Error(String text) {
   if (MQTT.connected()) {
-    UpdateMQTTText(Error_Name,(timeClient.getFormattedTime()+" "+text).c_str());
+    UpdateMQTTTextSensor(Error_Name,(timeClient.getFormattedTime()+" "+text).c_str());
   }
   Serial.println(text);
 }
@@ -2519,8 +2519,8 @@ void PublishAllMQTTSensors()
   PublishMQTTCurvatureSelect(Curvature_Name);
   PublishMQTTText(MQTT_TempTopic_Name);
   PublishMQTTText(MQTT_OutsideTempTopic_Name);
-  PublishMQTTText(Debug_Name);
-  PublishMQTTText(Error_Name);
+  PublishMQTTTextSensor(Debug_Name);
+  PublishMQTTTextSensor(Error_Name);
   PublishMQTTTextSensor(IP_Address_Name);
 
   // Subscribe to temperature topic

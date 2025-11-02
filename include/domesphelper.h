@@ -214,6 +214,8 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
 void UpdateMQTTNumber(const char* uniquename, float value);
 void PublishMQTTText(const char* uniquename);
 void UpdateMQTTText(const char* uniquename, const char* value);
+void PublishMQTTTextSensor(const char* uniquename);
+void UpdateMQTTTextSensor(const char* uniquename, const char* value);
 void PublishMQTTCurvatureSelect(const char* uniquename);
 void UpdateMQTTCurvatureSelect(const char* uniquename, int value);
 void UpdateMQTTBoilerSetpointMode();
