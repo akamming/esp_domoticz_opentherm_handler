@@ -2300,6 +2300,42 @@ void UpdateMQTTText(const char* uniquename,const char* value)
   MQTT.publish((host+"/text/"+String(uniquename)+"/state").c_str(),value,mqttpersistence);
 }
 
+void PublishMQTTTextSensor(const char* uniquename)
+{
+  Serial.println("PublishMQTTTextSensor");
+  JsonDocument json;
+
+  // Construct JSON config message voor een read-only sensor
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["stat_t"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["value_template"] = "{{ value_json.value }}";
+  // Geen cmd_t, dus niet editable
+
+  addDeviceToJson(&json);
+
+  char conf[512];
+  serializeJson(json, conf);  // conf now contains the json
+
+  // Publish config message
+  MQTT.publish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(),conf,mqttpersistence);
+}
+
+void UpdateMQTTTextSensor(const char* uniquename, const char* value)
+{
+  Serial.println("UpdateMQTTTextSensor");
+  JsonDocument json;
+
+  // Construct JSON state message
+  json["value"] = value;
+
+  char state[128];
+  serializeJson(json, state);  // state now contains the json
+
+  // Publish state message
+  MQTT.publish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence);
+}
+
 
 void PublishMQTTCurvatureSelect(const char* uniquename)
 {
@@ -2485,7 +2521,7 @@ void PublishAllMQTTSensors()
   PublishMQTTText(MQTT_OutsideTempTopic_Name);
   PublishMQTTText(Debug_Name);
   PublishMQTTText(Error_Name);
-  PublishMQTTText(IP_Address_Name);
+  PublishMQTTTextSensor(IP_Address_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
@@ -2665,7 +2701,7 @@ void loop()
         String newIP = WiFi.localIP().toString();
         if (!currentIP.equals(newIP)) {
           currentIP=newIP;
-          UpdateMQTTText(IP_Address_Name,currentIP.c_str());
+          UpdateMQTTTextSensor(IP_Address_Name,currentIP.c_str());
           Debug("IP address changed to "+currentIP);
         }
       }
