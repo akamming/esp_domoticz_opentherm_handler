@@ -2646,8 +2646,8 @@ void setup()
   MQTT.setBufferSize(1024); // discovery messages are longer than default max buffersize(!)
 
 // Limit blocking times on sockets to reduce stalls during network issues
-  espClient.setTimeout(1000);   // WiFiClient read timeout in ms
-  MQTT.setSocketTimeout(2);     // PubSubClient socket timeout in seconds (default ~15)
+  espClient.setTimeout(500);   // WiFiClient read timeout in ms
+  MQTT.setSocketTimeout(1);     // PubSubClient socket timeout in seconds (default ~15)
   MQTT.setKeepAlive(15);        // Shorter keepalive to detect dead connections faster
 
   MQTT.setCallback(MQTTcallback); // listen to callbacks
