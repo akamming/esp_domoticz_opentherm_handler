@@ -112,7 +112,7 @@ float mqtt_BoilerTempAtPlus20 = 99;                // for calculating when in we
 float mqtt_BoilerTempAtMinus10 = 99;               // for calculating when in weather dependent mode
 float mqtt_Curvature=99;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 float mqtt_SwitchHeatingOffAt = 99;                // Automatic switch off when in weather dependent mode when outside temp too high
-float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
+float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode: Correct with this number per degree celsius difference (air temperature - setpoint) 
 float mqtt_kp=99;
 float mqtt_ki=99;
 float mqtt_kd=99;
@@ -122,7 +122,7 @@ float mqtt_d=99;
 String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
-String currentIP = "";  // Houd het huidige IP bij om alleen bij verandering te updaten
+String currentIP = "";  // Keep track of the current IP to only update on change
 
 // vars for program logic
 int OpenThermCommandIndex = 0; // index of the OpenTherm command we are processing
@@ -304,7 +304,7 @@ void handleGetSensors() {
   SendHTTP("GetSensors","OK");
 }
 
-// Generieke handler voor het aan- of uitzetten van een functie via HTTP argument
+// Generic handler for enabling or disabling a function via HTTP argument
 void handleHTTPToggle(const String& argName, bool& targetVar, const String& enableText = "On") {
   if (server.arg(argName) != "") {
     if (server.arg(argName).equalsIgnoreCase(enableText)) {
@@ -589,14 +589,14 @@ void handleRemoveConfig() {
   Serial.println("handleRemoveConfig");
   
   if (LittleFS.exists(CONFIGFILE)) {
-    Serial.println("Config file existst, removing configfile");
+    Serial.println("Config file exists, removing configfile");
     LittleFS.remove(CONFIGFILE);
     server.send(200, "text/plain", "Config file removed");
     Debug("Configfile removed");
     delay(500); // wait for server send to finish
     ESP.restart(); // restart
   } else {
-    server.send(200, "text/plain", "No confile file present to remove");
+    server.send(200, "text/plain", "No config file present to remove");
   } 
 
   return;
@@ -920,7 +920,7 @@ if (client.connected()) {
     CommunicateSetpoint(Boiler_Setpoint_Name,boiler_SetPoint,&mqtt_boiler_setpoint);
     CommunicateSetpoint(DHW_Setpoint_Name,dhw_SetPoint,&mqtt_dhw_setpoint);
 
-    // Communicatie the steering vars
+    // Communicate the steering vars
     CommunicateNumber(MinBoilerTemp_Name,MinBoilerTemp,&mqtt_minboilertemp,0.5);
     CommunicateNumber(MaxBoilerTemp_Name,MaxBoilerTemp,&mqtt_maxboilertemp,0.5);
     CommunicateNumber(MinimumTempDifference_Name,minimumTempDifference,&mqtt_minimumTempDifference,0.5);
@@ -1060,9 +1060,9 @@ void UpdatePID(float setpoint,float temperature)
     // calculate the error (sp-pv)
     error = setpoint-temperature;
 
-    // calculate he amount of rising/dropping temp
+    // calculate the amount of rising/dropping temp
     CurrentMinute=(millis() % 60000 / 1000);
-    DeltaKPH = (mqttTemperature-insideTempAt[(CurrentMinute+45)%60])*4;  // tempchange the last 15 mins mutltiplied by 4 is the number of kelvin per hour the temp is currently dropping or rising
+    DeltaKPH = (mqttTemperature-insideTempAt[(CurrentMinute+45)%60])*4;  // temp change the last 15 mins multiplied by 4 is the number of kelvin per hour the temp is currently dropping or rising
     
     // calculate the PID output
     P = KP * error;          // proportional contribution
@@ -1156,7 +1156,7 @@ void handleClimateProgram()
         boiler_SetPoint=P+I+D;
       }
     } else {
-      // no need to actie, set the correct state
+      // no need to act, set the correct state
       FrostProtectionActive=false;
       enableCentralHeating=false;
     }
@@ -1435,7 +1435,7 @@ void handleGetThermostatTemperature()
 
 void handleOpenTherm() {
 
-  // Array of  handler functions to choose from, lokaal in de functie
+  // Array of handler functions to choose from, local in the function
   typedef void (*OTHandlerFunc)();
   OTHandlerFunc otHandlers[] = {
     handleSetBoilerStatus,
@@ -1452,7 +1452,7 @@ void handleOpenTherm() {
   };
   const int OTHandlerCount = sizeof(otHandlers) / sizeof(otHandlers[0]);
 
-  // Dispatcher: voer de juiste handler uit en verhoog de index
+  // Dispatcher: execute the correct handler and increment the index
   otHandlers[OpenThermCommandIndex]();
   OpenThermCommandIndex = (OpenThermCommandIndex + 1) % OTHandlerCount;
 }
@@ -1490,7 +1490,7 @@ bool HandleClimateMode(const char* mode)
       DelayedSaveConfig();
     } else {
       Error("Unknown payload for Climate mode command");
-      // sendback current mode to requester, so trick program into making it think it has to communicatie
+      // sendback current mode to requester, so trick program into making it think it has to communicate
       mqtt_climate_Mode="abcd"; // random value, so the program thinks it is changed next time it wants to communicate
       CommandSucceeded=false;
     }
@@ -1560,7 +1560,7 @@ bool HandleBoilerMode(const char* mode)
     enableCooling=true;
   } else {
     Error("Unknown payload for central boiler setpoint mode command");
-    // sendback current mode to requester, so trick program into making it think it has to communicatie
+    // sendback current mode to requester, so trick program into making it think it has to communicate
     if (enableCentralHeating) {
       mqtt_enable_CentralHeating=false;
     } else {
@@ -1585,7 +1585,7 @@ bool HandleDHWMode(const char* mode)
     enableHotWater=true;
   } else {
     Error("Unknown payload for dhw setpoint mode command");
-    // sendback current mode to requester, so trick program into making it think it has to communicatie
+    // sendback current mode to requester, so trick program into making it think it has to communicate
     if (enableHotWater) {
       mqtt_enable_HotWater=false;
     } else {
@@ -1631,30 +1631,30 @@ bool handleClimateSetpoint(float setpoint) {
 }
 
 String extractRelevantStringFromPayload(const char* payload) {
-  // Definieer de relevante sleutels
+  // Define the relevant keys
   const char* keys[] = { "value", "state", "temperature", "svalue", "svalue1" };
   const int keyCount = sizeof(keys) / sizeof(keys[0]);
 
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, payload);
   if (error) {
-    // Geen JSON, geef originele payload terug
+    // No JSON, return original payload
     return String(payload);
   }
 
-  // Probeer relevante keys te vinden
+  // Try to find relevant keys
   for (int i = 0; i < keyCount; i++) {
     if (doc[keys[i]].is<float>()) return String(doc[keys[i]].as<float>());
     if (doc[keys[i]].is<const char*>()) return String(doc[keys[i]].as<const char*>());
     if (doc[keys[i]].is<int>()) return String(doc[keys[i]].as<int>());
   }
 
-  // Geen relevante key gevonden, probeer root value
+  // No relevant key found, try root value
   if (doc.is<float>()) return String(doc.as<float>());
   if (doc.is<const char*>()) return String(doc.as<const char*>());
   if (doc.is<int>()) return String(doc.as<int>());
 
-  // fallback: geef hele JSON als string
+  // fallback: return entire JSON as string
   String result;
   serializeJson(doc, result);
   return result;
@@ -1678,7 +1678,7 @@ int getIdxFromPayload(const char* payload) {
   return -1; // Return -1 if idx is not found or not an integer
 }
 
-// Handler voor domoticz device readings
+// Handler for Domoticz device readings
 void handleDomoticzOutputTopic(const String& value, const char* payloadstr) {
   int idx = getIdxFromPayload(payloadstr);
   Debug("Received domoticz device reading: "+String(idx)+","+String(payloadstr));
@@ -1690,14 +1690,14 @@ void handleDomoticzOutputTopic(const String& value, const char* payloadstr) {
   }
 }
 
-// Genereieke handler om een MQTT topic te wijzigen en opnieuw te subscriben
+// Generic handler to change an MQTT topic and resubscribe
 bool handleMQTTTopicChange(String& topicVar, const String& newValue) {
   if (topicVar.length() > 0) {
-    client.unsubscribe(topicVar.c_str()); // Unsubscribe van oude topic
+    client.unsubscribe(topicVar.c_str()); // Unsubscribe from old topic
   }
   topicVar = newValue;
-  client.subscribe(topicVar.c_str(), 0);    // Subscribe op nieuwe topic
-  return true; // Config moet worden opgeslagen
+  client.subscribe(topicVar.c_str(), 0);    // Subscribe to new topic
+  return true; // Config must be saved
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -1846,17 +1846,17 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 }
 
 void onMessageCallback(int messageSize) {
-  // Lees topic en payload
+  // Read topic and payload
   String topic = client.messageTopic();
   String payload = client.readString();
 
-  // Converteer naar oude formaat voor compatibiliteit (optioneel, als je de rest van de code niet wilt aanpassen)
+  // Convert to old format for compatibility (optional, if you don't want to adjust the rest of the code)
   char topicChar[topic.length() + 1];
   topic.toCharArray(topicChar, topic.length() + 1);
   char payloadChar[payload.length() + 1];
   payload.toCharArray(payloadChar, payload.length() + 1);
 
-  // Roep de oude logica aan (pas aan als nodig)
+  // Call the old logic (adjust if necessary)
   MQTTcallback(topicChar, (byte*)payloadChar, payload.length());
 }
 
@@ -2034,7 +2034,7 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   delay(MQTT_PUBLISH_DELAY);
 }
@@ -2065,7 +2065,7 @@ void PublishMQTTNumberSensor(const char* uniquename)
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   delay(MQTT_PUBLISH_DELAY);
 }
@@ -2099,7 +2099,7 @@ void PublishMQTTPressureSensor(const char* uniquename)
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   delay(MQTT_PUBLISH_DELAY);
 }
@@ -2134,7 +2134,7 @@ void PublishMQTTPercentageSensor(const char* uniquename)
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   delay(MQTT_PUBLISH_DELAY);
 }
@@ -2169,7 +2169,7 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   delay(MQTT_PUBLISH_DELAY);
 }
@@ -2218,7 +2218,7 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   client.subscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str(), 0);
   client.subscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str(), 0);
@@ -2262,7 +2262,7 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   client.subscribe((host+"/number/"+String(uniquename)+"/set").c_str(), 0);
   delay(MQTT_PUBLISH_DELAY);
@@ -2297,7 +2297,7 @@ void PublishMQTTText(const char* uniquename)
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   client.subscribe((host+"/text/"+String(uniquename)+"/set").c_str(), 0);
   delay(MQTT_PUBLISH_DELAY);
@@ -2317,12 +2317,12 @@ void PublishMQTTTextSensor(const char* uniquename)
   Serial.println("PublishMQTTTextSensor");
   JsonDocument json;
 
-  // Construct JSON config message voor een read-only sensor
+  // Construct JSON config message for a read-only sensor
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/sensor/"+String(uniquename)+"/state";
   json["value_template"] = "{{ value_json.value }}";
-  // Geen cmd_t, dus niet editable
+  // No cmd_t, so not editable
 
   addDeviceToJson(&json);
 
@@ -2368,7 +2368,7 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
 
   addDeviceToJson(&json);
 
-  // publsh the Message
+  // publish the Message
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/select/"+host+"/"+String(uniquename)+"/config").c_str(), json);
   client.subscribe((host+"/select/"+String(uniquename)+"/set").c_str(), 0);
   delay(MQTT_PUBLISH_DELAY);
@@ -2401,7 +2401,7 @@ void UpdateMQTTBoilerSetpointMode()
     }
   } else  {
     if (enableCooling) {
-      // only cooling, set to Cooing
+      // only cooling, set to Cooling
       UpdateMQTTSetpointMode(Boiler_Setpoint_Name,11);
     } else {
       // nothing, set to Off
@@ -2729,7 +2729,7 @@ void loop()
       MDNS.update();
     }
 
-    // Remember last hour of temperatures (PID calculation needs to be able te determine if temperature is rising or dropping)
+    // Remember last hour of temperatures (PID calculation needs to be able to determine if temperature is rising or dropping)
     {
       if (insideTemperatureReceived) {
         int CurrentMinute=(millis() % 60000) / 1000;
@@ -2740,7 +2740,7 @@ void loop()
     // Handle CLimate program
     handleClimateProgram(); 
     
-    // Check if we have to communicatie steering vars
+    // Check if we have to communicate steering vars
     CommunicateSteeringVarsToMQTT();
 
     // handle openthem commands
