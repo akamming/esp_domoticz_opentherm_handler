@@ -179,16 +179,18 @@ void publishDiscoveryMessage(const char* topic, JsonDocument& json) {
 
 void Debug(String text) {
   if (debug) {
+    text=timeClient.getFormattedTime()+" "+text;
     if (client.connected()) {
-      UpdateMQTTTextSensor(Debug_Name,(timeClient.getFormattedTime()+" "+text).c_str());
+      UpdateMQTTTextSensor(Debug_Name,text.c_str());
     }
     Serial.println(text);
   }
 }
 
 void Error(String text) {
+  text=timeClient.getFormattedTime()+" "+text;
   if (client.connected()) {
-    UpdateMQTTTextSensor(Error_Name,(timeClient.getFormattedTime()+" "+text).c_str());
+    UpdateMQTTTextSensor(Error_Name,text.c_str());
   }
   Serial.println(text);
 }
@@ -1220,6 +1222,7 @@ void handleClimateProgram()
 
 void handleSetBoilerStatus() {
   // enable/disable heating, hotwater, heating and get status from opentherm connection and boiler (if it can be reached)
+  Debug("ot.setBoilerStatus(CH="+String(enableCentralHeating)+", HW="+String(enableHotWater)+", Cooling="+String(enableCooling)+")");
   unsigned long response = ot.setBoilerStatus(enableCentralHeating, enableHotWater, enableCooling);
   responseStatus = ot.getLastResponseStatus();
   if (responseStatus == OpenThermResponseStatus::SUCCESS) {
@@ -1282,6 +1285,7 @@ void handleSetBoilerStatus() {
 }
 
 void handleGetOutSideTemp(){
+  Debug("getOutsideTemperature()");
   // Get the outside temperature from OpenTherm
   OT_outside_Temperature = getOutsideTemperature();
 
@@ -1314,18 +1318,21 @@ void handleGetOutSideTemp(){
 void handleSetBoilerTemperature()
 {
   // Set the boiler temperature
+  Debug("ot.setBoilerTemperature("+String(boiler_SetPoint)+")");
   ot.setBoilerTemperature(boiler_SetPoint);
 }
 
 void handleSetDHWSetpoint()
 {
   // Set the DHW setpoint
+  Debug("ot.setDHWSetpoint("+String(dhw_SetPoint)+")"); 
   ot.setDHWSetpoint(dhw_SetPoint);
 }
 
 void handleGetBoilerTemperature()
 {
   // Get the boiler temperature
+  Debug("ot.getBoilerTemperature()");
   boiler_Temperature = ot.getBoilerTemperature();
 
   // Check if we have to send to MQTT
@@ -1341,6 +1348,7 @@ void handleGetBoilerTemperature()
 
 void handleGetDHWTemperature()
 {
+  Debug("ot.getDHWTemperature()");
   // Get the DHW temperature
   dhw_Temperature = ot.getDHWTemperature();
 
@@ -1357,6 +1365,7 @@ void handleGetDHWTemperature()
 
 void handleGetReturnTemperature()
 {
+  Debug("ot.getReturnTemperature()");
   // Get the return temperature
   return_Temperature = ot.getReturnTemperature();
 
@@ -1372,6 +1381,7 @@ void handleGetReturnTemperature()
 
 void handleGetPressure()
 {
+  Debug("ot.getPressure()");
   // Get the pressure from OpenTherm
   pressure = ot.getPressure();
 
@@ -1387,6 +1397,7 @@ void handleGetPressure()
 
 void handleGetFlowRate()
 {
+  Debug("getDHWFlowrate()");
   // Get the DHW flow rate from OpenTherm
   flowrate = getDHWFlowrate();
 
@@ -1402,6 +1413,7 @@ void handleGetFlowRate()
 
 void handleGetFaultCode()
 {
+  Debug("ot.getFault()");
   // Get the fault code from OpenTherm
   FaultCode = ot.getFault();
 
@@ -1416,6 +1428,7 @@ void handleGetFaultCode()
 
 void handleGetThermostatTemperature()
 {
+  Debug("getThermostatTemperature()");
   // Get the thermostat temperature from the DS18B20 sensor
   sensors.requestTemperatures(); // Send the command to get temperature readings 
   currentTemperature = sensors.getTempCByIndex(0);
@@ -1487,6 +1500,10 @@ bool HandleClimateMode(const char* mode)
     if (String(mode).equals("off") or String(mode).equals("heat") or String(mode).equals("cool") or String(mode).equals("auto")) {
       Debug("Setting clime mode to "+String(mode));
       climate_Mode=mode;
+      if (String(mode).equals("off")) {
+        // when setting to off, also correct boiler setpoint to prevent unwanted heating
+        boiler_SetPoint=0;
+      }
       DelayedSaveConfig();
     } else {
       Error("Unknown payload for Climate mode command");
@@ -2653,7 +2670,7 @@ void setup()
 
 // Limit blocking times on sockets to reduce stalls during network issues
   espClient.setTimeout(500);   // WiFiClient read timeout in ms
-  client.setConnectionTimeout(500);     // ArduinoMqttClient connection timeout in ms (halve seconde)
+  client.setConnectionTimeout(250);     // ArduinoMqttClient connection timeout in ms (halve seconde)
   client.setKeepAliveInterval(300);        // Keep-alive in seconden
 
   client.onMessage(onMessageCallback); // listen to callbacks
