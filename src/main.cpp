@@ -1274,13 +1274,13 @@ void handleSetBoilerStatus() {
     }
     // Execute the next command in the next call
   } else if (responseStatus == OpenThermResponseStatus::NONE) {
-      Serial.println("Opentherm Error: OpenTherm is not initialized");
+      Debug("Opentherm Error: OpenTherm is not initialized");
   } else if (responseStatus == OpenThermResponseStatus::INVALID) {
-      Serial.println("Opentherm Error: Invalid response " + String(response, HEX));
+      Debug("Opentherm Error: Invalid response " + String(response, HEX));
   } else if (responseStatus == OpenThermResponseStatus::TIMEOUT) {
-      Serial.println("Opentherm Error: Response timeout");
+      Debug("Opentherm Error: Response timeout");
   }  else {
-      Serial.println("Opentherm Error: unknown error");
+      Debug("Opentherm Error: unknown error");
   }
 }
 
