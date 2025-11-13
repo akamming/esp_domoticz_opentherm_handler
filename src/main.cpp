@@ -32,7 +32,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <vector>                 // for log buffer
 
 std::vector<String> logBuffer;
-const int MAX_LOG_BUFFER = 100;
+const int MAX_LOG_BUFFER = 200;
 
 // vars to manage boiler
 bool enableCentralHeating = false; // define this as false, so we can set it to true in the config
@@ -187,7 +187,16 @@ void publishDiscoveryMessage(const char* topic, JsonDocument& json) {
 void Log(String level, String text) {
   text = timeClient.getFormattedTime() + " " + level + ": " + text;
   if (client.connected()) {
+    // First, send any buffered messages
+    for (auto& bufferedMsg : logBuffer) {
+      String msgWithBuffered = "[buffered] " + bufferedMsg;
+      UpdateMQTTTextSensor(Log_Name, msgWithBuffered.c_str());
+    }
+    logBuffer.clear();
+
+    // Then send the new message
     if (!UpdateMQTTTextSensor(Log_Name, text.c_str())) {
+      // If failed, buffer it
       if (logBuffer.size() < MAX_LOG_BUFFER) {
         logBuffer.push_back(text);
       }
@@ -1955,12 +1964,6 @@ void reconnect()
         } else {
           Error("Time was not set");
         }
-
-        // Send buffered log messages
-        for (auto& msg : logBuffer) {
-          UpdateMQTTTextSensor(Log_Name, msg.c_str());
-        }
-        logBuffer.clear();
       } else {
         Serial.print("failed, rc=");
         Serial.print(client.connectError());
@@ -2002,21 +2005,23 @@ void PublishMQTTDimmer(const char* uniquename)
 
 void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
 {
-  Serial.println("UpdateMQTTDimmer");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTDimmer");
+    JsonDocument json;
 
-  // Construct JSON config message
-  json["state"]=Value ? "ON" : "OFF";
-  if (Value and Mod==0) { // Workaround for homekit not being able to show dimmer with value on and brightness 0
-    json["brightness"]=3;     
-  } else {
-    json["brightness"]=int(Mod*255/100);
+    // Construct JSON config message
+    json["state"]=Value ? "ON" : "OFF";
+    if (Value and Mod==0) { // Workaround for homekit not being able to show dimmer with value on and brightness 0
+      json["brightness"]=3;     
+    } else {
+      json["brightness"]=int(Mod*255/100);
+    }
+    char state[128];
+    serializeJson(json, state);  // state now contains the json
+
+    // publish state message
+    publishMessage((host+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
   }
-  char state[128];
-  serializeJson(json, state);  // state now contains the json
-
-  // publish state message
-  publishMessage((host+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
 }
 
 void PublishMQTTSwitch(const char* uniquename)
@@ -2042,9 +2047,11 @@ void PublishMQTTSwitch(const char* uniquename)
 
 void UpdateMQTTSwitch(const char* uniquename, bool Value)
 {
-  // Serial.println("UpdateMQTTSwitch");
-  // publish state message
-  publishMessage((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence,MQTT_QOS_STATE);
+  if (client.connected()) {
+    // Serial.println("UpdateMQTTSwitch");
+    // publish state message
+    publishMessage((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence,MQTT_QOS_STATE);
+  }
 }
 
 void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
@@ -2072,16 +2079,18 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
 
 void UpdateMQTTBinarySensor(const char* uniquename, bool Value)
 {
-  Serial.println("UpdateBinarySensor");
+  if (client.connected()) {
+    Serial.println("UpdateBinarySensor");
 
-   JsonDocument json;
-   json["value"] = Value;
+     JsonDocument json;
+     json["value"] = Value;
 
-   char message[512];
-   serializeJson(json,message);
+     char message[512];
+     serializeJson(json,message);
 
-  // publish state message
-  publishMessage((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence,MQTT_QOS_STATE);
+    // publish state message
+    publishMessage((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence,MQTT_QOS_STATE);
+  }
 }
 
 void PublishMQTTTemperatureSensor(const char* uniquename)
@@ -2107,14 +2116,16 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
 
 void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
 {
-  Serial.println("UpdateMQTTTemperatureSensor");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTTemperatureSensor");
+    JsonDocument json;
 
-  // Create message
-  char state[128];
-  json["value"] =  float(int(temperature*10))/10;   // ensures round to 1 decimal behind the comma
-  serializeJson(json, state);  // buf now contains the json 
-  publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+    // Create message
+    char state[128];
+    json["value"] =  float(int(temperature*10))/10;   // ensures round to 1 decimal behind the comma
+    serializeJson(json, state);  // buf now contains the json 
+    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+  }
 }
 
 void PublishMQTTNumberSensor(const char* uniquename)
@@ -2138,15 +2149,17 @@ void PublishMQTTNumberSensor(const char* uniquename)
 
 void UpdateMQTTNumberSensor(const char* uniquename, float value)
 {
-  Serial.println("UpdateMQTTGenericSensor");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTGenericSensor");
+    JsonDocument json;
 
-  // Create message
-  char state[128];
-  json["value"] =  float(int(value*100))/100;   // ensures round to 1 decimal behind the comma
-  serializeJson(json, state);  // buf now contains the json 
+    // Create message
+    char state[128];
+    json["value"] =  float(int(value*100))/100;   // ensures round to 1 decimal behind the comma
+    serializeJson(json, state);  // buf now contains the json 
 
-  publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+  }
 }
 
 void PublishMQTTPressureSensor(const char* uniquename)
@@ -2172,15 +2185,17 @@ void PublishMQTTPressureSensor(const char* uniquename)
 
 void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
 {
-  Serial.println("UpdateMQTTPressureSensor");
-  // Create message
-  char state[128];
-  JsonDocument json;
-  json["value"] =  pressure;
-  serializeJson(json, state);  // buf now contains the json 
-  // char charVal[10];
-  // dtostrf(pressure,4,1,charVal); 
-  publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+  if (client.connected()) {
+    Serial.println("UpdateMQTTPressureSensor");
+    // Create message
+    char state[128];
+    JsonDocument json;
+    json["value"] =  pressure;
+    serializeJson(json, state);  // buf now contains the json 
+    // char charVal[10];
+    // dtostrf(pressure,4,1,charVal); 
+    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+  }
 }
 
 
@@ -2207,17 +2222,19 @@ void PublishMQTTPercentageSensor(const char* uniquename)
 
 void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
 {
-  Serial.println("UpdateMQTTPercentageSensor");
-  // char charVal[10];
-  // dtostrf(percentage,4,1,charVal); 
-   JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTPercentageSensor");
+    // char charVal[10];
+    // dtostrf(percentage,4,1,charVal); 
+     JsonDocument json;
 
-  // Create message
-  char data[128];
-  json["value"]=percentage;
-  serializeJson(json,data);
- 
-  publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence,0);
+    // Create message
+    char data[128];
+    json["value"]=percentage;
+    serializeJson(json,data);
+   
+    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence,0);
+  }
 }
 
 void PublishMQTTFaultCodeSensor(const char* uniquename)
@@ -2242,14 +2259,16 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
 
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 {
-  Serial.println("UpdateMQTTFaultCodeSensor");
-    // Create message
-  char state[128];
-  JsonDocument json;
-  json["value"] =  FaultCode;
-  serializeJson(json, state);  // buf now contains the json 
+  if (client.connected()) {
+    Serial.println("UpdateMQTTFaultCodeSensor");
+      // Create message
+    char state[128];
+    JsonDocument json;
+    json["value"] =  FaultCode;
+    serializeJson(json, state);  // buf now contains the json 
 
-  publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+  }
 }
 
 void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool includeCooling)
@@ -2293,16 +2312,18 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
 
 void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
 {
-  Serial.println("UpdateMQTTSetpointtemperature");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTSetpointtemperature");
+    JsonDocument json;
 
-  // Construct JSON config message
-  // json["value"] = value;
+    // Construct JSON config message
+    // json["value"] = value;
 
-  // char jsonstr[128];
-  // serializeJson(json, jsonstr);  // conf now contains the json
+    // char jsonstr[128];
+    // serializeJson(json, jsonstr);  // conf now contains the json
 
-  publishMessage((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+    publishMessage((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+  }
 }
 
 void PublishMQTTNumber(const char* uniquename, int min, int max, float step, bool isSlider)
@@ -2337,16 +2358,18 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
 
 void UpdateMQTTNumber(const char* uniquename,float value)
 {
-  Serial.println("UpdateMQTTSetpointtemperature");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTSetpointtemperature");
+    JsonDocument json;
 
-  // Construct JSON config message
-  // json["value"] = value;
+    // Construct JSON config message
+    // json["value"] = value;
 
-  // char jsonstr[128];
-  // serializeJson(json, jsonstr);  // conf now contains the json
+    // char jsonstr[128];
+    // serializeJson(json, jsonstr);  // conf now contains the json
 
-  publishMessage((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence,0);
+    publishMessage((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence,0);
+  }
 }
 
 void PublishMQTTText(const char* uniquename)
@@ -2372,10 +2395,12 @@ void PublishMQTTText(const char* uniquename)
 
 void UpdateMQTTText(const char* uniquename,const char* value)
 {
-  // Debug("UpdateMQTTText");
-  JsonDocument json;
+  if (client.connected()) {
+    // Debug("UpdateMQTTText");
+    JsonDocument json;
 
-  publishMessage((host+"/text/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+    publishMessage((host+"/text/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+  }
 }
 
 void PublishMQTTTextSensor(const char* uniquename)
@@ -2398,19 +2423,22 @@ void PublishMQTTTextSensor(const char* uniquename)
 
 bool UpdateMQTTTextSensor(const char* uniquename, const char* value)
 {
-  Serial.println("UpdateMQTTTextSensor");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTTextSensor");
+    JsonDocument json;
 
-  // Construct JSON state message
-  json["value"] = value;
+    // Construct JSON state message
+    json["value"] = value;
 
-  char state[128];
-  serializeJson(json, state);  // state now contains the json
+    char state[128];
+    serializeJson(json, state);  // state now contains the json
 
-  // Publish state message
-  client.beginMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(), mqttpersistence, 0);
-  client.print(state);
-  return client.endMessage() == 0;
+    // Publish state message
+    client.beginMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(), mqttpersistence, 0);
+    client.print(state);
+    return client.endMessage() != 0;
+  }
+  return false;
 }
 
 
@@ -2444,16 +2472,18 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
 
 void UpdateMQTTCurvatureSelect(const char* uniquename,int value)
 {
-  Serial.println("UpdateMQTTCurvatureSelect");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTCurvatureSelect");
+    JsonDocument json;
 
-  // Construct JSON config message
-  json["curvature"] = getCurvatureStringFromInt(value);
+    // Construct JSON config message
+    json["curvature"] = getCurvatureStringFromInt(value);
 
-  char jsonstr[128];
-  serializeJson(json, jsonstr);  // conf now contains the json
+    char jsonstr[128];
+    serializeJson(json, jsonstr);  // conf now contains the json
 
-  publishMessage((host+"/select/"+String(uniquename)+"/state").c_str(),jsonstr,mqttpersistence,0);
+    publishMessage((host+"/select/"+String(uniquename)+"/state").c_str(),jsonstr,mqttpersistence,0);
+  }
 }
 
 
@@ -2481,31 +2511,35 @@ void UpdateMQTTBoilerSetpointMode()
 
 void UpdateMQTTSetpointMode(const char* uniquename,int value)
 {
-  Serial.println("UpdateMQTTSetpointmode");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTSetpointmode");
+    JsonDocument json;
 
-  // Construct JSON config message
-  // json["value"] = value;
+    // Construct JSON config message
+    // json["value"] = value;
 
-  // char jsonstr[128];
-  // serializeJson(json, jsonstr);  // conf now contains the json
+    // char jsonstr[128];
+    // serializeJson(json, jsonstr);  // conf now contains the json
 
-  publishMessage((host+"/climate/"+String(uniquename)+"/mode").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+    publishMessage((host+"/climate/"+String(uniquename)+"/mode").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+  }
 }
 
 
 void UpdateMQTTSetpoint(const char* uniquename, float temperature)
 {
-  Serial.println("UpdateMQTTSetpoint");
-  JsonDocument json;
+  if (client.connected()) {
+    Serial.println("UpdateMQTTSetpoint");
+    JsonDocument json;
 
-  // Construct JSON config message
-  json["seltemp"] = temperature;
+    // Construct JSON config message
+    json["seltemp"] = temperature;
 
-  char value[128];
-  serializeJson(json, value);  // conf now contains the json
+    char value[128];
+    serializeJson(json, value);  // conf now contains the json
 
-  publishMessage((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+    publishMessage((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+  }
 }
 
 void updateTime() {
@@ -2733,16 +2767,24 @@ void loop()
   Debug("starting loop");
 
   // Update Timeclient
-  unsigned long startTime = millis();
-  timeClient.update();
-  unsigned long updateDuration = millis() - startTime;
-  Debug("timeClient.update() took " + String(updateDuration) + " milliseconds");
+  if (WiFi.status() == WL_CONNECTED) {
+    unsigned long startTime = millis();
+    timeClient.update();
+    unsigned long updateDuration = millis() - startTime;
+    Debug("timeClient.update() took " + String(updateDuration) + " milliseconds");
+  } else {
+    Debug("WiFi not connected, skipping timeClient.update()");
+  }
   
   // handle OTA
-  startTime = millis();
-  ArduinoOTA.handle();
-  unsigned long handleDuration = millis() - startTime;
-  Debug("ArduinoOTA.handle() took " + String(handleDuration) + " milliseconds");
+  if (WiFi.status() == WL_CONNECTED) {
+    unsigned long startTime = millis();
+    ArduinoOTA.handle();
+    unsigned long handleDuration = millis() - startTime;
+    Debug("ArduinoOTA.handle() took " + String(handleDuration) + " milliseconds");
+  } else {
+    Debug("WiFi not connected, skipping ArduinoOTA.handle()");
+  }
 
   // update Uptime
   updateTime();
@@ -2765,51 +2807,59 @@ void loop()
       t_heartbeat=millis();
 
       // (Re)connect MQTT
-      if (!client.connected()) {
-        if (!mqttConnectionLostLogged) {
-          Error("MQTT connection lost");
-          mqttConnectionLostLogged = true;
+      if (WiFi.status() == WL_CONNECTED) {
+        if (!client.connected()) {
+          if (!mqttConnectionLostLogged) {
+            Error("MQTT connection lost");
+            mqttConnectionLostLogged = true;
+          }
+          // We are no connected, so try to reconnect
+          if (millis()-t_last_mqtt_try_connect>MQTTConnectTimeoutInMillis) {
+            reconnect();
+            t_last_mqtt_try_connect=millis();
+          }
+        } else {
+          if (mqttConnectionLostLogged) {
+            mqttConnectionLostLogged = false;
+          }
+          // we are connected, check if we have to resend discovery info
+          if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis)
+          {
+            PublishAllMQTTSensors();
+          }
         }
-        // We are no connected, so try to reconnect
-        if (millis()-t_last_mqtt_try_connect>MQTTConnectTimeoutInMillis) {
-          reconnect();
-          t_last_mqtt_try_connect=millis();
+
+        if (client.connected()) {
+          String newIP = WiFi.localIP().toString();
+          if (!currentIP.equals(newIP)) {
+            currentIP=newIP;
+            UpdateMQTTTextSensor(IP_Address_Name,currentIP.c_str());
+            Info("IP address changed to "+currentIP);
+          }
         }
+        
+        if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis and climate_Mode.equals("off")) {
+            // No commands given for too long a time, so do nothing
+            Serial.print("."); // Just print a dot, so we can see the software in still running
+            digitalWrite(LED_BUILTIN, HIGH);    // switch the LED off, to indicate we lost connection
+
+            // Switch off Heating and Cooling since there is no one controlling it
+            enableCentralHeating=false;
+            enableCooling=false;
+            boiler_SetPoint=10;
+        } else {
+            digitalWrite(LED_BUILTIN, LOW);    // switch the LED on , to indicate we have connection
+        }
+
+        // handle MDNS
+        unsigned long startTime = millis();
+        MDNS.update();
+        unsigned long mdnsDuration = millis() - startTime;
+        Debug("MDNS.update() took " + String(mdnsDuration) + " milliseconds");
       } else {
-        if (mqttConnectionLostLogged) {
-          mqttConnectionLostLogged = false;
-        }
-        // we are connected, check if we have to resend discovery info
-        if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis)
-        {
-          PublishAllMQTTSensors();
-        }
+        // WiFi niet verbonden, sla netwerkacties over
+        Debug("WiFi not connected, skipping heartbeat network operations");
       }
-
-      if (client.connected()) {
-        String newIP = WiFi.localIP().toString();
-        if (!currentIP.equals(newIP)) {
-          currentIP=newIP;
-          UpdateMQTTTextSensor(IP_Address_Name,currentIP.c_str());
-          Info("IP address changed to "+currentIP);
-        }
-      }
-      
-      if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis and climate_Mode.equals("off")) {
-          // No commands given for too long a time, so do nothing
-          Serial.print("."); // Just print a dot, so we can see the software in still running
-          digitalWrite(LED_BUILTIN, HIGH);    // switch the LED off, to indicate we lost connection
-
-          // Switch off Heating and Cooling since there is no one controlling it
-          enableCentralHeating=false;
-          enableCooling=false;
-          boiler_SetPoint=10;
-      } else {
-          digitalWrite(LED_BUILTIN, LOW);    // switch the LED on , to indicate we have connection
-      }
-
-      // handle MDNS
-      MDNS.update();
     }
 
     // Remember last hour of temperatures (PID calculation needs to be able to determine if temperature is rising or dropping)
@@ -2833,10 +2883,14 @@ void loop()
     server.handleClient();
 
     // handle MQTT
-    startTime = millis();
-    client.poll();
-    unsigned long pollDuration = millis() - startTime;
-    Debug("client.poll() took " + String(pollDuration) + " milliseconds");
+    if (WiFi.status() == WL_CONNECTED) {
+      unsigned long startTime = millis();
+      client.poll();
+      unsigned long pollDuration = millis() - startTime;
+      Debug("client.poll() took " + String(pollDuration) + " milliseconds");
+    } else {
+      Debug("WiFi not connected, skipping client.poll()");
+    }
 
   }
 }
