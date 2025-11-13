@@ -2765,6 +2765,7 @@ void setup()
 void loop()
 {
   Debug("starting loop");
+  Debug("WiFi status: " + String(WiFi.status() == WL_CONNECTED ? "connected" : "not connected") + ", RSSI: " + String(WiFi.RSSI()) + " dBm");
 
   // Update Timeclient
   if (WiFi.status() == WL_CONNECTED) {
