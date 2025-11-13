@@ -163,7 +163,7 @@ OpenTherm ot(4,5);                    // pin number for opentherm adapter connec
 WiFiClient espClient;                 // Needed for MQTT
 MqttClient client(espClient);         // MQTT client
 WiFiUDP ntpUDP;                       // for NTP client
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000); //  Set the timeserver (incl offset and timeout)
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 3600000); //  Set the timeserver (incl offset and interval)
 
 void publishMessage(const char* topic, const char* payload, bool retained, uint8_t qos = 0) {
   client.beginMessage(topic, retained, qos);
@@ -413,7 +413,9 @@ void handleGetInfo()
   }
   json["mqttstate"] = client.connectError();
   json["currentTime"] = timeClient.getFormattedTime();
-  json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
+  char uptimeBuffer[128];
+  snprintf(uptimeBuffer, sizeof(uptimeBuffer), "%d years, %d days, %d hrs, %d ms, %d secs, %d msec", y, d, h, m, s, ms);
+  json["uptime"] = uptimeBuffer;
   json["compile_date"] = String(compile_date);
   
   serializeJson(json, buf); 
@@ -1114,7 +1116,7 @@ void UpdatePID(float setpoint,float temperature)
       D=MaxBoilerTemp-P-I;
     }
   }
-  Info("PID Mode, PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
+  Debug("PID Mode, PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -1513,7 +1515,7 @@ bool HandleClimateMode(const char* mode)
 {
   bool CommandSucceeded=true;
   if (String(mode).equals(String(climate_Mode))) {
-    Info("Climate mode unchanged, ignoring command");
+    Error("Climate mode unchanged, ignoring command");
   } else {
     // Init PID calculater
     InitPID();
@@ -1649,7 +1651,7 @@ bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode)
   } else if (String(mode).equals("OFF")) {
     *Switch=false;
   } else {
-    Info("unknown state for enabletoggle");
+    Error("unknown state for enabletoggle");
     // make sure we communicate back the current status
     if (*Switch) {
       *mqtt_switch=false;
@@ -1703,7 +1705,7 @@ int getIdxFromPayload(const char* payload) {
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, payload);
   if (error) {
-    Info("Failed to parse JSON payload: " + String(error.c_str()));
+    Error("Failed to parse JSON payload: " + String(error.c_str()));
     return -1; // Return -1 if parsing fails
   }
   
@@ -1712,7 +1714,7 @@ int getIdxFromPayload(const char* payload) {
     return doc["idx"].as<int>();
   }
   
-  Info("No valid idx found in payload");
+  Error("No valid idx found in payload");
   return -1; // Return -1 if idx is not found or not an integer
 }
 
@@ -1933,11 +1935,12 @@ void reconnect()
         Info("None, all OK");
         if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();
-        }      
+        }  
+        Debug("attempting NTP.forceUpdate");    
         if (timeClient.forceUpdate()) {
           Info("Time was set");
         } else {
-          Info("Time was not set");
+          Error("Time was not set");
         }
       } else {
         Serial.print("failed, rc=");
@@ -2570,7 +2573,6 @@ void PublishAllMQTTSensors()
   PublishMQTTCurvatureSelect(Curvature_Name);
   PublishMQTTText(MQTT_TempTopic_Name);
   PublishMQTTText(MQTT_OutsideTempTopic_Name);
-  PublishMQTTTextSensor(Debug_Name);
   PublishMQTTTextSensor(Log_Name);
   PublishMQTTTextSensor(IP_Address_Name);
 
@@ -2658,21 +2660,21 @@ void setup()
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Info("OTA Progress: " + String(progress / (total / 100))+ "%");
+    Debug("OTA Progress: " + String(progress / (total / 100))+ "%");
   });
   
   ArduinoOTA.onError([](ota_error_t error) {
-    Info("OTA: Error["+String(error)+"]:");
+    Error("OTA: Error["+String(error)+"]:");
     if (error == OTA_AUTH_ERROR) {
-      Info("OTA: Auth Failed");
+      Error("OTA: Auth Failed");
     } else if (error == OTA_BEGIN_ERROR) {
-      Info("OTA: Begin Failed");
+      Error("OTA: Begin Failed");
     } else if (error == OTA_CONNECT_ERROR) {
-      Info("OTA: Connect Failed");
+      Error("OTA: Connect Failed");
     } else if (error == OTA_RECEIVE_ERROR) {
-      Info("OTA: Receive Failed");
+      Error("OTA: Receive Failed");
     } else if (error == OTA_END_ERROR) {
-      Info("OTA: End Failed");
+      Error("OTA: End Failed");
     }
     OTAUpdateInProgress=false;
   });
@@ -2707,11 +2709,19 @@ void setup()
 // Loop Code
 void loop()
 {
-  // Update Timeclient
-  timeClient.update();
+  Debug("starting loop");
 
+  // Update Timeclient
+  unsigned long startTime = millis();
+  timeClient.update();
+  unsigned long updateDuration = millis() - startTime;
+  Debug("timeClient.update() took " + String(updateDuration) + " milliseconds");
+  
   // handle OTA
+  startTime = millis();
   ArduinoOTA.handle();
+  unsigned long handleDuration = millis() - startTime;
+  Debug("ArduinoOTA.handle() took " + String(handleDuration) + " milliseconds");
 
   // update Uptime
   updateTime();
@@ -2795,7 +2805,10 @@ void loop()
     server.handleClient();
 
     // handle MQTT
+    startTime = millis();
     client.poll();
+    unsigned long pollDuration = millis() - startTime;
+    Debug("client.poll() took " + String(pollDuration) + " milliseconds");
 
   }
 }
