@@ -123,6 +123,7 @@ float mqtt_kd=99;
 float mqtt_p=99;
 float mqtt_i=99;
 float mqtt_d=99;
+float mqtt_wifi_rssi=0;
 String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
@@ -975,6 +976,7 @@ if (client.connected()) {
     CommunicateNumberSensor(P_Name,P,&mqtt_p,0.01);
     CommunicateNumberSensor(I_Name,I,&mqtt_i,0.01);
     CommunicateNumberSensor(D_Name,D,&mqtt_d,0.01);
+    CommunicateNumberSensor(WiFi_RSSI_Name, WiFi.RSSI(), &mqtt_wifi_rssi, 1.0);
     CommunicateText(MQTT_TempTopic_Name,mqtttemptopic,&mqtt_mqtttemptopic);
     CommunicateText(MQTT_OutsideTempTopic_Name,mqttoutsidetemptopic,&mqtt_mqttoutsidetemptopic);
     if (mqtt_Curvature!=Curvature) {
@@ -2147,6 +2149,26 @@ void PublishMQTTNumberSensor(const char* uniquename)
   delay(MQTT_PUBLISH_DELAY);
 }
 
+void PublishMQTTRSSISensor(const char* uniquename)
+{
+  Serial.println("PublishMQTTRSSISensor");
+  JsonDocument json;
+
+  // Create message
+  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["value_template"] =  "{{ value_json.value }}";
+  json["unit_of_measurement"] = "dBm";
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+
+  addDeviceToJson(&json);
+
+  // publish the Message
+  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
+  delay(MQTT_PUBLISH_DELAY);
+}
+
 void UpdateMQTTNumberSensor(const char* uniquename, float value)
 {
   if (client.connected()) {
@@ -2630,6 +2652,7 @@ void PublishAllMQTTSensors()
   PublishMQTTText(MQTT_OutsideTempTopic_Name);
   PublishMQTTTextSensor(Log_Name);
   PublishMQTTTextSensor(IP_Address_Name);
+  PublishMQTTRSSISensor(WiFi_RSSI_Name);
 
   // Subscribe to temperature topic
   if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {

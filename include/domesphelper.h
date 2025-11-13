@@ -74,6 +74,7 @@ const char Debug_Name[] = "DebugToMQTT";
 const char Log_Name[] = "Log";
 const char Info_Name[] = "InfoToMQTT";
 const char IP_Address_Name[] = "Device_IP_Address";
+const char WiFi_RSSI_Name[] = "WiFi_RSSI";
                     
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
