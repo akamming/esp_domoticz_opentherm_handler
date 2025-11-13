@@ -122,6 +122,7 @@ float mqtt_d=99;
 String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
+bool mqtt_infotomqtt = true;
 String currentIP = "";  // Keep track of the current IP to only update on change
 
 // vars for program logic
@@ -149,6 +150,7 @@ float outsidetemp[NUMBEROFMEASUREMENTS];
 int outsidetempcursor;
 bool controlledByHTTP = false;
 bool debug=false;
+bool infotomqtt = DEFAULT_INFOTOMQTT;
 
 // object for uploading files
 File fsUploadFile;
@@ -177,22 +179,28 @@ void publishDiscoveryMessage(const char* topic, JsonDocument& json) {
     delay(MQTT_PUBLISH_DELAY);
 }
 
+void Log(String level, String text) {
+  text = timeClient.getFormattedTime() + " " + level + ": " + text;
+  if (client.connected()) {
+    UpdateMQTTTextSensor(Log_Name, text.c_str());
+  }
+  Serial.println(text);
+}
+
 void Debug(String text) {
   if (debug) {
-    text=timeClient.getFormattedTime()+" "+text;
-    if (client.connected()) {
-      UpdateMQTTTextSensor(Debug_Name,text.c_str());
-    }
-    Serial.println(text);
+    Log("DEBUG", text);
   }
 }
 
 void Error(String text) {
-  text=timeClient.getFormattedTime()+" "+text;
-  if (client.connected()) {
-    UpdateMQTTTextSensor(Error_Name,text.c_str());
+  Log("ERROR", text);
+}
+
+void Info(String text) {
+  if (infotomqtt) {
+    Log("INFO", text);
   }
-  Serial.println(text);
 }
 
 void IRAM_ATTR handleInterrupt() {
@@ -553,6 +561,8 @@ void handleSaveConfig() {
     
     debug=json["debugtomqtt"] | true;
 
+    infotomqtt=json["infotomqtt"] | true;
+
     // PID Settings
     KP = json["KP"] | KP;
     KI = json["KI"] | KI;
@@ -739,6 +749,8 @@ void readConfig()
 
         debug = json["debugtomqtt"].is<bool>() ? json["debugtomqtt"].as<bool>() : DEFAULT_DEBUG;
 
+        infotomqtt = json["infotomqtt"].is<bool>() ? json["infotomqtt"].as<bool>() : DEFAULT_INFOTOMQTT;
+
         // PID Settings
         KP = json["KP"].is<int>() ? json["KP"].as<int>() : DEFAULT_KP;
         KI = json["KI"].is<float>() ? json["KI"].as<float>() : DEFAULT_KI;
@@ -783,6 +795,7 @@ void readConfig()
   mqtttemptopic = DEFAULT_MQTTTEMP_TOPIC;
   mqttoutsidetemptopic = DEFAULT_MQTTOUTSIDETEMP_TOPIC;
   debug = DEFAULT_DEBUG;
+  infotomqtt = DEFAULT_INFOTOMQTT;
   KP = DEFAULT_KP;
   KI = DEFAULT_KI;
   KD = DEFAULT_KD;
@@ -819,6 +832,7 @@ void SaveConfig()
   json["mqtttemptopic"] = mqtttemptopic;
   json["mqttoutsidetemptopic"] = mqttoutsidetemptopic;
   json["debugtomqtt"] = debug;
+  json["infotomqtt"] = infotomqtt;
   
   // add/change the Climate settings
   json["climateMode"] = climate_Mode;
@@ -1002,6 +1016,13 @@ if (client.connected()) {
       mqtt_debug=debug;
     }
 
+    // Info
+    if (infotomqtt!=mqtt_infotomqtt) // value changed
+    {
+      UpdateMQTTSwitch(Info_Name,infotomqtt);
+      mqtt_infotomqtt=infotomqtt;
+    }
+
     // Frost Protection Active
     if (FrostProtectionActive!=mqtt_FrostProtectionActive) // value changed
     {
@@ -1093,7 +1114,7 @@ void UpdatePID(float setpoint,float temperature)
       D=MaxBoilerTemp-P-I;
     }
   }
-  Debug("PID Mode, PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
+  Info("PID Mode, PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -1174,7 +1195,7 @@ void handleClimateProgram()
       }
 
       if (Weather_Dependent_Mode and !HotWater) {
-        Debug("Weather dependent mode, setting setpoint to "+String(GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature)));
+        Info("Weather dependent mode, setting setpoint to "+String(GetBoilerSetpointFromOutsideTemperature(roomTemperature,outside_Temperature)));
       }
 
       // reset timestamp
@@ -1492,13 +1513,13 @@ bool HandleClimateMode(const char* mode)
 {
   bool CommandSucceeded=true;
   if (String(mode).equals(String(climate_Mode))) {
-    Debug("Climate mode unchanged, ignoring command");
+    Info("Climate mode unchanged, ignoring command");
   } else {
     // Init PID calculater
     InitPID();
 
     if (String(mode).equals("off") or String(mode).equals("heat") or String(mode).equals("cool") or String(mode).equals("auto")) {
-      Debug("Setting clime mode to "+String(mode));
+      Info("Setting clime mode to "+String(mode));
       climate_Mode=mode;
       if (String(mode).equals("off")) {
         // when setting to off, also correct boiler setpoint to prevent unwanted heating
@@ -1536,7 +1557,7 @@ void SetMQTTTemperature(float value) {
 
   // additional actions if first time received
   if (!insideTemperatureReceived) {
-    Debug("First temperature ("+String(value)+") received, ready for climate mode");
+    Info("First temperature ("+String(value)+") received, ready for climate mode");
     insideTemperatureReceived=true; // Make sure we do this only once ;-)
     InitPID();
   }
@@ -1549,7 +1570,7 @@ void SetMQTTOutsideTemperature(float value) {
 
   // additional actions if first time received
   if (!outsideTemperatureReceived) {
-    Debug("First outside temperature ("+String(value)+") received, ready for weather dependent mode");
+    Info("First outside temperature ("+String(value)+") received, ready for weather dependent mode");
     outsideTemperatureReceived=true; // Make sure we do this only once ;-)
 
     // this is our first measurement, initialize the array
@@ -1628,7 +1649,7 @@ bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode)
   } else if (String(mode).equals("OFF")) {
     *Switch=false;
   } else {
-    Debug("unknown state for enabletoggle");
+    Info("unknown state for enabletoggle");
     // make sure we communicate back the current status
     if (*Switch) {
       *mqtt_switch=false;
@@ -1682,7 +1703,7 @@ int getIdxFromPayload(const char* payload) {
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, payload);
   if (error) {
-    Debug("Failed to parse JSON payload: " + String(error.c_str()));
+    Info("Failed to parse JSON payload: " + String(error.c_str()));
     return -1; // Return -1 if parsing fails
   }
   
@@ -1691,14 +1712,14 @@ int getIdxFromPayload(const char* payload) {
     return doc["idx"].as<int>();
   }
   
-  Debug("No valid idx found in payload");
+  Info("No valid idx found in payload");
   return -1; // Return -1 if idx is not found or not an integer
 }
 
 // Handler for Domoticz device readings
 void handleDomoticzOutputTopic(const String& value, const char* payloadstr) {
   int idx = getIdxFromPayload(payloadstr);
-  Debug("Received domoticz device reading: "+String(idx)+","+String(payloadstr));
+  Info("Received domoticz device reading: "+String(idx)+","+String(payloadstr));
   if (mqtttemptopic.equals(String(idx))) {
     SetMQTTTemperature(value.toFloat());
   }
@@ -1727,7 +1748,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   String value = extractRelevantStringFromPayload(payloadstr);
 
   if (!topicstr.equals(domoticzoutputtopic)) { // prevent flooding debug log with updates from domoticzdevices
-    Debug("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
+    Info("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
   }
 
   // Assume succesful command 
@@ -1783,9 +1804,15 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
     // Handle debug switch command
     } else if (topicstr.equals(CommandTopic(Debug_Name))) {
-      Debug("Received debug command: "+value);
+      Info("Received debug command: "+value);
       CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, value.c_str());
-      Debug("Debugging switched "+String(value));
+      Info("Debugging switched "+String(value));
+
+    // Handle info switch command
+    } else if (topicstr.equals(CommandTopic(Info_Name))) {
+      Info("Received info command: "+value);
+      CommandSucceeded=HandleSwitch(&infotomqtt, &mqtt_infotomqtt, value.c_str());
+      Info("Info logging switched "+String(value));
 
     // boiler setpoint command
     } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
@@ -1846,7 +1873,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
       CommandSucceeded = handleMQTTTopicChange(mqtttemptopic, value);
     }
     else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
-      Debug("Setting outsideTempTopic to "+String(payloadstr));
+      Info("Setting outsideTempTopic to "+String(payloadstr));
       CommandSucceeded = handleMQTTTopicChange(mqttoutsidetemptopic, value);
 
     // Unknown topic (this code should never be reached, indicates programming logic error)  
@@ -1902,15 +1929,15 @@ void reconnect()
       if (mqttconnected) {
         PublishAllMQTTSensors();
         publishMessage("domesphelper/status", "connected", false, MQTT_QOS_STATE);
-        Debug("Succesfully (re)connected, starting operations");
-        Error("None, all OK");
+        Info("Succesfully (re)connected, starting operations");
+        Info("None, all OK");
         if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();
         }      
         if (timeClient.forceUpdate()) {
-          Debug("Time was set");
+          Info("Time was set");
         } else {
-          Debug("Time was not set");
+          Info("Time was not set");
         }
       } else {
         Serial.print("failed, rc=");
@@ -2521,6 +2548,7 @@ void PublishAllMQTTSensors()
   PublishMQTTSwitch(Weather_Dependent_Mode_Name);
   PublishMQTTSwitch(Holiday_Mode_Name);
   PublishMQTTSwitch(Debug_Name);
+  PublishMQTTSwitch(Info_Name);
 
   // Publish setpoints
   PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);
@@ -2543,7 +2571,7 @@ void PublishAllMQTTSensors()
   PublishMQTTText(MQTT_TempTopic_Name);
   PublishMQTTText(MQTT_OutsideTempTopic_Name);
   PublishMQTTTextSensor(Debug_Name);
-  PublishMQTTTextSensor(Error_Name);
+  PublishMQTTTextSensor(Log_Name);
   PublishMQTTTextSensor(IP_Address_Name);
 
   // Subscribe to temperature topic
@@ -2617,34 +2645,34 @@ void setup()
 
   ArduinoOTA.onStart([]() {
     if (ArduinoOTA.getCommand() == U_FLASH) {
-      Debug("OTA: Start updating sketch...");
+      Info("OTA: Start updating sketch...");
     } else { // U_FS
-      Debug("OTA: Start updating filesystem...");
+      Info("OTA: Start updating filesystem...");
     }
     OTAUpdateInProgress=true;
   });
 
   ArduinoOTA.onEnd([]() {
-    Debug("OTA Completed, restarting");
+    Info("OTA Completed, restarting");
     OTAUpdateInProgress=false;
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Debug("OTA Progress: " + String(progress / (total / 100))+ "%");
+    Info("OTA Progress: " + String(progress / (total / 100))+ "%");
   });
   
   ArduinoOTA.onError([](ota_error_t error) {
-    Debug("OTA: Error["+String(error)+"]:");
+    Info("OTA: Error["+String(error)+"]:");
     if (error == OTA_AUTH_ERROR) {
-      Debug("OTA: Auth Failed");
+      Info("OTA: Auth Failed");
     } else if (error == OTA_BEGIN_ERROR) {
-      Debug("OTA: Begin Failed");
+      Info("OTA: Begin Failed");
     } else if (error == OTA_CONNECT_ERROR) {
-      Debug("OTA: Connect Failed");
+      Info("OTA: Connect Failed");
     } else if (error == OTA_RECEIVE_ERROR) {
-      Debug("OTA: Receive Failed");
+      Info("OTA: Receive Failed");
     } else if (error == OTA_END_ERROR) {
-      Debug("OTA: End Failed");
+      Info("OTA: End Failed");
     }
     OTAUpdateInProgress=false;
   });
@@ -2725,7 +2753,7 @@ void loop()
         if (!currentIP.equals(newIP)) {
           currentIP=newIP;
           UpdateMQTTTextSensor(IP_Address_Name,currentIP.c_str());
-          Debug("IP address changed to "+currentIP);
+          Info("IP address changed to "+currentIP);
         }
       }
       

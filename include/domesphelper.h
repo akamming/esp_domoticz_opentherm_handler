@@ -9,6 +9,7 @@ const bool   DEFAULT_MQTTPERSISTENCE = false;
 const char*  DEFAULT_MQTTTEMP_TOPIC = "";
 const char*  DEFAULT_MQTTOUTSIDETEMP_TOPIC = "";
 const bool   DEFAULT_DEBUG = true;
+const bool   DEFAULT_INFOTOMQTT = true;
 const int    DEFAULT_KP = 30;
 const float  DEFAULT_KI = 0.01f;
 const float  DEFAULT_KD = 2.5f;
@@ -70,9 +71,10 @@ const char D_Name[] = "D";
 const char MQTT_TempTopic_Name[] = "MQTTTemperatureTopic";
 const char MQTT_OutsideTempTopic_Name[] = "MQTTOutsideTemperatureTopic";
 const char Debug_Name[] = "DebugToMQTT";
-const char Error_Name[] = "Error";
+const char Log_Name[] = "Log";
+const char Info_Name[] = "InfoToMQTT";
 const char IP_Address_Name[] = "Device_IP_Address";
-
+                    
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
 const int MQTTConnectTimeoutInMillis = 3*1000;     // the time to reconnect if disconnect occurred 
