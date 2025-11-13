@@ -29,6 +29,10 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <LittleFS.h>             // Filesystem
 #include <NTPClient.h>            // for NTP Client
 #include <WiFiUdp.h>              // is needed by NTP client
+#include <vector>                 // for log buffer
+
+std::vector<String> logBuffer;
+const int MAX_LOG_BUFFER = 100;
 
 // vars to manage boiler
 bool enableCentralHeating = false; // define this as false, so we can set it to true in the config
@@ -151,6 +155,7 @@ int outsidetempcursor;
 bool controlledByHTTP = false;
 bool debug=false;
 bool infotomqtt = DEFAULT_INFOTOMQTT;
+bool mqttConnectionLostLogged = false;
 
 // object for uploading files
 File fsUploadFile;
@@ -182,7 +187,15 @@ void publishDiscoveryMessage(const char* topic, JsonDocument& json) {
 void Log(String level, String text) {
   text = timeClient.getFormattedTime() + " " + level + ": " + text;
   if (client.connected()) {
-    UpdateMQTTTextSensor(Log_Name, text.c_str());
+    if (!UpdateMQTTTextSensor(Log_Name, text.c_str())) {
+      if (logBuffer.size() < MAX_LOG_BUFFER) {
+        logBuffer.push_back(text);
+      }
+    }
+  } else {
+    if (logBuffer.size() < MAX_LOG_BUFFER) {
+      logBuffer.push_back(text);
+    }
   }
   Serial.println(text);
 }
@@ -1942,6 +1955,12 @@ void reconnect()
         } else {
           Error("Time was not set");
         }
+
+        // Send buffered log messages
+        for (auto& msg : logBuffer) {
+          UpdateMQTTTextSensor(Log_Name, msg.c_str());
+        }
+        logBuffer.clear();
       } else {
         Serial.print("failed, rc=");
         Serial.print(client.connectError());
@@ -2377,7 +2396,7 @@ void PublishMQTTTextSensor(const char* uniquename)
   publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
 }
 
-void UpdateMQTTTextSensor(const char* uniquename, const char* value)
+bool UpdateMQTTTextSensor(const char* uniquename, const char* value)
 {
   Serial.println("UpdateMQTTTextSensor");
   JsonDocument json;
@@ -2389,7 +2408,9 @@ void UpdateMQTTTextSensor(const char* uniquename, const char* value)
   serializeJson(json, state);  // state now contains the json
 
   // Publish state message
-  publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+  client.beginMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(), mqttpersistence, 0);
+  client.print(state);
+  return client.endMessage() == 0;
 }
 
 
@@ -2745,12 +2766,19 @@ void loop()
 
       // (Re)connect MQTT
       if (!client.connected()) {
+        if (!mqttConnectionLostLogged) {
+          Error("MQTT connection lost");
+          mqttConnectionLostLogged = true;
+        }
         // We are no connected, so try to reconnect
         if (millis()-t_last_mqtt_try_connect>MQTTConnectTimeoutInMillis) {
           reconnect();
           t_last_mqtt_try_connect=millis();
         }
       } else {
+        if (mqttConnectionLostLogged) {
+          mqttConnectionLostLogged = false;
+        }
         // we are connected, check if we have to resend discovery info
         if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis)
         {
