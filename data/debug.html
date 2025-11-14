@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width">
+    <title>Debug Info</title>
+    <link rel="stylesheet" href="index.css">
+    <style>
+        .debug-section {
+            margin-bottom: 20px;
+        }
+        .debug-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .debug-table th, .debug-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .debug-table th {
+            background-color: #f2f2f2;
+        }
+        .json-display {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            color: black;
+        }
+    </style>
+</head>
+<body onload="loadDebugData();">
+    <div class="header">ESP OpenTherm Control - Debug Info</div>
+    <div class="outer_frame">
+        <p>Info (updates every 5 seconds)</p>
+        <div id="infoDisplay" class="json-display">Loading info...</div>
+    </div>
+    <div class="outer_frame">
+        <p>Sensors (updates every 5 seconds)</p>
+        <div id="sensorsDisplay" class="json-display">Loading sensors...</div>
+    </div>
+    <div class="outer_frame">
+        <p>Config (loaded once)</p>
+        <div id="configDisplay" class="json-display">Loading config...</div>
+    </div>
+    <br />
+    <div style="text-align:center; margin-bottom:20px;">
+        <a href="index.html">Back to Thermostat</a>
+    </div>
+    <script>
+        let configLoaded = false;
+
+        function loadConfig() {
+            if (configLoaded) return;
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    const json = JSON.parse(xhttp.responseText);
+                    document.getElementById('configDisplay').textContent = JSON.stringify(json, null, 2);
+                    configLoaded = true;
+                }
+            };
+            xhttp.open("GET", "http://" + location.hostname + "/getconfig", true);
+            xhttp.send();
+        }
+
+        function loadInfo() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    const json = JSON.parse(xhttp.responseText);
+                    document.getElementById('infoDisplay').textContent = JSON.stringify(json, null, 2);
+                }
+            };
+            xhttp.open("GET", "http://" + location.hostname + "/info", true);
+            xhttp.send();
+        }
+
+        function loadSensors() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    const json = JSON.parse(xhttp.responseText);
+                    document.getElementById('sensorsDisplay').textContent = JSON.stringify(json, null, 2);
+                }
+            };
+            xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
+            xhttp.send();
+        }
+
+        function loadDebugData() {
+            loadConfig();
+            loadInfo();
+            loadSensors();
+            setTimeout(loadDebugData, 5000);
+        }
+    </script>
+</body>
+</html>
