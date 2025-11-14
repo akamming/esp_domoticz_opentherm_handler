@@ -24,15 +24,133 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <DallasTemperature.h>    // temperature sensors by mile burton
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
-#include <ArduinoMqttClient.h>    // MQTT library
+#define USE_PUBSUBCLIENT 0        // Set to 1 for PubSubClient, 0 for ArduinoMqttClient
+#if USE_PUBSUBCLIENT
+#include <PubSubClient.h>
+#else
+#include <ArduinoMqttClient.h>
+#endif
 #include "domesphelper.h"               // Set Configuration and default constants
 #include <LittleFS.h>             // Filesystem
 #include <NTPClient.h>            // for NTP Client
 #include <WiFiUdp.h>              // is needed by NTP client
 #include <vector>                 // for log buffer
 
+#define NUMBEROFMEASUREMENTS 10 // number of measurements over which to average for outside temp
+#define MQTT_QOS_CONFIG 1
+#define MQTT_QOS_STATE 0
+
 std::vector<String> logBuffer;
 const int MAX_LOG_BUFFER = 200;
+
+// Generic MQTT helper functions
+WiFiClient espClient;
+#if USE_PUBSUBCLIENT
+PubSubClient client(espClient);
+#else
+MqttClient client(espClient);
+#endif
+
+bool mqttConnected() {
+  return client.connected();
+}
+
+int mqttConnectError() {
+  #if USE_PUBSUBCLIENT
+    return client.state();
+  #else
+    return client.connectError();
+  #endif
+}
+
+void mqttSubscribe(const char* topic, int qos = 0) {
+  #if USE_PUBSUBCLIENT
+    client.subscribe(topic);
+  #else
+    client.subscribe(topic, qos);
+  #endif
+}
+
+void mqttPoll() {
+  #if USE_PUBSUBCLIENT
+    client.loop();
+  #else
+    client.poll();
+  #endif
+}
+
+bool mqttPublish(const char* topic, const char* payload, bool retained, int qos = 0) {
+  #if USE_PUBSUBCLIENT
+    return client.publish(topic, payload, retained);
+  #else
+    client.beginMessage(topic, retained, qos);
+    client.print(payload);
+    return client.endMessage() != 0;
+  #endif
+}
+
+void mqttSetConnectionTimeout(int timeout) {
+  #if !USE_PUBSUBCLIENT
+    client.setConnectionTimeout(timeout);
+  #endif
+}
+
+void mqttSetKeepAliveInterval(int interval) {
+  #if USE_PUBSUBCLIENT
+    // PubSubClient uses setKeepAlive in connect
+  #else
+    client.setKeepAliveInterval(interval);
+  #endif
+}
+
+void mqttSetId(const char* clientId) {
+  #if USE_PUBSUBCLIENT
+    // PubSubClient sets ID in connect
+  #else
+    client.setId(clientId);
+  #endif
+}
+
+void mqttSetUsernamePassword(const char* user, const char* pass) {
+  #if USE_PUBSUBCLIENT
+    // PubSubClient sets auth in connect
+  #else
+    client.setUsernamePassword(user, pass);
+  #endif
+}
+
+bool mqttConnect(const char* server, int port) {
+  #if USE_PUBSUBCLIENT
+    return client.connect(server, port);
+  #else
+    return client.connect(server, port);
+  #endif
+}
+
+void mqttUnsubscribe(const char* topic) {
+  #if USE_PUBSUBCLIENT
+    client.unsubscribe(topic);
+  #else
+    client.unsubscribe(topic);
+  #endif
+}
+
+void mqttOnMessage(void (*callback)(int)) {
+  #if USE_PUBSUBCLIENT
+    // PubSubClient uses setCallback with different signature, so we need a wrapper
+  #else
+    client.onMessage(callback);
+  #endif
+}
+
+// For PubSubClient callback
+#if USE_PUBSUBCLIENT
+void mqttSetCallback(void (*callback)(char*, byte*, unsigned int)) {
+  client.setCallback(callback);
+}
+#endif
+
+
 
 // vars to manage boiler
 bool enableCentralHeating = false; // define this as false, so we can set it to true in the config
@@ -143,13 +261,6 @@ unsigned long t_last_outsidetempreceived=0; // Time when last MQTT temp was rece
 unsigned long t_save_config; // timestamp for delayed save
 unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
 bool ClimateConfigSaved=true;
-bool OTAUpdateInProgress=false;
-bool insideTemperatureReceived=false;
-bool outsideTemperatureReceived=false;
-#define NUMBEROFMEASUREMENTS 10 // number of measurements over which to average for outside temp
-#define MQTT_PUBLISH_DELAY 10
-#define MQTT_QOS_CONFIG 1
-#define MQTT_QOS_STATE 0
 float insideTempAt[60];
 float outsidetemp[NUMBEROFMEASUREMENTS];
 int outsidetempcursor;
@@ -158,6 +269,9 @@ bool debug=false;
 bool infotomqtt = DEFAULT_INFOTOMQTT;
 bool mqttConnectionLostLogged = false;
 bool wifiConnectionLostLogged = false;
+bool insideTemperatureReceived = false;
+bool outsideTemperatureReceived = false;
+bool OTAUpdateInProgress = false;
 int sensorIndex = 0;
 
 // object for uploading files
@@ -168,28 +282,14 @@ ESP8266WebServer server(httpport);    //Web server object. Will be listening in 
 OneWire oneWire(14);                  // for OneWire Bus. Data wire is connected to 14 pin on the OpenTherm Shield (Temperature sensor)
 DallasTemperature sensors(&oneWire);  // for the temp sensor on one wire bus
 OpenTherm ot(4,5);                    // pin number for opentherm adapter connection, 2/3 for Arduino, 4/5 for ESP8266 (D2), 21/22 for ESP32
-WiFiClient espClient;                 // Needed for MQTT
-MqttClient client(espClient);         // MQTT client
 WiFiUDP ntpUDP;                       // for NTP client
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 3600000); //  Set the timeserver (incl offset and interval)
 
-void publishMessage(const char* topic, const char* payload, bool retained, uint8_t qos = 0) {
-  client.beginMessage(topic, retained, qos);
-  client.print(payload);
-  client.endMessage();
-}
 
-void publishDiscoveryMessage(const char* topic, JsonDocument& json) {
-    unsigned long len = measureJson(json);
-    client.beginMessage(topic, len, mqttpersistence, MQTT_QOS_CONFIG);
-    serializeJson(json, client);
-    client.endMessage();
-    delay(MQTT_PUBLISH_DELAY);
-}
 
 void Log(String level, String text) {
   text = timeClient.getFormattedTime() + " " + level + ": " + text;
-  if (client.connected()) {
+  if (mqttConnected()) {
     // First, send any buffered messages
     for (auto& bufferedMsg : logBuffer) {
       String msgWithBuffered = "[buffered] " + bufferedMsg;
@@ -269,8 +369,8 @@ void SendHTTP(String command, String result) {
   }
   
   // Add MQTT Connection status 
-  json["MQTTconnected"] = client.connected() ? "true" : "false";
-  json["MQTTstate"] = client.connectError();
+  json["MQTTconnected"] = mqttConnected() ? "true" : "false";
+  json["MQTTstate"] = mqttConnectError();
 
   // Add BoilerManagementVars
   json["EnableCentralHeating"] = enableCentralHeating;
@@ -430,13 +530,13 @@ void handleGetInfo()
   json["resetreason"] = ESP.getResetReason();
   json["resetinfo"] = ESP.getResetInfo();
   json["freeheap"] = ESP.getFreeHeap();
-  if (client.connected())
+  if (mqttConnected())
   {
     json["MQTTconnected"] = true;
   } else {
     json["MQTTconnected"] = false;
   }
-  json["mqttstate"] = client.connectError();
+  json["mqttstate"] = mqttConnectError();
   json["currentTime"] = timeClient.getFormattedTime();
   char uptimeBuffer[128];
   snprintf(uptimeBuffer, sizeof(uptimeBuffer), "%d years, %d days, %d hrs, %d ms, %d secs, %d msec", y, d, h, m, s, ms);
@@ -943,7 +1043,7 @@ void CommunicateText(const char* TextName,String Value,String *mqttValue) {
 
 
 void CommunicateSteeringVarsToMQTT() {
-if (client.connected()) {
+if (mqttConnected()) {
     // Climate Mode
     if (!climate_Mode.equals(mqtt_climate_Mode)){ // value changed
       if (climate_Mode.equals("off")) {
@@ -1291,7 +1391,7 @@ void handleSetBoilerStatus() {
     modulation = ot.getModulation();
 
     // Check if we have to send to MQTT for steering vars
-    if (client.connected()) {
+    if (mqttConnected()) {
       if (Flame!=mqtt_Flame){ // value changed
         UpdateMQTTBinarySensor(FlameActive_Name,Flame);
         mqtt_Flame=Flame;
@@ -1349,7 +1449,7 @@ void handleGetOutSideTemp(){
   }
 
   // Check if we have to send to MQTT
-  if (client.connected()) {
+  if (mqttConnected()) {
     float delta = mqtt_outside_Temperature-outside_Temperature;
     if ((delta != 0) and outside_Temperature!=99 and outside_Temperature!=0){ // value changed
       UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
@@ -1385,7 +1485,7 @@ void handleGetBoilerTemperature()
   boiler_Temperature = ot.getBoilerTemperature();
 
   // Check if we have to send to MQTT
-  if (client.connected()) {
+  if (mqttConnected()) {
     float delta = mqtt_boiler_Temperature-boiler_Temperature;
     if (delta<-0.09 or delta>0.09){ // value changed
       UpdateMQTTTemperatureSensor(Boiler_Temperature_Name,boiler_Temperature);
@@ -1402,7 +1502,7 @@ void handleGetDHWTemperature()
   dhw_Temperature = ot.getDHWTemperature();
 
   // Check if we have to send to MQTT
-  if (client.connected()) {
+  if (mqttConnected()) {
     float delta = mqtt_dhw_Temperature-dhw_Temperature;
     if (delta<-0.09 or delta>0.09){ // value changed
       UpdateMQTTTemperatureSensor(DHW_Temperature_Name,dhw_Temperature);
@@ -1419,7 +1519,7 @@ void handleGetReturnTemperature()
   return_Temperature = ot.getReturnTemperature();
 
   // Check if we have to send to MQTT
-  if (client.connected()) {
+  if (mqttConnected()) {
     float delta = mqtt_return_Temperature-return_Temperature;
     if (delta<-0.09 or delta>0.09){ // value changed
       UpdateMQTTTemperatureSensor(Return_Temperature_Name,return_Temperature);
@@ -1435,7 +1535,7 @@ void handleGetPressure()
   pressure = ot.getPressure();
 
   // Check if we have to send to MQTT
-  if (client.connected()) {
+  if (mqttConnected()) {
     float delta = mqtt_pressure-pressure;
     if (delta<-0.009 or delta>0.009){ // value changed
       UpdateMQTTPressureSensor(Pressure_Name,pressure);
@@ -1467,7 +1567,7 @@ void handleGetFaultCode()
   FaultCode = ot.getFault();
 
   // Check if we have to send to MQTT
-  if (client.connected()) {
+  if (mqttConnected()) {
     if (FaultCode!=mqtt_FaultCode){ // value changed
       UpdateMQTTFaultCodeSensor(FaultCode_Name,FaultCode);
       mqtt_FaultCode=FaultCode;
@@ -1483,7 +1583,7 @@ void handleGetThermostatTemperature()
   currentTemperature = sensors.getTempCByIndex(0);
 
   // Check if we have to send to MQTT
-  if (client.connected()) {
+  if (mqttConnected()) {
     float delta = mqtt_currentTemperature-currentTemperature;
     if (delta<-0.09 or delta>0.09){ // value changed
       UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name,currentTemperature);
@@ -1759,10 +1859,10 @@ void handleDomoticzOutputTopic(const String& value, const char* payloadstr) {
 // Generic handler to change an MQTT topic and resubscribe
 bool handleMQTTTopicChange(String& topicVar, const String& newValue) {
   if (topicVar.length() > 0) {
-    client.unsubscribe(topicVar.c_str()); // Unsubscribe from old topic
+    mqttUnsubscribe(topicVar.c_str()); // Unsubscribe from old topic
   }
   topicVar = newValue;
-  client.subscribe(topicVar.c_str(), 0);    // Subscribe to new topic
+  mqttSubscribe(topicVar.c_str(), 0);    // Subscribe to new topic
   return true; // Config must be saved
 }
 
@@ -1933,7 +2033,7 @@ void onMessageCallback(int messageSize) {
 }
 
 void SubScribeToDomoticz() {
-  client.subscribe(domoticzoutputtopic.c_str(), 0);
+  mqttSubscribe(domoticzoutputtopic.c_str(), 0);
 }
 
 void reconnect()
@@ -1943,21 +2043,21 @@ void reconnect()
       Serial.print("WiFi not connected, can't connect to MQTT broker");
       return;
     }
-    if (!client.connected()) {
+    if (!mqttConnected()) {
       Serial.print("Attempting MQTT connection...");
       bool mqttconnected;
       String clientId = "esp_ot_" + WiFi.macAddress();
       clientId.replace(":", "");
-      client.setId(clientId.c_str());  // Set unique client ID based on MAC
-      client.setKeepAliveInterval(300);  // Keep-alive in seconden
+      mqttSetId(clientId.c_str());  // Set unique client ID based on MAC
+      mqttSetKeepAliveInterval(300);  // Keep-alive in seconden
       if (usemqttauthentication) {
-        client.setUsernamePassword(mqttuser.c_str(), mqttpass.c_str());
+        mqttSetUsernamePassword(mqttuser.c_str(), mqttpass.c_str());
       }
-      mqttconnected = client.connect(mqttserver.c_str(), mqttport);
+      mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
       if (mqttconnected) {
         sensorIndex = 0; // Reset sensor index for discovery
         PublishAllMQTTSensors();
-        publishMessage("domesphelper/status", "connected", false, MQTT_QOS_STATE);
+        mqttPublish("domesphelper/status", "connected", false, MQTT_QOS_STATE);
         Info("Succesfully (re)connected, starting operations");
         Info("None, all OK");
         if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
@@ -1971,7 +2071,7 @@ void reconnect()
         }
       } else {
         Serial.print("failed, rc=");
-        Serial.print(client.connectError());
+        Serial.print(mqttConnectError());
       }
     }
   }
@@ -2005,12 +2105,14 @@ void PublishMQTTDimmer(const char* uniquename)
   addDeviceToJson(&json);
 
   // Publish config message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(), json);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTDimmer");
     JsonDocument json;
 
@@ -2025,7 +2127,7 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
     serializeJson(json, state);  // state now contains the json
 
     // publish state message
-    publishMessage((host+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+    mqttPublish((host+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
   }
 }
 
@@ -2043,19 +2145,20 @@ void PublishMQTTSwitch(const char* uniquename)
   addDeviceToJson(&json);
 
   // Publish config message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(), json);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 
   // subscribe if need to listen to commands
-  client.subscribe((host+"/light/"+String(uniquename)+"/set").c_str(), 0);
-  delay(MQTT_PUBLISH_DELAY);
+  mqttSubscribe((host+"/light/"+String(uniquename)+"/set").c_str(), 0);
 }
 
 void UpdateMQTTSwitch(const char* uniquename, bool Value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     // Serial.println("UpdateMQTTSwitch");
     // publish state message
-    publishMessage((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence,MQTT_QOS_STATE);
+    mqttPublish((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence,MQTT_QOS_STATE);
   }
 }
 
@@ -2078,13 +2181,14 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
   addDeviceToJson(&json);
 
   // Publish config message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/binary_sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/binary_sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTBinarySensor(const char* uniquename, bool Value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateBinarySensor");
 
      JsonDocument json;
@@ -2094,7 +2198,7 @@ void UpdateMQTTBinarySensor(const char* uniquename, bool Value)
      serializeJson(json,message);
 
     // publish state message
-    publishMessage((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence,MQTT_QOS_STATE);
+    mqttPublish((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence,MQTT_QOS_STATE);
   }
 }
 
@@ -2115,13 +2219,14 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTTemperatureSensor");
     JsonDocument json;
 
@@ -2129,7 +2234,7 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
     char state[128];
     json["value"] =  float(int(temperature*10))/10;   // ensures round to 1 decimal behind the comma
     serializeJson(json, state);  // buf now contains the json 
-    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
   }
 }
 
@@ -2148,8 +2253,9 @@ void PublishMQTTNumberSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void PublishMQTTRSSISensor(const char* uniquename)
@@ -2168,13 +2274,14 @@ void PublishMQTTRSSISensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTNumberSensor(const char* uniquename, float value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTGenericSensor");
     JsonDocument json;
 
@@ -2183,7 +2290,7 @@ void UpdateMQTTNumberSensor(const char* uniquename, float value)
     json["value"] =  float(int(value*100))/100;   // ensures round to 1 decimal behind the comma
     serializeJson(json, state);  // buf now contains the json 
 
-    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
   }
 }
 
@@ -2204,13 +2311,14 @@ void PublishMQTTPressureSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTPressureSensor");
     // Create message
     char state[128];
@@ -2219,7 +2327,7 @@ void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
     serializeJson(json, state);  // buf now contains the json 
     // char charVal[10];
     // dtostrf(pressure,4,1,charVal); 
-    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
   }
 }
 
@@ -2241,13 +2349,14 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTPercentageSensor");
     // char charVal[10];
     // dtostrf(percentage,4,1,charVal); 
@@ -2258,7 +2367,7 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
     json["value"]=percentage;
     serializeJson(json,data);
    
-    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence,0);
+    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence,0);
   }
 }
 
@@ -2278,13 +2387,14 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTFaultCodeSensor");
       // Create message
     char state[128];
@@ -2292,7 +2402,7 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
     json["value"] =  FaultCode;
     serializeJson(json, state);  // buf now contains the json 
 
-    publishMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
   }
 }
 
@@ -2329,15 +2439,16 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  client.subscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str(), 0);
-  client.subscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str(), 0);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttSubscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str(), 0);
+  mqttSubscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str(), 0);
 }
 
 void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTSetpointtemperature");
     JsonDocument json;
 
@@ -2347,7 +2458,7 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
     // char jsonstr[128];
     // serializeJson(json, jsonstr);  // conf now contains the json
 
-    publishMessage((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+    mqttPublish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
   }
 }
 
@@ -2376,15 +2487,16 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  client.subscribe((host+"/number/"+String(uniquename)+"/set").c_str(), 0);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttSubscribe((host+"/number/"+String(uniquename)+"/set").c_str(), 0);
   // Debug("Publish to "+String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config");
 }
 
 void UpdateMQTTNumber(const char* uniquename,float value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTSetpointtemperature");
     JsonDocument json;
 
@@ -2394,7 +2506,7 @@ void UpdateMQTTNumber(const char* uniquename,float value)
     // char jsonstr[128];
     // serializeJson(json, jsonstr);  // conf now contains the json
 
-    publishMessage((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence,0);
+    mqttPublish((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence,0);
   }
 }
 
@@ -2414,19 +2526,20 @@ void PublishMQTTText(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  client.subscribe((host+"/text/"+String(uniquename)+"/set").c_str(), 0);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttSubscribe((host+"/text/"+String(uniquename)+"/set").c_str(), 0);
   // Debug("Publish to "+String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config");
 }
 
 void UpdateMQTTText(const char* uniquename,const char* value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     // Debug("UpdateMQTTText");
     JsonDocument json;
 
-    publishMessage((host+"/text/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+    mqttPublish((host+"/text/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
   }
 }
 
@@ -2445,12 +2558,14 @@ void PublishMQTTTextSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // Publish config message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), json);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 bool UpdateMQTTTextSensor(const char* uniquename, const char* value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTTextSensor");
     JsonDocument json;
 
@@ -2461,9 +2576,7 @@ bool UpdateMQTTTextSensor(const char* uniquename, const char* value)
     serializeJson(json, state);  // state now contains the json
 
     // Publish state message
-    client.beginMessage((host+"/sensor/"+String(uniquename)+"/state").c_str(), mqttpersistence, 0);
-    client.print(state);
-    return client.endMessage() != 0;
+    return mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(), state, mqttpersistence, 0);
   }
   return false;
 }
@@ -2493,14 +2606,15 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  publishDiscoveryMessage((String(mqttautodiscoverytopic)+"/select/"+host+"/"+String(uniquename)+"/config").c_str(), json);
-  client.subscribe((host+"/select/"+String(uniquename)+"/set").c_str(), 0);
-  delay(MQTT_PUBLISH_DELAY);
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/select/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttSubscribe((host+"/select/"+String(uniquename)+"/set").c_str(), 0);
 }
 
 void UpdateMQTTCurvatureSelect(const char* uniquename,int value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTCurvatureSelect");
     JsonDocument json;
 
@@ -2510,7 +2624,7 @@ void UpdateMQTTCurvatureSelect(const char* uniquename,int value)
     char jsonstr[128];
     serializeJson(json, jsonstr);  // conf now contains the json
 
-    publishMessage((host+"/select/"+String(uniquename)+"/state").c_str(),jsonstr,mqttpersistence,0);
+    mqttPublish((host+"/select/"+String(uniquename)+"/state").c_str(),jsonstr,mqttpersistence,0);
   }
 }
 
@@ -2539,7 +2653,7 @@ void UpdateMQTTBoilerSetpointMode()
 
 void UpdateMQTTSetpointMode(const char* uniquename,int value)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTSetpointmode");
     JsonDocument json;
 
@@ -2549,14 +2663,14 @@ void UpdateMQTTSetpointMode(const char* uniquename,int value)
     // char jsonstr[128];
     // serializeJson(json, jsonstr);  // conf now contains the json
 
-    publishMessage((host+"/climate/"+String(uniquename)+"/mode").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+    mqttPublish((host+"/climate/"+String(uniquename)+"/mode").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
   }
 }
 
 
 void UpdateMQTTSetpoint(const char* uniquename, float temperature)
 {
-  if (client.connected()) {
+  if (mqttConnected()) {
     Serial.println("UpdateMQTTSetpoint");
     JsonDocument json;
 
@@ -2566,7 +2680,7 @@ void UpdateMQTTSetpoint(const char* uniquename, float temperature)
     char value[128];
     serializeJson(json, value);  // conf now contains the json
 
-    publishMessage((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+    mqttPublish((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
   }
 }
 
@@ -2606,11 +2720,11 @@ bool PublishAllMQTTSensors()
       // Subscriptions
       if (mqtttemptopic.length()>0 && mqtttemptopic.toInt()==0) {
         Info("Subscribing to temperature topic: " + mqtttemptopic);
-        client.subscribe(mqtttemptopic.c_str(), 0);
+        mqttSubscribe(mqtttemptopic.c_str(), 0);
       }
       if (mqttoutsidetemptopic.length()>0 && mqttoutsidetemptopic.toInt()==0) {
         Info("Subscribing to outside temperature topic: " + mqttoutsidetemptopic);
-        client.subscribe(mqttoutsidetemptopic.c_str(), 0);
+        mqttSubscribe(mqttoutsidetemptopic.c_str(), 0);
       }
       break;
     case 1: PublishMQTTTemperatureSensor(Boiler_Temperature_Name); break;
@@ -2781,10 +2895,14 @@ void setup()
 
 // Limit blocking times on sockets to reduce stalls during network issues
   espClient.setTimeout(500);   // WiFiClient read timeout in ms
-  client.setConnectionTimeout(250);     // ArduinoMqttClient connection timeout in ms (halve seconde)
-  client.setKeepAliveInterval(300);        // Keep-alive in seconden
+  mqttSetConnectionTimeout(250);     // ArduinoMqttClient connection timeout in ms (halve seconde)
+  mqttSetKeepAliveInterval(300);        // Keep-alive in seconden
 
-  client.onMessage(onMessageCallback); // listen to callbacks
+  #if USE_PUBSUBCLIENT
+    mqttSetCallback(MQTTcallback);
+  #else
+    mqttOnMessage(onMessageCallback); // listen to callbacks
+  #endif
 }
 
 // Loop Code
@@ -2849,7 +2967,7 @@ void loop()
 
       // (Re)connect MQTT
       if (WiFi.status() == WL_CONNECTED) {
-        if (!client.connected()) {
+        if (!mqttConnected()) {
           if (!mqttConnectionLostLogged) {
             Error("MQTT connection lost");
             mqttConnectionLostLogged = true;
@@ -2872,7 +2990,7 @@ void loop()
           }
         }
 
-        if (client.connected()) {
+        if (mqttConnected()) {
           String newIP = WiFi.localIP().toString();
           if (!currentIP.equals(newIP)) {
             currentIP=newIP;
@@ -2928,7 +3046,7 @@ void loop()
     // handle MQTT
     if (WiFi.status() == WL_CONNECTED) {
       unsigned long startTime = millis();
-      client.poll();
+      mqttPoll();
       unsigned long pollDuration = millis() - startTime;
       Debug("client.poll() took " + String(pollDuration) + " milliseconds");
     } else {
