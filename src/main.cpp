@@ -157,6 +157,7 @@ bool controlledByHTTP = false;
 bool debug=false;
 bool infotomqtt = DEFAULT_INFOTOMQTT;
 bool mqttConnectionLostLogged = false;
+bool wifiConnectionLostLogged = false;
 
 // object for uploading files
 File fsUploadFile;
@@ -1140,7 +1141,7 @@ void UpdatePID(float setpoint,float temperature)
       D=MaxBoilerTemp-P-I;
     }
   }
-  Debug("PID Mode, PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
+  Info("PID Mode, PID=("+String(P)+","+String(I)+","+String(D)+"), total: "+String(P+I+D));
 }
 
 float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, float CurrentOutsideTemperature) 
@@ -2595,7 +2596,7 @@ void updateTime() {
 
 void PublishAllMQTTSensors()
 {
-  Serial.println("PublishAllMQTTSensors()");
+  Info("PublishAllMQTTSensors()");
 
   // Sensors
   PublishMQTTTemperatureSensor(Boiler_Temperature_Name);
@@ -2788,6 +2789,20 @@ void setup()
 void loop()
 {
   Debug("starting loop");
+
+  // Check WiFi connection status and log changes
+  if (WiFi.status() != WL_CONNECTED) {
+    if (!wifiConnectionLostLogged) {
+      Error("WiFi connection lost");
+      wifiConnectionLostLogged = true;
+    }
+  } else {
+    if (wifiConnectionLostLogged) {
+      wifiConnectionLostLogged = false;
+      Info("WiFi connection restored, RSSI: " + String(WiFi.RSSI()) + " dBm");
+    }
+  }
+
   Debug("WiFi status: " + String(WiFi.status() == WL_CONNECTED ? "connected" : "not connected") + ", RSSI: " + String(WiFi.RSSI()) + " dBm");
 
   // Update Timeclient
