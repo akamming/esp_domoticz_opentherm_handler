@@ -526,7 +526,7 @@ void handleGetInfo()
 {
   Serial.println("GetInfo");
   JsonDocument json;
-  char buf[512];
+  char buf[2048];
   json["heap"] = ESP.getFreeHeap();
   json["sketchsize"] = ESP.getSketchSize();
   json["sketchspace"] = ESP.getFreeSketchSpace();
@@ -560,7 +560,7 @@ void handleGetInfo()
   json["mqttLibrary"] = "ArduinoMqttClient";
   #endif
   
-  serializeJson(json, buf); 
+  serializeJson(json, buf, sizeof(buf)); 
   server.send(200, "application/json", buf);       //Response to the HTTP request
 }
 
