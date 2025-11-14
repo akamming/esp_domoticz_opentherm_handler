@@ -10,7 +10,88 @@ Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm
 - Made to work perfectly for domoticz weather dependent heating plugin (https://github.com/akamming/Domoticz_Thermostate_Plugin), 
 - As of release 1.0, the thermostat functionality is also included in the firmware itself, See thermostat mode  
 
+### WiFi RSSI Monitoring
+- The device monitors the WiFi signal strength (RSSI) and publishes it as a sensor to MQTT for Home Assistant/Domoticz integration.
+- RSSI is logged every loop iteration and updated periodically via MQTT with dBm unit.
+- Helps in diagnosing WiFi connectivity issues.
+
+### NTP Time Synchronization
+- The device synchronizes time using NTP (Network Time Protocol) for accurate logging and scheduling.
+- Time is updated periodically and used for timestamped debug/info messages.
+- NTP updates are performed only when WiFi is connected to avoid blocking.
+
+### OTA (Over-the-Air) Updates
+- Firmware can be updated wirelessly via OTA without needing physical USB connection.
+- Configure the device IP and optional password in `platformio.ini` for secure updates.
+- OTA updates preserve the filesystem (LittleFS) but may require re-uploading config if needed.
+
+### MQTT Reliability Improvements
+- Connection checks ensure MQTT functions only run when connected, preventing errors.
+- Batch sensor publishing (one per heartbeat) prevents broker overload during discovery.
+- Detailed logging for WiFi/MQTT connections, PID values, and sensor publishing.
+- Keep-alive interval optimized (30 seconds) for stable connections.
+- Subscriptions to temperature topics happen first during discovery.
+
+### Frost Protection
+- When thermostat mode is off or in holiday mode, heating activates if room temperature drops below the Frost Protection Setpoint.
+- Prevents pipes from freezing by maintaining minimum temperature.
+- Uses PID control for gradual heating.
+
+### PID Controller
+- Implements a Proportional-Integral-Derivative (PID) controller for precise temperature regulation.
+- Parameters KP, KI, KD can be adjusted via MQTT or web interface.
+- PID is used in thermostat mode for maintaining setpoint temperature.
+- Includes safeguards to prevent overshooting min/max boiler temperatures.
+
+### Weather Dependent Mode
+- Adjusts boiler setpoint based on outside temperature for energy efficiency.
+- Uses a linear curve between BoilerTempAtPlus20 and BoilerTempAtMinus10.
+- Curvature parameter allows non-linear adjustments.
+- Heating is disabled when outside temperature exceeds SwitchHeatingOffAt.
+- Reference Room Compensation adjusts setpoint if room temperature deviates from climate setpoint.
+
+### Holiday Mode
+- Disables thermostat control while maintaining frost protection.
+- Prevents unnecessary heating during absences.
+- Can be controlled via MQTT switch or web interface.
+
+### MQTT Autodiscovery
+- Automatically creates devices in Home Assistant and Domoticz via MQTT discovery topics.
+- Includes sensors, switches, numbers, selects, and climate devices.
+- No manual configuration needed in HA/Domoticz after initial setup.
+- Sensor publishing is batched (one sensor per heartbeat) to prevent broker overload, spreading discovery over multiple heartbeats.
+
+### Web Interface
+- Built-in web UI accessible at device IP or mDNS hostname (http://domesphelper.local).
+- Allows configuration of MQTT, boiler settings, PID parameters, etc.
+- Supports uploading custom HTML/CSS/JS files to LittleFS filesystem.
+- Provides real-time status and control of the boiler/thermostat.
+
+### Configuration Management
+- Configuration stored in JSON format on LittleFS.
+- Can be backed up/downloaded via HTTP API.
+- Settings include MQTT credentials, PID parameters, boiler limits, etc.
+- Config is preserved across firmware updates if uploaded via OTA filesystem.
+
 ### Supported HTTP commands:
+Controlling the boiler commands:
+- http://domesphelper/GetSensors will return a JSON formatted status of all sensors
+- http://domesphelper/command allows you to control the boiler (response also gives JSON formatted status of alle sensors):
+    - HotWater=<on|off>  will enable or disable DHT
+    - CentralHeating=<on|off> will enable or disable Central Heating
+    - Cooling=<on|off> will enable or disable heating
+    - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
+    - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
+    - e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
+NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
+
+Managing the device (are used by the UI):
+- http://domesphelper/info gives a lot of technical info on the device
+- http://domesphelper/getconfig retrieves the configuration file (e.g. with MQTT settings)
+- http://domesphelper/saveconfig stores the configuration file (e.g. with MQTT settings) and reboot
+- http://domesphelper/removeconfig deleters the config
+- http://domesphelper/ResetWifiCredentials will clear wifi credentials and reboots the device, making the wifimanager portal to re-appear so you can add new WIFI connection settings
+- http://domesphelper/reset reboots the device
 Controlling the boiler commands:
 - http://domesphelper/GetSensors will return a JSON formatted status of all sensors
 - http://domesphelper/command allows you to control the boiler (response also gives JSON formatted status of alle sensors):
@@ -38,13 +119,23 @@ The following device are created using MQTT autodiscovery in domoticz and home a
 - A Boiler setpoint device: Set the temperature to which you want the heating/cooling system to heat or cool
 - A HotWater Setpoint device: (if supported by your boiler): The to be temperature of the hot water reserve in your heating/cooling system
 - Several sensors containing the state of the heating/cooling system
+- WiFi RSSI sensor: Monitors signal strength in dBm
+- Log sensor: Receives debug and info messages from the device
+- IP Address sensor: Shows current device IP
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
 
 ### Thermostat mode
 Additional 3 more devices :
 - a Climate setpoint Device (when you want to use the firmware in thermostat mode)
 - a Holiday Mode  switch: Prevents heating when in themostat mode (only frostprotection)
-- a Weather Dependent Mde switch: When in thermostat mode decides wheter to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature 
+- a Weather Dependent Mode switch: When in thermostat mode decides wheter to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature 
+
+Thermostat mode includes:
+- PID-based temperature control for precise regulation
+- Frost protection when thermostat is off
+- Weather dependent heating based on outside temperature
+- Holiday mode for absence periods
+- Automatic switching between heating/cooling/auto modes 
 
 ## Installation
 
@@ -124,6 +215,10 @@ For connecting to wifi:
   - the MQTT State topic of your temperature sensor 
   - The IDX of your domoticz device (it will listen to domoticz/out. Note, this is not recommended, cause the device than has to check every domoticz device update on if it's the temperature sensor, which will make the device very slow if domoticz has many device updates!)
   - leave empty (for reference room temp it will use the internal dallastemperature sensor connected to the device, so the DS18B20 pin should be configured correctly. This is also not recommended, cause the temperature of the ESP influences the temperature sensor. For outside temperature it will use the outside temperature as reported by the boiler (if a outside temp sensor is attached))
+- MQTT authentication: Enable if your broker requires username/password
+- MQTT persistence: Retain messages for HA/Domoticz
+- Debug to MQTT: Send debug logs to MQTT
+- Info to MQTT: Send info logs to MQTT
 
 About the mqtt temperature topic: If you want to use a domoticz sensor to be used, there are several options available, but this is the best way to do it:
 - Install Mosquitto (or another MQTT broker) of you did not yet install a MQTT broker
@@ -144,8 +239,22 @@ About the mqtt temperature topic: If you want to use a domoticz sensor to be use
 - Switchheatingoffat: Disable the heating when the outside temp is above this value 
 - Refroomcompensation: Can change the boiler setpoint if the reference room temperature is lower than the climate setpoint
 
-## Controlling the Device
-The device can be controlled either by the MQTT devices (see above) or by navigating to the homepage 
+### Climate settings:
+- Climate Mode: Off, Heat, Cool, Auto
+- Climate Setpoint: Target temperature for thermostat mode
+- Weather Dependent Mode: Enable/disable weather-based setpoint adjustment
+- Holiday Mode: Enable/disable holiday mode (frost protection only)
+
+
+## Troubleshooting
+- **WiFi Connection Issues**: Check RSSI sensor in HA/Domoticz. If low, move device closer to router or use WiFi extender. Connection losses are logged as Info messages.
+- **MQTT Connection Problems**: Verify broker settings, credentials, and network connectivity. Check MQTT state in device info. Connection losses and restorations are logged with RSSI details.
+- **Boiler Not Responding**: Ensure OpenTherm adapter is correctly connected to pins 4 and 5. Check OpenTherm status in device info.
+- **OTA Upload Fails**: Ensure device is on same network, IP is correct in platformio.ini, and firewall allows connections.
+- **Time Sync Issues**: Check NTP server accessibility and WiFi connection during sync attempts.
+- **PID Tuning**: If temperature oscillates, adjust KI down or KD up. Monitor logs for PID values on every heartbeat.
+- **Weather Dependent Mode**: Requires outside temperature sensor on boiler. Check OT Outside Temperature sensor.
+- **MQTT Discovery Overload**: If broker disconnects during discovery, check logs for batch publishing status. Discovery spreads over ~25 minutes (one sensor per 30 seconds).
 
 ## Backup/Restore config
 
