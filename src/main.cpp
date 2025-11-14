@@ -158,6 +158,7 @@ bool debug=false;
 bool infotomqtt = DEFAULT_INFOTOMQTT;
 bool mqttConnectionLostLogged = false;
 bool wifiConnectionLostLogged = false;
+int sensorIndex = 0;
 
 // object for uploading files
 File fsUploadFile;
@@ -1954,6 +1955,7 @@ void reconnect()
       }
       mqttconnected = client.connect(mqttserver.c_str(), mqttport);
       if (mqttconnected) {
+        sensorIndex = 0; // Reset sensor index for discovery
         PublishAllMQTTSensors();
         publishMessage("domesphelper/status", "connected", false, MQTT_QOS_STATE);
         Info("Succesfully (re)connected, starting operations");
@@ -2029,7 +2031,7 @@ void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
 
 void PublishMQTTSwitch(const char* uniquename)
 {
-  Serial.println("PublishMQTTSwitch");
+  Info("Publishing switch: " + String(uniquename));
   JsonDocument json;
 
   // Construct JSON config message
@@ -2059,7 +2061,7 @@ void UpdateMQTTSwitch(const char* uniquename, bool Value)
 
 void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
 {
-  Serial.println("PublishBinarySensor");
+  Info("Publishing binary sensor: " + String(uniquename));
   JsonDocument json;
 
   // Construct JSON config message
@@ -2098,7 +2100,7 @@ void UpdateMQTTBinarySensor(const char* uniquename, bool Value)
 
 void PublishMQTTTemperatureSensor(const char* uniquename)
 {
-  Serial.println("PublishMQTTTemperatureSensor");
+  Info("Publishing temperature sensor: " + String(uniquename));
   JsonDocument json;
 
   // Create message
@@ -2133,7 +2135,7 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
 
 void PublishMQTTNumberSensor(const char* uniquename)
 {
-  Serial.println("PublishMQTTGenericSensor");
+  Info("Publishing number sensor: " + String(uniquename));
   JsonDocument json;
 
   // Create message
@@ -2152,7 +2154,7 @@ void PublishMQTTNumberSensor(const char* uniquename)
 
 void PublishMQTTRSSISensor(const char* uniquename)
 {
-  Serial.println("PublishMQTTRSSISensor");
+  Info("Publishing RSSI sensor: " + String(uniquename));
   JsonDocument json;
 
   // Create message
@@ -2187,7 +2189,7 @@ void UpdateMQTTNumberSensor(const char* uniquename, float value)
 
 void PublishMQTTPressureSensor(const char* uniquename)
 {
-  Serial.println("PublishMQTTPressureSensor");
+  Info("Publishing pressure sensor: " + String(uniquename));
   JsonDocument json;
 
   // Create message
@@ -2224,7 +2226,7 @@ void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
 
 void PublishMQTTPercentageSensor(const char* uniquename)
 {
-  Serial.println("PublishMQTTPercentageSensor");
+  Info("Publishing percentage sensor: " + String(uniquename));
   JsonDocument json;
 
   // Create message
@@ -2262,7 +2264,7 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
 
 void PublishMQTTFaultCodeSensor(const char* uniquename)
 {
-  Serial.println("PublishMQTTFaultCodeSensor");
+  Info("Publishing fault code sensor: " + String(uniquename));
   JsonDocument json;
 
   // Create message
@@ -2296,7 +2298,7 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
 
 void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool includeCooling)
 {
-  Serial.println("PublishMQTTSetpoint");
+  Info("Publishing setpoint: " + String(uniquename));
   JsonDocument json;
 
   // Create message
@@ -2351,6 +2353,7 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value)
 
 void PublishMQTTNumber(const char* uniquename, int min, int max, float step, bool isSlider)
 {
+  Info("Publishing number: " + String(uniquename));
   // Debug("PublishMQTTNumber");
   JsonDocument json;
 
@@ -2397,6 +2400,7 @@ void UpdateMQTTNumber(const char* uniquename,float value)
 
 void PublishMQTTText(const char* uniquename)
 {
+  Info("Publishing text: " + String(uniquename));
   // Debug("PublishMQTTText");
   JsonDocument json;
 
@@ -2428,7 +2432,7 @@ void UpdateMQTTText(const char* uniquename,const char* value)
 
 void PublishMQTTTextSensor(const char* uniquename)
 {
-  Serial.println("PublishMQTTTextSensor");
+  Info("Publishing text sensor: " + String(uniquename));
   JsonDocument json;
 
   // Construct JSON config message for a read-only sensor
@@ -2467,6 +2471,7 @@ bool UpdateMQTTTextSensor(const char* uniquename, const char* value)
 
 void PublishMQTTCurvatureSelect(const char* uniquename)
 {
+  Info("Publishing curvature select: " + String(uniquename));
   // Debug("PublishMQTTRefRoomCurvatureSelect");
   JsonDocument json;
 
@@ -2594,79 +2599,76 @@ void updateTime() {
   previousMillis=millis();
 }
 
-void PublishAllMQTTSensors()
+bool PublishAllMQTTSensors()
 {
-  Info("PublishAllMQTTSensors()");
-
-  // Sensors
-  PublishMQTTTemperatureSensor(Boiler_Temperature_Name);
-  PublishMQTTTemperatureSensor(DHW_Temperature_Name);
-  PublishMQTTTemperatureSensor(Return_Temperature_Name);
-  PublishMQTTTemperatureSensor(Thermostat_Temperature_Name);
-  PublishMQTTTemperatureSensor(Outside_Temperature_Name);
-  PublishMQTTTemperatureSensor(OT_Outside_Temperature_Name);
-  PublishMQTTPressureSensor(Pressure_Name);
-  PublishMQTTPercentageSensor(Modulation_Name);
-  PublishMQTTFaultCodeSensor(FaultCode_Name);
-  PublishMQTTNumberSensor(P_Name);
-  PublishMQTTNumberSensor(I_Name);
-  PublishMQTTNumberSensor(D_Name);
-  
-
-  // binary sesnors sensors telling state
-  PublishMQTTBinarySensor(FlameActive_Name,"heat");
-  PublishMQTTBinarySensor(FaultActive_Name,"problem");
-  PublishMQTTBinarySensor(DiagnosticActive_Name,"problem");
-  PublishMQTTBinarySensor(CoolingActive_Name,"heat");
-  PublishMQTTBinarySensor(CentralHeatingActive_Name,"heat");
-  PublishMQTTBinarySensor(HotWaterActive_Name,"heat");
-  PublishMQTTBinarySensor(FrostProtectionActive_Name,"cold");
-
-  // Switches to control the boiler
-  PublishMQTTSwitch(EnableCentralHeating_Name);
-  PublishMQTTSwitch(EnableCooling_Name);
-  PublishMQTTSwitch(EnableHotWater_Name);
-  PublishMQTTSwitch(Weather_Dependent_Mode_Name);
-  PublishMQTTSwitch(Holiday_Mode_Name);
-  PublishMQTTSwitch(Debug_Name);
-  PublishMQTTSwitch(Info_Name);
-
-  // Publish setpoints
-  PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true);
-  PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false);
-  PublishMQTTSetpoint(Climate_Name,5,30,true);
-
-  // publish boiler parameters
-  PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true);
-  PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true);
-  PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true);
-  PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true);
-  PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true);
-  PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true);
-  PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true);
-  PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true);
-  PublishMQTTNumber(KP_Name,0,50,1,false);
-  PublishMQTTNumber(KI_Name,0,1,0.01,false);
-  PublishMQTTNumber(KD_Name,0,5,0.1,false);
-  PublishMQTTCurvatureSelect(Curvature_Name);
-  PublishMQTTText(MQTT_TempTopic_Name);
-  PublishMQTTText(MQTT_OutsideTempTopic_Name);
-  PublishMQTTTextSensor(Log_Name);
-  PublishMQTTTextSensor(IP_Address_Name);
-  PublishMQTTRSSISensor(WiFi_RSSI_Name);
-
-  // Subscribe to temperature topic
-  if (mqtttemptopic.length()>0 and mqtttemptopic.toInt()==0) {
-    client.subscribe(mqtttemptopic.c_str(), 0);
-  }
-  // Subscribe to outside temperature topic
-  if (mqttoutsidetemptopic.length()>0 and mqttoutsidetemptopic.toInt()==0) {
-    client.subscribe(mqttoutsidetemptopic.c_str(), 0);
+  switch (sensorIndex) {
+    case 0:
+      // Subscriptions
+      if (mqtttemptopic.length()>0 && mqtttemptopic.toInt()==0) {
+        Info("Subscribing to temperature topic: " + mqtttemptopic);
+        client.subscribe(mqtttemptopic.c_str(), 0);
+      }
+      if (mqttoutsidetemptopic.length()>0 && mqttoutsidetemptopic.toInt()==0) {
+        Info("Subscribing to outside temperature topic: " + mqttoutsidetemptopic);
+        client.subscribe(mqttoutsidetemptopic.c_str(), 0);
+      }
+      break;
+    case 1: PublishMQTTTemperatureSensor(Boiler_Temperature_Name); break;
+    case 2: PublishMQTTTemperatureSensor(DHW_Temperature_Name); break;
+    case 3: PublishMQTTTemperatureSensor(Return_Temperature_Name); break;
+    case 4: PublishMQTTTemperatureSensor(Thermostat_Temperature_Name); break;
+    case 5: PublishMQTTTemperatureSensor(Outside_Temperature_Name); break;
+    case 6: PublishMQTTTemperatureSensor(OT_Outside_Temperature_Name); break;
+    case 7: PublishMQTTPressureSensor(Pressure_Name); break;
+    case 8: PublishMQTTPercentageSensor(Modulation_Name); break;
+    case 9: PublishMQTTFaultCodeSensor(FaultCode_Name); break;
+    case 10: PublishMQTTNumberSensor(P_Name); break;
+    case 11: PublishMQTTNumberSensor(I_Name); break;
+    case 12: PublishMQTTNumberSensor(D_Name); break;
+    case 13: PublishMQTTBinarySensor(FlameActive_Name,"heat"); break;
+    case 14: PublishMQTTBinarySensor(FaultActive_Name,"problem"); break;
+    case 15: PublishMQTTBinarySensor(DiagnosticActive_Name,"problem"); break;
+    case 16: PublishMQTTBinarySensor(CoolingActive_Name,"heat"); break;
+    case 17: PublishMQTTBinarySensor(CentralHeatingActive_Name,"heat"); break;
+    case 18: PublishMQTTBinarySensor(HotWaterActive_Name,"heat"); break;
+    case 19: PublishMQTTBinarySensor(FrostProtectionActive_Name,"cold"); break;
+    case 20: PublishMQTTSwitch(EnableCentralHeating_Name); break;
+    case 21: PublishMQTTSwitch(EnableCooling_Name); break;
+    case 22: PublishMQTTSwitch(EnableHotWater_Name); break;
+    case 23: PublishMQTTSwitch(Weather_Dependent_Mode_Name); break;
+    case 24: PublishMQTTSwitch(Holiday_Mode_Name); break;
+    case 25: PublishMQTTSwitch(Debug_Name); break;
+    case 26: PublishMQTTSwitch(Info_Name); break;
+    case 27: PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true); break;
+    case 28: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
+    case 29: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
+    case 30: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
+    case 31: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
+    case 32: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
+    case 33: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
+    case 34: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
+    case 35: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
+    case 36: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
+    case 37: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
+    case 38: PublishMQTTNumber(KP_Name,0,50,1,false); break;
+    case 39: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
+    case 40: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
+    case 41: PublishMQTTCurvatureSelect(Curvature_Name); break;
+    case 42: PublishMQTTText(MQTT_TempTopic_Name); break;
+    case 43: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
+    case 44: PublishMQTTTextSensor(Log_Name); break;
+    case 45: PublishMQTTTextSensor(IP_Address_Name); break;
+    case 46: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
+    case 47:
+      // Reset index and return true (done)
+      sensorIndex = 0;
+      Info("All MQTT sensors published");
+      return true;
   }
 
-  // reset the timer
-  t_last_mqtt_discovery=millis();
-
+  // Increment sensor index for next call
+  sensorIndex++;
+  return false; // Not done yet
 }
 
 
@@ -2862,9 +2864,11 @@ void loop()
             mqttConnectionLostLogged = false;
           }
           // we are connected, check if we have to resend discovery info
-          if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis)
+          if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis || sensorIndex > 0)
           {
-            PublishAllMQTTSensors();
+            if (PublishAllMQTTSensors()) {
+              t_last_mqtt_discovery = millis();
+            }
           }
         }
 

@@ -82,7 +82,7 @@ const int MQTTConnectTimeoutInMillis = 3*1000;     // the time to reconnect if d
 const int MQTTTimeoutInMillis = 15 * 1000;              // if no command was sent in this period, the program will assume the MQTT client is no longer there
 const int HTTPTimeoutInMillis = 10 * 1000;              // if no command was sent during this periode, the program will assume HTTP control stopped.
 const int heartbeatTickInMillis = 1000;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
-const int MQTTDiscoveryHeartbeatInMillis = 10*60*1000;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
+const int MQTTDiscoveryHeartbeatInMillis = 60*60*1000;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
 const int ClimateHeartbeatInMillis = 1000;        // Interval to do calculate new PID values when in CLimate mode
 const int MQTTTemperatureTimeoutInMillis = 60*60*1000; // no climate mode calculations when temperature reading is older than this value
 float ThermostatTemperatureCalibration=0;         // set to a differenct value to zero is DS18B20 give a too high or low reading
@@ -225,4 +225,4 @@ void UpdateMQTTBoilerSetpointMode();
 void UpdateMQTTSetpointMode(const char* uniquename, int value);
 void UpdateMQTTSetpoint(const char* uniquename, float temperature);
 void updateTime();
-void PublishAllMQTTSensors();
+bool PublishAllMQTTSensors();
