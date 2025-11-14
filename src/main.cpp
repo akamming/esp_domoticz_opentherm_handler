@@ -24,7 +24,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <DallasTemperature.h>    // temperature sensors by mile burton
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
-#define USE_PUBSUBCLIENT 0        // Set to 1 for PubSubClient, 0 for ArduinoMqttClient
+#define USE_PUBSUBCLIENT 1        // Set to 1 for PubSubClient, 0 for ArduinoMqttClient
 #if USE_PUBSUBCLIENT
 #include <PubSubClient.h>
 #else
@@ -111,17 +111,20 @@ void mqttSetId(const char* clientId) {
   #endif
 }
 
+#if !USE_PUBSUBCLIENT
 void mqttSetUsernamePassword(const char* user, const char* pass) {
-  #if USE_PUBSUBCLIENT
-    // PubSubClient sets auth in connect
-  #else
     client.setUsernamePassword(user, pass);
-  #endif
 }
+#endif
 
 bool mqttConnect(const char* server, int port) {
   #if USE_PUBSUBCLIENT
-    return client.connect(server, port);
+    client.setServer(server, port);
+    if (usemqttauthentication) {
+      return client.connect(host.c_str(), mqttuser.c_str(), mqttpass.c_str());
+    } else {
+      return client.connect(host.c_str());
+    }
   #else
     return client.connect(server, port);
   #endif
@@ -511,6 +514,14 @@ void handleCommand() {
   SendHTTP("HandleCommand",Statustext);
 }
 
+size_t getLogBufferSizeInBytes() {
+  size_t totalSize = 0;
+  for (const auto& msg : logBuffer) {
+    totalSize += msg.length();  // String::length() geeft het aantal bytes terug
+  }
+  return totalSize;
+}
+
 void handleGetInfo()
 {
   Serial.println("GetInfo");
@@ -542,6 +553,12 @@ void handleGetInfo()
   snprintf(uptimeBuffer, sizeof(uptimeBuffer), "%d years, %d days, %d hrs, %d ms, %d secs, %d msec", y, d, h, m, s, ms);
   json["uptime"] = uptimeBuffer;
   json["compile_date"] = String(compile_date);
+  json["logBufferSize"] = getLogBufferSizeInBytes();
+  #if USE_PUBSUBCLIENT
+  json["mqttLibrary"] = "PubSubClient";
+  #else
+  json["mqttLibrary"] = "ArduinoMqttClient";
+  #endif
   
   serializeJson(json, buf); 
   server.send(200, "application/json", buf);       //Response to the HTTP request
@@ -2017,6 +2034,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
+#if !USE_PUBSUBCLIENT
 void onMessageCallback(int messageSize) {
   // Read topic and payload
   String topic = client.messageTopic();
@@ -2031,6 +2049,7 @@ void onMessageCallback(int messageSize) {
   // Call the old logic (adjust if necessary)
   MQTTcallback(topicChar, (byte*)payloadChar, payload.length());
 }
+#endif
 
 void SubScribeToDomoticz() {
   mqttSubscribe(domoticzoutputtopic.c_str(), 0);
@@ -2050,9 +2069,11 @@ void reconnect()
       clientId.replace(":", "");
       mqttSetId(clientId.c_str());  // Set unique client ID based on MAC
       mqttSetKeepAliveInterval(300);  // Keep-alive in seconden
+      #if !USE_PUBSUBCLIENT
       if (usemqttauthentication) {
         mqttSetUsernamePassword(mqttuser.c_str(), mqttpass.c_str());
       }
+      #endif
       mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
       if (mqttconnected) {
         sensorIndex = 0; // Reset sensor index for discovery
