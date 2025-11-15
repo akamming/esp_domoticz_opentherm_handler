@@ -423,7 +423,7 @@ void SendHTTP(String command, String result) {
 }
 
 void handleResetWifiCredentials() {
-  Debug("Resetting Wifi Credentials");
+  Info("Resetting Wifi Credentials");
   WiFiManager wifiManager;
   wifiManager.resetSettings();
   SendHTTP("ResetWifiCredentials","OK");
@@ -438,7 +438,7 @@ void handleResetWifiCredentials() {
 
 
 void handleGetSensors() {
-  Serial.println("Getting the sensors");
+  Info("Getting the sensors");
   SendHTTP("GetSensors","OK");
 }
 
@@ -456,6 +456,7 @@ void handleHTTPToggle(const String& argName, bool& targetVar, const String& enab
 }
 
 void handleCommand() {
+  Info("Handling Command: Number of args received: "+server.args());
   String Statustext="Unknown Command";
 
   // we received a command, so someone is comunicating
@@ -466,7 +467,6 @@ void handleCommand() {
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off , to indicate we are executing a command
 
   // for Debugging purposes
-  Debug("Handling Command: Number of args received: "+server.args());
   for (int i = 0; i < server.args(); i++) {
     Debug ("Argument "+String(i)+" -> "+server.argName(i)+": "+server.arg(i));
   } 
@@ -524,7 +524,7 @@ size_t getLogBufferSizeInBytes() {
 
 void handleGetInfo()
 {
-  Serial.println("GetInfo");
+  Info("GetInfo");
   JsonDocument json;
   char buf[2048];
   json["heap"] = ESP.getFreeHeap();
@@ -606,7 +606,7 @@ void handleFileUpload(){ // upload a new file to the SPIFFS
 
 void handleGetConfig()
 {
-  Serial.println("GetConfig");
+  Info("GetConfig");
   JsonDocument json;
 
   // First load config from file
@@ -639,6 +639,7 @@ void handleGetConfig()
 }
 
 void handleConfigJsonFile() {
+  Info("Config JSON file requested");
   if (LittleFS.exists(CONFIGFILE)) {
     File configFile = LittleFS.open(CONFIGFILE, "r");
     if (configFile) {
@@ -659,7 +660,7 @@ void handleConfigJsonFile() {
 }
 
 void handleSaveConfig() {
-  Serial.println("handleSaveConfig");
+  Info("handleSaveConfig");
   String Message;
   
   // for Debugging purposes
@@ -742,7 +743,7 @@ void handleSaveConfig() {
 }
 
 void handleRemoveConfig() {
-  Serial.println("handleRemoveConfig");
+  Info("handleRemoveConfig");
   
   if (LittleFS.exists(CONFIGFILE)) {
     Serial.println("Config file exists, removing configfile");
@@ -759,7 +760,7 @@ void handleRemoveConfig() {
 }
 
 void handleReset() {
-  Debug("handleReset");
+  Info("handleReset");
   
   server.send(200, "text/plain", "Device Reset");
   delay(500); // wait for server send to finish
@@ -815,6 +816,7 @@ bool serveFile(const char url[])
 
 void handleNotFound()
 {
+  Info("Not found: " + server.uri());
   // first, try to serve the requested file from flash
   if (!serveFile(server.uri().c_str()))
   {
@@ -1337,6 +1339,8 @@ void handleClimateProgram()
       // Check if we have to update the PID (only when boiler not in hotwater mode)
       if (!(HotWater or Weather_Dependent_Mode)) {
         UpdatePID(climate_SetPoint,roomTemperature);
+      } else {
+        Debug("Skipping PID update, Hotwater or Weather dependent mode active");
       }
 
       if (Weather_Dependent_Mode and !HotWater) {
@@ -3002,13 +3006,6 @@ void loop()
           if (mqttConnectionLostLogged) {
             mqttConnectionLostLogged = false;
           }
-          // we are connected, check if we have to resend discovery info
-          if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis || sensorIndex > 0)
-          {
-            if (PublishAllMQTTSensors()) {
-              t_last_mqtt_discovery = millis();
-            }
-          }
         }
 
         if (mqttConnected()) {
@@ -3041,6 +3038,16 @@ void loop()
       } else {
         // WiFi niet verbonden, sla netwerkacties over
         Debug("WiFi not connected, skipping heartbeat network operations");
+      }
+    }
+
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      // we are connected, check if we have to resend discovery info
+      if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis || sensorIndex > 0)
+      {
+        if (PublishAllMQTTSensors()) {
+          t_last_mqtt_discovery = millis();
+        }
       }
     }
 
