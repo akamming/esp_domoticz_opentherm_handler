@@ -222,5 +222,6 @@ void UpdateMQTTCurvatureSelect(const char* uniquename, int value);
 void UpdateMQTTBoilerSetpointMode();
 void UpdateMQTTSetpointMode(const char* uniquename, int value);
 bool UpdateMQTTSetpoint(const char* uniquename, float& currentValue, float newValue, bool force = false);
+void UpdateClimateSetpointMode(bool force = false);
 void updateTime();
 bool PublishAllMQTTSensors();

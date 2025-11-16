@@ -1034,18 +1034,7 @@ float getDHWFlowrate() {
 void CommunicateSteeringVarsToMQTT() {
 if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     // Climate Mode
-    if (!climate_Mode.equals(mqtt_climate_Mode)){ // value changed
-      if (climate_Mode.equals("off")) {
-        UpdateMQTTSetpointMode(Climate_Name,OFF);
-      } else if (climate_Mode.equals("heat")) {
-        UpdateMQTTSetpointMode(Climate_Name,HEAT);
-      } else if (climate_Mode.equals("cool")) {
-        UpdateMQTTSetpointMode(Climate_Name,COOL);
-      } else if (climate_Mode.equals("auto")) {
-        UpdateMQTTSetpointMode(Climate_Name,AUTO);
-      }
-      mqtt_climate_Mode=climate_Mode;
-    }
+    UpdateClimateSetpointMode();
 
     // Communicate the setpoints
     UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, false);
@@ -2601,6 +2590,22 @@ void UpdateMQTTBoilerSetpointMode()
 
 }
 
+void UpdateClimateSetpointMode(bool force)
+{
+  if (force || !climate_Mode.equals(mqtt_climate_Mode)) {
+    if (climate_Mode.equals("off")) {
+      UpdateMQTTSetpointMode(Climate_Name, OFF);
+    } else if (climate_Mode.equals("heat")) {
+      UpdateMQTTSetpointMode(Climate_Name, HEAT);
+    } else if (climate_Mode.equals("cool")) {
+      UpdateMQTTSetpointMode(Climate_Name, COOL);
+    } else if (climate_Mode.equals("auto")) {
+      UpdateMQTTSetpointMode(Climate_Name, AUTO);
+    }
+    mqtt_climate_Mode = climate_Mode;
+  }
+}
+
 void UpdateMQTTSetpointMode(const char* uniquename,int value)
 {
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
@@ -2668,20 +2673,21 @@ void updateTime() {
   previousMillis=millis();
 }
 
+void SubscribeToTempTopics() {
+  if (mqtttemptopic.length()>0 && mqtttemptopic.toInt()==0) {
+    Info("Subscribing to temperature topic: " + mqtttemptopic);
+    mqttSubscribe(mqtttemptopic.c_str(), 0);
+  }
+  if (mqttoutsidetemptopic.length()>0 && mqttoutsidetemptopic.toInt()==0) {
+    Info("Subscribing to outside temperature topic: " + mqttoutsidetemptopic);
+    mqttSubscribe(mqttoutsidetemptopic.c_str(), 0);
+  }
+}
+
 bool PublishAllMQTTSensors()
 {
   switch (sensorIndex) {
-    case 0:
-      // Subscriptions
-      if (mqtttemptopic.length()>0 && mqtttemptopic.toInt()==0) {
-        Info("Subscribing to temperature topic: " + mqtttemptopic);
-        mqttSubscribe(mqtttemptopic.c_str(), 0);
-      }
-      if (mqttoutsidetemptopic.length()>0 && mqttoutsidetemptopic.toInt()==0) {
-        Info("Subscribing to outside temperature topic: " + mqttoutsidetemptopic);
-        mqttSubscribe(mqttoutsidetemptopic.c_str(), 0);
-      }
-      break;
+    case 0: SubscribeToTempTopics(); break;
     case 1: PublishMQTTTemperatureSensor(Boiler_Temperature_Name); break;
     case 2: UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, true); break;
     case 3: PublishMQTTTemperatureSensor(DHW_Temperature_Name); break;
@@ -2736,45 +2742,50 @@ bool PublishAllMQTTSensors()
     case 52: UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, true); break;
     case 53: PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true); break;
     case 54: UpdateMQTTSetpoint(Boiler_Setpoint_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
-    case 55: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
-    case 56: UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true); break;
-    case 57: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
-    case 58: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
-    case 59: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
-    case 60: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
-    case 61: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
-    case 62: UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); break;
-    case 63: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
-    case 64: UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); break;
-    case 65: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
-    case 66: UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); break;
-    case 67: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
-    case 68: UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); break;
-    case 69: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
-    case 70: UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); break;
-    case 71: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
-    case 72: UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); break;
-    case 73: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
-    case 74: UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); break;
-    case 75: PublishMQTTNumber(KP_Name,0,50,1,false); break;
-    case 76: UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); break;
-    case 77: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
-    case 78: UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); break;
-    case 79: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
-    case 80: UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); break;
-    case 81: PublishMQTTCurvatureSelect(Curvature_Name); break;
-    case 82: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature); break;
-    case 83: PublishMQTTText(MQTT_TempTopic_Name); break;
-    case 84: UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); break;
-    case 85: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
-    case 86: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); break;
-    case 87: PublishMQTTTextSensor(Log_Name); break;
-    case 88: /* UpdateMQTTTextSensor(Log_Name, "");*/ break;
-    case 89: PublishMQTTTextSensor(IP_Address_Name); break;
-    case 90: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str()); break;
-    case 91: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
-    case 92: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI()); break;
-    case 93:
+    case 55: UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name, boiler_Temperature); break;
+    case 56: UpdateMQTTBoilerSetpointMode(); break;
+    case 57: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
+    case 58: UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true); break;
+    case 59: UpdateMQTTSetpointTemperature(DHW_Setpoint_Name, dhw_Temperature); break;
+    case 60: UpdateMQTTSetpointMode(DHW_Setpoint_Name, enableHotWater ? 1 : 0); break;
+    case 61: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
+    case 62: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
+    case 63: UpdateMQTTSetpointTemperature(Climate_Name, currentTemperature); break;
+    case 64: UpdateClimateSetpointMode(true); break;
+    case 65: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
+    case 66: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
+    case 67: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
+    case 68: UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); break;
+    case 69: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
+    case 70: UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); break;
+    case 71: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
+    case 72: UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); break;
+    case 73: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
+    case 74: UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); break;
+    case 75: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
+    case 76: UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); break;
+    case 77: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
+    case 78: UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); break;
+    case 79: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
+    case 80: UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); break;
+    case 81: PublishMQTTNumber(KP_Name,0,50,1,false); break;
+    case 82: UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); break;
+    case 83: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
+    case 84: UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); break;
+    case 85: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
+    case 86: UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); break;
+    case 87: PublishMQTTCurvatureSelect(Curvature_Name); break;
+    case 88: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature); break;
+    case 89: PublishMQTTText(MQTT_TempTopic_Name); break;
+    case 90: UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); break;
+    case 91: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
+    case 92: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); break;
+    case 93: PublishMQTTTextSensor(Log_Name); break;
+    case 94: PublishMQTTTextSensor(IP_Address_Name); break;
+    case 95: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str()); break;
+    case 96: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
+    case 97: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI()); break;
+    case 98:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");
