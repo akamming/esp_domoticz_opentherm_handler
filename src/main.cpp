@@ -1171,11 +1171,7 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     }
 
     // Frost Protection Active
-    if (FrostProtectionActive!=mqtt_FrostProtectionActive) // value changed
-    {
-      UpdateMQTTBinarySensor(FrostProtectionActive_Name,FrostProtectionActive);
-      mqtt_FrostProtectionActive=FrostProtectionActive;
-    }
+    UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, false);
   }
 }
 
@@ -1413,34 +1409,13 @@ void handleSetBoilerStatus() {
 
     // Check if we have to send to MQTT for steering vars
     if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      if (Flame!=mqtt_Flame){ // value changed
-        UpdateMQTTBinarySensor(FlameActive_Name,Flame);
-        mqtt_Flame=Flame;
-      }
-      if (Fault!=mqtt_Fault){ // value changed
-        UpdateMQTTBinarySensor(FaultActive_Name,Fault);
-        mqtt_Fault=Fault;
-      }
-      if (Diagnostic!=mqtt_Diagnostic){ // value changed
-        UpdateMQTTBinarySensor(DiagnosticActive_Name,Diagnostic);
-        mqtt_Diagnostic=Diagnostic;
-      }
-      if (Cooling!=mqtt_Cooling){ // value changed
-        UpdateMQTTBinarySensor(CoolingActive_Name,Cooling);
-        mqtt_Cooling=Cooling;
-      }
-      if (CentralHeating!=mqtt_CentralHeating){ // value changed
-        UpdateMQTTBinarySensor(CentralHeatingActive_Name,CentralHeating);
-        mqtt_CentralHeating=CentralHeating;
-      }
-      if (HotWater!=mqtt_HotWater){ // value changed
-        UpdateMQTTBinarySensor(HotWaterActive_Name,HotWater);
-        mqtt_HotWater=HotWater;
-      }
-      if (modulation!=mqtt_modulation){ // value changed
-        UpdateMQTTPercentageSensor(Modulation_Name,modulation);
-        mqtt_modulation=modulation; // remember mqtt modulation value
-      }
+      UpdateMQTTBinarySensor(FlameActive_Name, mqtt_Flame, Flame, false);
+      UpdateMQTTBinarySensor(FaultActive_Name, mqtt_Fault, Fault, false);
+      UpdateMQTTBinarySensor(DiagnosticActive_Name, mqtt_Diagnostic, Diagnostic, false);
+      UpdateMQTTBinarySensor(CoolingActive_Name, mqtt_Cooling, Cooling, false);
+      UpdateMQTTBinarySensor(CentralHeatingActive_Name, mqtt_CentralHeating, CentralHeating, false);
+      UpdateMQTTBinarySensor(HotWaterActive_Name, mqtt_HotWater, HotWater, false);
+      UpdateMQTTPercentageSensor(Modulation_Name, mqtt_modulation, modulation, false);
     }
     // Execute the next command in the next call
   } else if (responseStatus == OpenThermResponseStatus::NONE) {
@@ -1471,17 +1446,8 @@ void handleGetOutSideTemp(){
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    float delta = mqtt_outside_Temperature-outside_Temperature;
-    if ((delta != 0) and outside_Temperature!=99 and outside_Temperature!=0){ // value changed
-      UpdateMQTTTemperatureSensor(Outside_Temperature_Name,outside_Temperature);
-      mqtt_outside_Temperature=outside_Temperature;
-    }
-
-    delta = mqtt_OT_outside_Temperature-OT_outside_Temperature;
-    if ((delta != 0) and OT_outside_Temperature!=99 and OT_outside_Temperature!=0){ // value changed
-      UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name,OT_outside_Temperature);
-      mqtt_OT_outside_Temperature=OT_outside_Temperature;
-    }
+    UpdateMQTTTemperatureSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, false);
+    UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, false);
   }
 }
 
@@ -1507,12 +1473,8 @@ void handleGetBoilerTemperature()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    float delta = mqtt_boiler_Temperature-boiler_Temperature;
-    if (delta<-0.09 or delta>0.09){ // value changed
-      UpdateMQTTTemperatureSensor(Boiler_Temperature_Name,boiler_Temperature);
-      UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature);
-      mqtt_boiler_Temperature=boiler_Temperature;
-    }
+    UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, false);
+    UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature);
   }
 }
 
@@ -1524,12 +1486,8 @@ void handleGetDHWTemperature()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    float delta = mqtt_dhw_Temperature-dhw_Temperature;
-    if (delta<-0.09 or delta>0.09){ // value changed
-      UpdateMQTTTemperatureSensor(DHW_Temperature_Name,dhw_Temperature);
-      UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature);
-      mqtt_dhw_Temperature=dhw_Temperature;
-    }
+    UpdateMQTTTemperatureSensor(DHW_Temperature_Name, mqtt_dhw_Temperature, dhw_Temperature, false);
+    UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature);
   }
 }
 
@@ -1541,11 +1499,7 @@ void handleGetReturnTemperature()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    float delta = mqtt_return_Temperature-return_Temperature;
-    if (delta<-0.09 or delta>0.09){ // value changed
-      UpdateMQTTTemperatureSensor(Return_Temperature_Name,return_Temperature);
-      mqtt_return_Temperature=return_Temperature;
-    }
+    UpdateMQTTTemperatureSensor(Return_Temperature_Name, mqtt_return_Temperature, return_Temperature, false);
   }
 }
 
@@ -1557,11 +1511,7 @@ void handleGetPressure()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    float delta = mqtt_pressure-pressure;
-    if (delta<-0.009 or delta>0.009){ // value changed
-      UpdateMQTTPressureSensor(Pressure_Name,pressure);
-      mqtt_pressure=pressure;
-    }
+    UpdateMQTTPressureSensor(Pressure_Name, mqtt_pressure, pressure, false);
   }
 }
 
@@ -1589,10 +1539,7 @@ void handleGetFaultCode()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    if (FaultCode!=mqtt_FaultCode){ // value changed
-      UpdateMQTTFaultCodeSensor(FaultCode_Name,FaultCode);
-      mqtt_FaultCode=FaultCode;
-    }
+    UpdateMQTTFaultCodeSensor(FaultCode_Name, mqtt_FaultCode, FaultCode, false);
   }
 }
 
@@ -1605,13 +1552,9 @@ void handleGetThermostatTemperature()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    float delta = mqtt_currentTemperature-currentTemperature;
-    if (delta<-0.09 or delta>0.09){ // value changed
-      UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name,currentTemperature);
-      mqtt_currentTemperature=currentTemperature;
-      if (mqtttemptopic.length()==0) { // temptopic empty, use internal temperature
-        SetMQTTTemperature(currentTemperature);
-      }
+    UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name, mqtt_currentTemperature, currentTemperature, false);
+    if (mqtttemptopic.length()==0) { // temptopic empty, use internal temperature
+      SetMQTTTemperature(currentTemperature);
     }
   }
 }
@@ -2082,7 +2025,6 @@ void reconnect()
       if (mqttconnected) {
         sensorIndex = 0; // Reset sensor index for discovery
         PublishAllMQTTSensors();
-        mqttPublish("domesphelper/status", "connected", false, MQTT_QOS_STATE);
         Info("Succesfully (re)connected, starting operations");
         Info("None, all OK");
         if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
@@ -2211,19 +2153,22 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
   mqttPublish((String(mqttautodiscoverytopic)+"/binary_sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
-void UpdateMQTTBinarySensor(const char* uniquename, bool Value)
+void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateBinarySensor");
+  if (force || currentValue != newValue) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateBinarySensor");
 
-     JsonDocument json;
-     json["value"] = Value;
+       JsonDocument json;
+       json["value"] = newValue;
 
-     char message[512];
-     serializeJson(json,message);
+       char message[512];
+       serializeJson(json,message);
 
-    // publish state message
-    mqttPublish((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence,MQTT_QOS_STATE);
+      // publish state message
+      mqttPublish((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence,MQTT_QOS_STATE);
+    }
+    currentValue = newValue;
   }
 }
 
@@ -2249,17 +2194,22 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
-void UpdateMQTTTemperatureSensor(const char* uniquename, float temperature)
+void UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTTemperatureSensor");
-    JsonDocument json;
+  if (newValue == 99 || newValue == 0) return;
 
-    // Create message
-    char state[128];
-    json["value"] =  float(int(temperature*10))/10;   // ensures round to 1 decimal behind the comma
-    serializeJson(json, state);  // buf now contains the json 
-    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+  if (force || fabs(currentValue - newValue) > 0.09) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTTemperatureSensor");
+      JsonDocument json;
+
+      // Create message
+      char state[128];
+      json["value"] =  float(int(newValue*10))/10;   // ensures round to 1 decimal behind the comma
+      serializeJson(json, state);  // buf now contains the json 
+      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+    }
+    currentValue = newValue;
   }
 }
 
@@ -2356,18 +2306,19 @@ void PublishMQTTPressureSensor(const char* uniquename)
   mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
-void UpdateMQTTPressureSensor(const char* uniquename, float pressure)
+void UpdateMQTTPressureSensor(const char* uniquename, float& currentValue, float newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTPressureSensor");
-    // Create message
-    char state[128];
-    JsonDocument json;
-    json["value"] =  pressure;
-    serializeJson(json, state);  // buf now contains the json 
-    // char charVal[10];
-    // dtostrf(pressure,4,1,charVal); 
-    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+  if (force || fabs(currentValue - newValue) > 0.009) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTPressureSensor");
+      // Create message
+      char state[128];
+      JsonDocument json;
+      json["value"] = newValue;
+      serializeJson(json, state);  // buf now contains the json
+      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+    }
+    currentValue = newValue;
   }
 }
 
@@ -2394,20 +2345,21 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
-void UpdateMQTTPercentageSensor(const char* uniquename, float percentage)
+void UpdateMQTTPercentageSensor(const char* uniquename, float& currentValue, float newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTPercentageSensor");
-    // char charVal[10];
-    // dtostrf(percentage,4,1,charVal); 
-     JsonDocument json;
+  if (force || fabs(currentValue - newValue) > 0.01) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTPercentageSensor");
+      JsonDocument json;
 
-    // Create message
-    char data[128];
-    json["value"]=percentage;
-    serializeJson(json,data);
-   
-    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence,0);
+      // Create message
+      char data[128];
+      json["value"]=newValue;
+      serializeJson(json,data);
+     
+      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence,0);
+    }
+    currentValue = newValue;
   }
 }
 
@@ -2432,17 +2384,20 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
-void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char FaultCode)
+void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char& currentValue, unsigned char newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTFaultCodeSensor");
-      // Create message
-    char state[128];
-    JsonDocument json;
-    json["value"] =  FaultCode;
-    serializeJson(json, state);  // buf now contains the json 
+  if (force || currentValue != newValue) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTFaultCodeSensor");
+        // Create message
+      char state[128];
+      JsonDocument json;
+      json["value"] = newValue;
+      serializeJson(json, state);  // buf now contains the json
 
-    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+    }
+    currentValue = newValue;
   }
 }
 
@@ -2768,23 +2723,23 @@ bool PublishAllMQTTSensors()
       }
       break;
     case 1: PublishMQTTTemperatureSensor(Boiler_Temperature_Name); break;
-    case 2: UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, boiler_Temperature); break;
+    case 2: UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, true); break;
     case 3: PublishMQTTTemperatureSensor(DHW_Temperature_Name); break;
-    case 4: UpdateMQTTTemperatureSensor(DHW_Temperature_Name, dhw_Temperature); break;
+    case 4: UpdateMQTTTemperatureSensor(DHW_Temperature_Name, mqtt_dhw_Temperature, dhw_Temperature, true); break;
     case 5: PublishMQTTTemperatureSensor(Return_Temperature_Name); break;
-    case 6: UpdateMQTTTemperatureSensor(Return_Temperature_Name, return_Temperature); break;
+    case 6: UpdateMQTTTemperatureSensor(Return_Temperature_Name, mqtt_return_Temperature, return_Temperature, true); break;
     case 7: PublishMQTTTemperatureSensor(Thermostat_Temperature_Name); break;
-    case 8: UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name, currentTemperature); break;
+    case 8: UpdateMQTTTemperatureSensor(Thermostat_Temperature_Name, mqtt_currentTemperature, currentTemperature, true); break;
     case 9: PublishMQTTTemperatureSensor(Outside_Temperature_Name); break;
-    case 10: UpdateMQTTTemperatureSensor(Outside_Temperature_Name, outside_Temperature); break;
+    case 10: UpdateMQTTTemperatureSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, true); break;
     case 11: PublishMQTTTemperatureSensor(OT_Outside_Temperature_Name); break;
-    case 12: UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name, OT_outside_Temperature); break;
+    case 12: UpdateMQTTTemperatureSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, true); break;
     case 13: PublishMQTTPressureSensor(Pressure_Name); break;
-    case 14: UpdateMQTTPressureSensor(Pressure_Name, pressure); break;
+    case 14: UpdateMQTTPressureSensor(Pressure_Name, mqtt_pressure, pressure, true); break;
     case 15: PublishMQTTPercentageSensor(Modulation_Name); break;
-    case 16: UpdateMQTTPercentageSensor(Modulation_Name, modulation); break;
+    case 16: UpdateMQTTPercentageSensor(Modulation_Name, mqtt_modulation, modulation, true); break;
     case 17: PublishMQTTFaultCodeSensor(FaultCode_Name); break;
-    case 18: UpdateMQTTFaultCodeSensor(FaultCode_Name, FaultCode); break;
+    case 18: UpdateMQTTFaultCodeSensor(FaultCode_Name, mqtt_FaultCode, FaultCode, true); break;
     case 19: PublishMQTTNumberSensor(P_Name); break;
     case 20: UpdateMQTTNumberSensor(P_Name, P); break;
     case 21: PublishMQTTNumberSensor(I_Name); break;
@@ -2792,19 +2747,19 @@ bool PublishAllMQTTSensors()
     case 23: PublishMQTTNumberSensor(D_Name); break;
     case 24: UpdateMQTTNumberSensor(D_Name, D); break;
     case 25: PublishMQTTBinarySensor(FlameActive_Name,"heat"); break;
-    case 26: UpdateMQTTBinarySensor(FlameActive_Name, Flame); break;
+    case 26: UpdateMQTTBinarySensor(FlameActive_Name, mqtt_Flame, Flame, true); break;
     case 27: PublishMQTTBinarySensor(FaultActive_Name,"problem"); break;
-    case 28: UpdateMQTTBinarySensor(FaultActive_Name, Fault); break;
+    case 28: UpdateMQTTBinarySensor(FaultActive_Name, mqtt_Fault, Fault, true); break;
     case 29: PublishMQTTBinarySensor(DiagnosticActive_Name,"problem"); break;
-    case 30: UpdateMQTTBinarySensor(DiagnosticActive_Name, Diagnostic); break;
+    case 30: UpdateMQTTBinarySensor(DiagnosticActive_Name, mqtt_Diagnostic, Diagnostic, true); break;
     case 31: PublishMQTTBinarySensor(CoolingActive_Name,"heat"); break;
-    case 32: UpdateMQTTBinarySensor(CoolingActive_Name, Cooling); break;
+    case 32: UpdateMQTTBinarySensor(CoolingActive_Name, mqtt_Cooling, Cooling, true); break;
     case 33: PublishMQTTBinarySensor(CentralHeatingActive_Name,"heat"); break;
-    case 34: UpdateMQTTBinarySensor(CentralHeatingActive_Name, CentralHeating); break;
+    case 34: UpdateMQTTBinarySensor(CentralHeatingActive_Name, mqtt_CentralHeating, CentralHeating, true); break;
     case 35: PublishMQTTBinarySensor(HotWaterActive_Name,"heat"); break;
-    case 36: UpdateMQTTBinarySensor(HotWaterActive_Name, HotWater); break;
+    case 36: UpdateMQTTBinarySensor(HotWaterActive_Name, mqtt_HotWater, HotWater, true); break;
     case 37: PublishMQTTBinarySensor(FrostProtectionActive_Name,"cold"); break;
-    case 38: UpdateMQTTBinarySensor(FrostProtectionActive_Name, FrostProtectionActive); break;
+    case 38: UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, true); break;
     case 39: PublishMQTTSwitch(EnableCentralHeating_Name); break;
     case 40: UpdateMQTTSwitch(EnableCentralHeating_Name, enableCentralHeating); break;
     case 41: PublishMQTTSwitch(EnableCooling_Name); break;
