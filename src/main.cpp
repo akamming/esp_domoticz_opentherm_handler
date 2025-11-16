@@ -1028,22 +1028,6 @@ float getDHWFlowrate() {
   return round(temp * 10.0) / 10.0; // round to 1 decimal place
 }
 
-void CommunicateSetpoint(const char* setpointName,float setpointValue,float *mqttValue) {
-  // Debug("CommunicateSetpoint("+String(setpointName)+","+String(setpointValue)+","+String(*mqttValue)+"), diff is "+String(setpointValue-*mqttValue));
-  if (not (setpointValue-*mqttValue>-0.1 and setpointValue-*mqttValue<0.1)) { 
-    UpdateMQTTSetpoint(setpointName,setpointValue);
-    *mqttValue=setpointValue;
-  }
-}
-
-void CommunicateNumber(const char* numberName,float Value,float *mqttValue, float tolerance) {
-  // Debug("CommunicateNumber("+String(numberName)+","+String(Value)+","+String(*mqttValue)+","+String(tolerance)+"), where diff is "+String(Value-*mqttValue));
-  if (not (Value-*mqttValue>-tolerance and Value-*mqttValue<tolerance)){ // value changed
-    UpdateMQTTNumber(numberName,Value);
-    *mqttValue=Value;
-  }
-}
-
 void CommunicateText(const char* TextName,String Value,String *mqttValue) {
   if (not Value.equals(*mqttValue)){ // value changed
     UpdateMQTTText(TextName,Value.c_str());
@@ -1069,22 +1053,22 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     }
 
     // Communicate the setpoints
-    CommunicateSetpoint(Climate_Name,climate_SetPoint,&mqtt_climate_setpoint);
-    CommunicateSetpoint(Boiler_Setpoint_Name,boiler_SetPoint,&mqtt_boiler_setpoint);
-    CommunicateSetpoint(DHW_Setpoint_Name,dhw_SetPoint,&mqtt_dhw_setpoint);
+    UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, false);
+    UpdateMQTTSetpoint(Boiler_Setpoint_Name, mqtt_boiler_setpoint, boiler_SetPoint, false);
+    UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, false);
 
     // Communicate the steering vars
-    CommunicateNumber(MinBoilerTemp_Name,MinBoilerTemp,&mqtt_minboilertemp,0.5);
-    CommunicateNumber(MaxBoilerTemp_Name,MaxBoilerTemp,&mqtt_maxboilertemp,0.5);
-    CommunicateNumber(MinimumTempDifference_Name,minimumTempDifference,&mqtt_minimumTempDifference,0.5);
-    CommunicateNumber(FrostProtectionSetPoint_Name,FrostProtectionSetPoint,&mqtt_FrostProtectionSetPoint,0.5);
-    CommunicateNumber(BoilerTempAtPlus20_Name,BoilerTempAtPlus20,&mqtt_BoilerTempAtPlus20,0.5);
-    CommunicateNumber(BoilerTempAtMinus10_Name,BoilerTempAtMinus10,&mqtt_BoilerTempAtMinus10,0.5);
-    CommunicateNumber(SwitchHeatingOffAt_Name,SwitchHeatingOffAt,&mqtt_SwitchHeatingOffAt,0.5);
-    CommunicateNumber(ReferenceRoomCompensation_Name,ReferenceRoomCompensation,&mqtt_ReferenceRoomCompensation,0.5);
-    CommunicateNumber(KP_Name,KP,&mqtt_kp,0.01);
-    CommunicateNumber(KI_Name,KI,&mqtt_ki,0.01);
-    CommunicateNumber(KD_Name,KD,&mqtt_kd,0.01);
+    UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, false);
+    UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, false);
+    UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, false);
+    UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, false);
+    UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, false);
+    UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, false);
+    UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, false);
+    UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, false);
+    UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, false);
+    UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, false);
+    UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, false);
     UpdateMQTTNumberSensor(P_Name, mqtt_p, P, 0.01);
     UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01);
     UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01);
@@ -1103,28 +1087,19 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     }
 
     // Enable CEntral Heating
-    if (enableCentralHeating!=mqtt_enable_CentralHeating) // value changed
-    {
-      UpdateMQTTSwitch(EnableCentralHeating_Name,enableCentralHeating);
-      mqtt_enable_CentralHeating=enableCentralHeating;
+    if (UpdateMQTTSwitch(EnableCentralHeating_Name, mqtt_enable_CentralHeating, enableCentralHeating, false)) {
       // Communicate to setpoint as well
       UpdateMQTTBoilerSetpointMode();
     }
 
     // EnableCooling
-    if (enableCooling!=mqtt_enable_Cooling) // value changed
-    {
-      UpdateMQTTSwitch(EnableCooling_Name,enableCooling);
-      mqtt_enable_Cooling=enableCooling;
+    if (UpdateMQTTSwitch(EnableCooling_Name, mqtt_enable_Cooling, enableCooling, false)) {
       // Communicate to setpoint as well
       UpdateMQTTBoilerSetpointMode();
     }
 
     //Enable HOt Water
-    if (enableHotWater!=mqtt_enable_HotWater) // value changed
-    {
-      UpdateMQTTSwitch(EnableHotWater_Name,enableHotWater);
-      mqtt_enable_HotWater=enableHotWater;
+    if (UpdateMQTTSwitch(EnableHotWater_Name, mqtt_enable_HotWater, enableHotWater, false)) {
       // Communicate to setpoint as well
       if (enableHotWater) {
         UpdateMQTTSetpointMode(DHW_Setpoint_Name,1);
@@ -1134,32 +1109,16 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     }
 
     // Weather Dependent Mode
-    if (Weather_Dependent_Mode!=mqtt_Weather_Dependent_Mode) // value changed
-    {
-      UpdateMQTTSwitch(Weather_Dependent_Mode_Name,Weather_Dependent_Mode);
-      mqtt_Weather_Dependent_Mode=Weather_Dependent_Mode;
-    }
+    UpdateMQTTSwitch(Weather_Dependent_Mode_Name, mqtt_Weather_Dependent_Mode, Weather_Dependent_Mode, false);
 
     // Holiday Mode
-    if (Holiday_Mode!=mqtt_Holiday_Mode) // value changed
-    {
-      UpdateMQTTSwitch(Holiday_Mode_Name,Holiday_Mode);
-      mqtt_Holiday_Mode=Holiday_Mode;
-    }
+    UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, false);
 
     // Debug
-    if (debug!=mqtt_debug) // value changed
-    {
-      UpdateMQTTSwitch(Debug_Name,debug);
-      mqtt_debug=debug;
-    }
+    UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, false);
 
     // Info
-    if (infotomqtt!=mqtt_infotomqtt) // value changed
-    {
-      UpdateMQTTSwitch(Info_Name,infotomqtt);
-      mqtt_infotomqtt=infotomqtt;
-    }
+    UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, false);
 
     // Frost Protection Active
     UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, false);
@@ -2111,13 +2070,18 @@ void PublishMQTTSwitch(const char* uniquename)
   mqttSubscribe((host+"/light/"+String(uniquename)+"/set").c_str(), 0);
 }
 
-void UpdateMQTTSwitch(const char* uniquename, bool Value)
+bool UpdateMQTTSwitch(const char* uniquename, bool& currentValue, bool newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    // Serial.println("UpdateMQTTSwitch");
-    // publish state message
-    mqttPublish((host+"/light/"+String(uniquename)+"/state").c_str(),Value?"ON":"OFF",mqttpersistence,MQTT_QOS_STATE);
+  if (force || currentValue != newValue) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      // Serial.println("UpdateMQTTSwitch");
+      // publish state message
+      mqttPublish((host+"/light/"+String(uniquename)+"/state").c_str(),newValue?"ON":"OFF",mqttpersistence,MQTT_QOS_STATE);
+    }
+    currentValue = newValue;
+    return true;
   }
+  return false;
 }
 
 void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
@@ -2482,20 +2446,17 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
   // Debug("Publish to "+String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config");
 }
 
-void UpdateMQTTNumber(const char* uniquename,float value)
+bool UpdateMQTTNumber(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTSetpointtemperature");
-    JsonDocument json;
-
-    // Construct JSON config message
-    // json["value"] = value;
-
-    // char jsonstr[128];
-    // serializeJson(json, jsonstr);  // conf now contains the json
-
-    mqttPublish((host+"/number/"+String(uniquename)+"/state").c_str(),String(value).c_str(),mqttpersistence,0);
+  if (force || fabs(currentValue - newValue) > tolerance) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTNumber");
+      mqttPublish((host+"/number/"+String(uniquename)+"/state").c_str(),String(newValue).c_str(),mqttpersistence,0);
+    }
+    currentValue = newValue;
+    return true;
   }
+  return false;
 }
 
 void PublishMQTTText(const char* uniquename)
@@ -2656,20 +2617,25 @@ void UpdateMQTTSetpointMode(const char* uniquename,int value)
 }
 
 
-void UpdateMQTTSetpoint(const char* uniquename, float temperature)
+bool UpdateMQTTSetpoint(const char* uniquename, float& currentValue, float newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTSetpoint");
-    JsonDocument json;
+  if (force || fabs(currentValue - newValue) > 0.01) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTSetpoint");
+      JsonDocument json;
 
-    // Construct JSON config message
-    json["seltemp"] = temperature;
+      // Construct JSON config message
+      json["seltemp"] = newValue;
 
-    char value[128];
-    serializeJson(json, value);  // conf now contains the json
+      char value[128];
+      serializeJson(json, value);  // conf now contains the json
 
-    mqttPublish((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+      mqttPublish((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+    }
+    currentValue = newValue;
+    return true;
   }
+  return false;
 }
 
 void updateTime() {
@@ -2754,47 +2720,47 @@ bool PublishAllMQTTSensors()
     case 37: PublishMQTTBinarySensor(FrostProtectionActive_Name,"cold"); break;
     case 38: UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, true); break;
     case 39: PublishMQTTSwitch(EnableCentralHeating_Name); break;
-    case 40: UpdateMQTTSwitch(EnableCentralHeating_Name, enableCentralHeating); break;
+    case 40: UpdateMQTTSwitch(EnableCentralHeating_Name, mqtt_enable_CentralHeating, enableCentralHeating, true); break;
     case 41: PublishMQTTSwitch(EnableCooling_Name); break;
-    case 42: UpdateMQTTSwitch(EnableCooling_Name, enableCooling); break;
+    case 42: UpdateMQTTSwitch(EnableCooling_Name, mqtt_enable_Cooling, enableCooling, true); break;
     case 43: PublishMQTTSwitch(EnableHotWater_Name); break;
-    case 44: UpdateMQTTSwitch(EnableHotWater_Name, enableHotWater); break;
+    case 44: UpdateMQTTSwitch(EnableHotWater_Name, mqtt_enable_HotWater, enableHotWater, true); break;
     case 45: PublishMQTTSwitch(Weather_Dependent_Mode_Name); break;
-    case 46: UpdateMQTTSwitch(Weather_Dependent_Mode_Name, Weather_Dependent_Mode); break;
+    case 46: UpdateMQTTSwitch(Weather_Dependent_Mode_Name, mqtt_Weather_Dependent_Mode, Weather_Dependent_Mode, true); break;
     case 47: PublishMQTTSwitch(Holiday_Mode_Name); break;
-    case 48: UpdateMQTTSwitch(Holiday_Mode_Name, Holiday_Mode); break;
+    case 48: UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, true); break;
     case 49: PublishMQTTSwitch(Debug_Name); break;
-    case 50: UpdateMQTTSwitch(Debug_Name, debug); break;
+    case 50: UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, true); break;
     case 51: PublishMQTTSwitch(Info_Name); break;
-    case 52: UpdateMQTTSwitch(Info_Name, infotomqtt); break;
+    case 52: UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, true); break;
     case 53: PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true); break;
-    case 54: UpdateMQTTSetpoint(Boiler_Setpoint_Name, boiler_SetPoint); break;
+    case 54: UpdateMQTTSetpoint(Boiler_Setpoint_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
     case 55: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
-    case 56: UpdateMQTTSetpoint(DHW_Setpoint_Name, dhw_SetPoint); break;
+    case 56: UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true); break;
     case 57: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
-    case 58: UpdateMQTTSetpoint(Climate_Name, climate_SetPoint); break;
+    case 58: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
     case 59: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
-    case 60: UpdateMQTTNumber(MinBoilerTemp_Name, MinBoilerTemp); break;
+    case 60: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
     case 61: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
-    case 62: UpdateMQTTNumber(MaxBoilerTemp_Name, MaxBoilerTemp); break;
+    case 62: UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); break;
     case 63: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
-    case 64: UpdateMQTTNumber(MinimumTempDifference_Name, minimumTempDifference); break;
+    case 64: UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); break;
     case 65: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
-    case 66: UpdateMQTTNumber(FrostProtectionSetPoint_Name, FrostProtectionSetPoint); break;
+    case 66: UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); break;
     case 67: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
-    case 68: UpdateMQTTNumber(BoilerTempAtPlus20_Name, BoilerTempAtPlus20); break;
+    case 68: UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); break;
     case 69: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
-    case 70: UpdateMQTTNumber(BoilerTempAtMinus10_Name, BoilerTempAtMinus10); break;
+    case 70: UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); break;
     case 71: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
-    case 72: UpdateMQTTNumber(SwitchHeatingOffAt_Name, SwitchHeatingOffAt); break;
+    case 72: UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); break;
     case 73: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
-    case 74: UpdateMQTTNumber(ReferenceRoomCompensation_Name, ReferenceRoomCompensation); break;
+    case 74: UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); break;
     case 75: PublishMQTTNumber(KP_Name,0,50,1,false); break;
-    case 76: UpdateMQTTNumber(KP_Name, KP); break;
+    case 76: UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); break;
     case 77: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
-    case 78: UpdateMQTTNumber(KI_Name, KI); break;
+    case 78: UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); break;
     case 79: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
-    case 80: UpdateMQTTNumber(KD_Name, KD); break;
+    case 80: UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); break;
     case 81: PublishMQTTCurvatureSelect(Curvature_Name); break;
     case 82: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature); break;
     case 83: PublishMQTTText(MQTT_TempTopic_Name); break;
