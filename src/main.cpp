@@ -120,6 +120,7 @@ void mqttSetUsernamePassword(const char* user, const char* pass) {
 bool mqttConnect(const char* server, int port) {
   #if USE_PUBSUBCLIENT
     client.setServer(server, port);
+    client.setBufferSize(2048); // For longer discoverymessages
     if (usemqttauthentication) {
       return client.connect(host.c_str(), mqttuser.c_str(), mqttpass.c_str());
     } else {
@@ -2391,7 +2392,7 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[1024];
+  char buf[2024];
   serializeJson(json, buf);
   mqttPublish((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
   mqttSubscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str(), 0);
