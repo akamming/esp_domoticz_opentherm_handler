@@ -1409,8 +1409,9 @@ void handleGetBoilerTemperature()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, false);
-    UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature);
+    if (UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, false)) {
+      UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature, false);
+    }
   }
 }
 
@@ -1422,8 +1423,9 @@ void handleGetDHWTemperature()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    UpdateMQTTTemperatureSensor(DHW_Temperature_Name, mqtt_dhw_Temperature, dhw_Temperature, false);
-    UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature);
+    if (UpdateMQTTTemperatureSensor(DHW_Temperature_Name, mqtt_dhw_Temperature, dhw_Temperature, false)) {
+      UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature, false);
+    }
   }
 }
 
@@ -2139,11 +2141,11 @@ void PublishMQTTTemperatureSensor(const char* uniquename)
   mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
-void UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force)
+bool UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
+  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
 
-  if (newValue == 99 || newValue == 0) return;
+  if (newValue == 99 || newValue == 0) return false;
 
   if (force || fabs(currentValue - newValue) > 0.09) {
     if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
@@ -2157,7 +2159,9 @@ void UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, fl
       mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
     }
     currentValue = newValue;
+    return true;
   }
+  return false;
 }
 
 void PublishMQTTNumberSensor(const char* uniquename)

@@ -200,7 +200,7 @@ bool UpdateMQTTSwitch(const char* uniquename, bool& currentValue, bool newValue,
 void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass);
 void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool newValue, bool force);
 void PublishMQTTTemperatureSensor(const char* uniquename);
-void UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force);
+bool UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force);
 void PublishMQTTRSSISensor(const char* uniquename);
 void UpdateMQTTRSSISensor(const char* uniquename, int rssi, bool force = false);
 void UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force = false);
