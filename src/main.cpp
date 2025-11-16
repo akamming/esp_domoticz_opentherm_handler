@@ -1029,12 +1029,6 @@ float getDHWFlowrate() {
   return round(temp * 10.0) / 10.0; // round to 1 decimal place
 }
 
-void CommunicateText(const char* TextName,String Value,String *mqttValue) {
-  if (not Value.equals(*mqttValue)){ // value changed
-    UpdateMQTTText(TextName,Value.c_str());
-    *mqttValue=Value;
-  }
-}
 
 
 void CommunicateSteeringVarsToMQTT() {
@@ -1074,8 +1068,8 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01);
     UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01);
     UpdateMQTTNumberSensor(WiFi_RSSI_Name, mqtt_wifi_rssi, WiFi.RSSI(), 1.0);
-    CommunicateText(MQTT_TempTopic_Name,mqtttemptopic,&mqtt_mqtttemptopic);
-    CommunicateText(MQTT_OutsideTempTopic_Name,mqttoutsidetemptopic,&mqtt_mqttoutsidetemptopic);
+    UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic);
+    UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic);
     if (mqtt_Curvature!=Curvature) {
       UpdateMQTTCurvatureSelect(Curvature_Name,Curvature);
       mqtt_Curvature=Curvature;
@@ -2483,14 +2477,20 @@ void PublishMQTTText(const char* uniquename)
   // Debug("Publish to "+String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config");
 }
 
-void UpdateMQTTText(const char* uniquename,const char* value)
+void UpdateMQTTText(const char* uniquename, String& currentValue, String newValue, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    // Debug("UpdateMQTTText");
-    JsonDocument json;
-
-    mqttPublish((host+"/text/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+  bool shouldPublish = force;
+  if (!newValue.equals(currentValue)) {
+    shouldPublish = true;
   }
+
+  if (shouldPublish) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      mqttPublish((host+"/text/"+String(uniquename)+"/state").c_str(), newValue.c_str(), mqttpersistence, 0);
+    }
+  }
+
+  currentValue = newValue;
 }
 
 void PublishMQTTTextSensor(const char* uniquename)
@@ -2765,11 +2765,11 @@ bool PublishAllMQTTSensors()
     case 81: PublishMQTTCurvatureSelect(Curvature_Name); break;
     case 82: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature); break;
     case 83: PublishMQTTText(MQTT_TempTopic_Name); break;
-    case 84: UpdateMQTTText(MQTT_TempTopic_Name, mqtttemptopic.c_str()); break;
+    case 84: UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); break;
     case 85: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
-    case 86: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqttoutsidetemptopic.c_str()); break;
+    case 86: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); break;
     case 87: PublishMQTTTextSensor(Log_Name); break;
-    case 88: UpdateMQTTTextSensor(Log_Name, ""); break;
+    case 88: /* UpdateMQTTTextSensor(Log_Name, "");*/ break;
     case 89: PublishMQTTTextSensor(IP_Address_Name); break;
     case 90: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str()); break;
     case 91: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;

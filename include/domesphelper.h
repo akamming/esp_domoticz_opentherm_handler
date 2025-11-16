@@ -214,7 +214,7 @@ void UpdateMQTTSetpointTemperature(const char* uniquename, float value);
 void PublishMQTTNumber(const char* uniquename, int min, int max, float step, bool isSlider);
 bool UpdateMQTTNumber(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force = false);
 void PublishMQTTText(const char* uniquename);
-void UpdateMQTTText(const char* uniquename, const char* value);
+void UpdateMQTTText(const char* uniquename, String& currentValue, String newValue, bool force = false);
 void PublishMQTTTextSensor(const char* uniquename);
 bool UpdateMQTTTextSensor(const char* uniquename, const char* value);
 void PublishMQTTCurvatureSelect(const char* uniquename);
