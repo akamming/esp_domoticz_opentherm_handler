@@ -60,6 +60,7 @@ Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm
 - Includes sensors, switches, numbers, selects, and climate devices.
 - No manual configuration needed in HA/Domoticz after initial setup.
 - Sensor publishing is batched (one sensor per heartbeat) to prevent broker overload, spreading discovery over multiple heartbeats.
+- Devices include `availability_topic` for automatic online/offline detection in Home Assistant using MQTT will messages.
 
 ### Web Interface
 - Built-in web UI accessible at device IP or mDNS hostname (http://domesphelper.local).
@@ -377,5 +378,9 @@ views:
               - number.domesphelper_referenceroomcompensation
             title: Weersafhankelijke Stooklijn
 ```
+
+---
+
+*This README was partially generated using AI.*
 
 
