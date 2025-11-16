@@ -1044,15 +1044,6 @@ void CommunicateNumber(const char* numberName,float Value,float *mqttValue, floa
   }
 }
 
-void CommunicateNumberSensor(const char* numberName,float Value,float *mqttValue, float tolerance) {
-  // Debug("CommunicateNumber("+String(numberName)+","+String(Value)+","+String(*mqttValue)+","+String(tolerance)+"), where diff is "+String(Value-*mqttValue));
-  if (not (Value-*mqttValue>-tolerance and Value-*mqttValue<tolerance)){ // value changed
-    UpdateMQTTNumberSensor(numberName,Value);
-    *mqttValue=Value;
-  }
-}
-
-
 void CommunicateText(const char* TextName,String Value,String *mqttValue) {
   if (not Value.equals(*mqttValue)){ // value changed
     UpdateMQTTText(TextName,Value.c_str());
@@ -1094,10 +1085,10 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     CommunicateNumber(KP_Name,KP,&mqtt_kp,0.01);
     CommunicateNumber(KI_Name,KI,&mqtt_ki,0.01);
     CommunicateNumber(KD_Name,KD,&mqtt_kd,0.01);
-    CommunicateNumberSensor(P_Name,P,&mqtt_p,0.01);
-    CommunicateNumberSensor(I_Name,I,&mqtt_i,0.01);
-    CommunicateNumberSensor(D_Name,D,&mqtt_d,0.01);
-    CommunicateNumberSensor(WiFi_RSSI_Name, WiFi.RSSI(), &mqtt_wifi_rssi, 1.0);
+    UpdateMQTTNumberSensor(P_Name, mqtt_p, P, 0.01);
+    UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01);
+    UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01);
+    UpdateMQTTNumberSensor(WiFi_RSSI_Name, mqtt_wifi_rssi, WiFi.RSSI(), 1.0);
     CommunicateText(MQTT_TempTopic_Name,mqtttemptopic,&mqtt_mqtttemptopic);
     CommunicateText(MQTT_OutsideTempTopic_Name,mqttoutsidetemptopic,&mqtt_mqttoutsidetemptopic);
     if (mqtt_Curvature!=Curvature) {
@@ -2269,18 +2260,20 @@ void UpdateMQTTRSSISensor(const char* uniquename, int rssi)
   }
 }
 
-void UpdateMQTTNumberSensor(const char* uniquename, float value)
+void UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force)
 {
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTGenericSensor");
-    JsonDocument json;
+  if (force || fabs(currentValue - newValue) > tolerance) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTGenericSensor");
+      JsonDocument json;
 
-    // Create message
-    char state[128];
-    json["value"] =  float(int(value*100))/100;   // ensures round to 1 decimal behind the comma
-    serializeJson(json, state);  // buf now contains the json 
-
-    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+      // Create message
+      char state[128];
+      json["value"] =  float(int(newValue*100))/100;   // ensures round to 1 decimal behind the comma
+      serializeJson(json, state);  // buf now contains the json 
+      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+    }
+    currentValue = newValue;
   }
 }
 
@@ -2741,11 +2734,11 @@ bool PublishAllMQTTSensors()
     case 17: PublishMQTTFaultCodeSensor(FaultCode_Name); break;
     case 18: UpdateMQTTFaultCodeSensor(FaultCode_Name, mqtt_FaultCode, FaultCode, true); break;
     case 19: PublishMQTTNumberSensor(P_Name); break;
-    case 20: UpdateMQTTNumberSensor(P_Name, P); break;
+    case 20: UpdateMQTTNumberSensor(P_Name, mqtt_p, P, 0.01, true); break;
     case 21: PublishMQTTNumberSensor(I_Name); break;
-    case 22: UpdateMQTTNumberSensor(I_Name, I); break;
+    case 22: UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01, true); break;
     case 23: PublishMQTTNumberSensor(D_Name); break;
-    case 24: UpdateMQTTNumberSensor(D_Name, D); break;
+    case 24: UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01, true); break;
     case 25: PublishMQTTBinarySensor(FlameActive_Name,"heat"); break;
     case 26: UpdateMQTTBinarySensor(FlameActive_Name, mqtt_Flame, Flame, true); break;
     case 27: PublishMQTTBinarySensor(FaultActive_Name,"problem"); break;
