@@ -1010,6 +1010,23 @@ float getDHWFlowrate() {
 }
 
 
+bool UpdateMQTTClimateTemperature(const char* uniquename, float& currentValue, float newValue, bool force)
+{
+  if (!insideTemperatureReceived) return false;
+
+  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
+
+  if (force || fabs(currentValue - newValue) > 0.09) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTClimateTemperature");
+      mqttPublish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(newValue)+" }").c_str(),mqttpersistence,0);
+    }
+    currentValue = newValue;
+    return true;
+  }
+  return false;
+}
+
 
 void CommunicateSteeringVarsToMQTT() {
 if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
@@ -2325,12 +2342,6 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value, bool forc
     Serial.println("UpdateMQTTSetpointtemperature");
     JsonDocument json;
 
-    // Construct JSON config message
-    // json["value"] = value;
-
-    // char jsonstr[128];
-    // serializeJson(json, jsonstr);  // conf now contains the json
-
     mqttPublish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
   }
 }
@@ -2676,7 +2687,7 @@ bool PublishAllMQTTSensors()
     case 52: UpdateMQTTSetpointMode(DHW_Setpoint_Name, enableHotWater ? 1 : 0, true); break;
     case 53: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
     case 54: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
-    case 55: UpdateMQTTSetpointTemperature(Climate_Name, currentTemperature, true); break;
+    case 55: UpdateMQTTSetpointTemperature(Climate_Name, mqttTemperature, true); break;
     case 56: UpdateClimateSetpointMode(true); break;
     case 57: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
     case 58: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
