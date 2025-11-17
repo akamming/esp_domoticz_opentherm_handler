@@ -36,7 +36,7 @@
         <label><input type="checkbox" name="flame" id="flame" disabled>flame</label><label><input type="checkbox" name="fault" id="fault" disabled>fault</label><label><input type="checkbox" name="diagnostic" id="diagnostic" disabled>diagnostic</label><br />
         Modulation <input type="range" class="modulation_input" id="modulation" min="0" max="100" size="10"  disabled><br />
         <br />Enable<br />
-        <label><input type="checkbox" name="enablehotwater" id="enablehotwater">hotwater</label><br />
+        <label><input type="checkbox" name="enablehotwater" id="enablehotwater" onchange="onHotWaterChanged()"> hotwater</label><br />
         <br />Actual<br />
         <label><input type="checkbox" name="heating" id="heating" disabled>heating</label><label><input type="checkbox" name="cooling" id="cooling" disabled>cooling</label><label><input type="checkbox" name="hotwater" id="hotwater" disabled>hotwater</label><br />
         <br /><b>Temperatures</b><br />
@@ -194,12 +194,7 @@
                     document.getElementById('FrostProtectionActive').checked = json.FrostProtectionActive;
                 }
             };
-            xhttp.open("GET",
-                "http://" + location.hostname +
-                "/command?DHWTemperature=" + document.getElementById('hotwatersetpoint').value +
-                "&HotWater=" + BooleanToString(document.getElementById('enablehotwater').checked),
-                true
-            );
+            xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
             xhttp.send();
             setTimeout(loadSensors, 5000);
         }

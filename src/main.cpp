@@ -1009,25 +1009,6 @@ float getDHWFlowrate() {
   return round(temp * 10.0) / 10.0; // round to 1 decimal place
 }
 
-
-bool UpdateMQTTClimateTemperature(const char* uniquename, float& currentValue, float newValue, bool force)
-{
-  if (!insideTemperatureReceived) return false;
-
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
-
-  if (force || fabs(currentValue - newValue) > 0.09) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      Serial.println("UpdateMQTTClimateTemperature");
-      mqttPublish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(newValue)+" }").c_str(),mqttpersistence,0);
-    }
-    currentValue = newValue;
-    return true;
-  }
-  return false;
-}
-
-
 void CommunicateSteeringVarsToMQTT() {
 if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     // Climate Mode
@@ -1912,49 +1893,6 @@ void addDeviceToJson(JsonDocument *json) {
   dev["mdl"] = "d1_mini";
   dev["mf"] = "espressif";
   dev["cu"] = "http://"+WiFi.localIP().toString()+"/";  
-}
-
-void PublishMQTTDimmer(const char* uniquename)
-{
-  Serial.println("PublishMQTTDimmer");
-  JsonDocument json;
-
-  // Construct JSON config message
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
-  json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
-  json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
-  json["schema"] = "json";
-  json["brightness"] = true;
-  json["availability_topic"] = "domesphelper/status";
-
-  addDeviceToJson(&json);
-
-  // Publish config message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
-}
-
-void UpdateMQTTDimmer(const char* uniquename, bool Value, float Mod)
-{
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTDimmer");
-    JsonDocument json;
-
-    // Construct JSON config message
-    json["state"]=Value ? "ON" : "OFF";
-    if (Value and Mod==0) { // Workaround for homekit not being able to show dimmer with value on and brightness 0
-      json["brightness"]=3;     
-    } else {
-      json["brightness"]=int(Mod*255/100);
-    }
-    char state[128];
-    serializeJson(json, state);  // state now contains the json
-
-    // publish state message
-    mqttPublish((host+"/light/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
-  }
 }
 
 void PublishMQTTSwitch(const char* uniquename)
