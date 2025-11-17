@@ -76,13 +76,12 @@ const char WiFi_RSSI_Name[] = "WiFi_RSSI";
                     
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
-const int MQTTConnectTimeoutInMillis = 3*1000;     // the time to reconnect if disconnect occurred 
-const int heartbeatTickInMillis = 1000;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
-const int MQTTDiscoveryHeartbeatInMillis = 60*60*1000;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
-const int ClimateHeartbeatInMillis = 1000;        // Interval to do calculate new PID values when in CLimate mode
-const int MQTTTemperatureTimeoutInMillis = 60*60*1000; // no climate mode calculations when temperature reading is older than this v
-const int HysteresisDelayMinutes = 10;             // Delay in minutes before turning off heating/cooling to prevent chattering
-const unsigned long HysteresisDelayMillis = HysteresisDelayMinutes * 60UL * 1000UL; // Delay in milliseconds
+const unsigned long MQTTConnectTimeoutInMillis = 3UL*1000UL;     // the time to reconnect if disconnect occurred 
+const unsigned long heartbeatTickInMillis = 1000UL;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
+const unsigned long MQTTDiscoveryHeartbeatInMillis = 60UL*60UL*1000UL;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
+const unsigned long ClimateHeartbeatInMillis = 1000UL;        // Interval to do calculate new PID values when in CLimate mode
+const unsigned long MQTTTemperatureTimeoutInMillis = 60UL*60UL*1000UL; // no climate mode calculations when temperature reading is older than this v
+const unsigned long HysteresisDelayMillis = 10UL * 60UL * 1000UL; // Delay in milliseconds before turning off heating/cooling to prevent chattering
 float ThermostatTemperatureCalibration=0;         // set to a differenct value to zero is DS18B20 give a too high or low reading
 int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
