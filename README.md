@@ -5,10 +5,10 @@ Home Assistant Example:
 ## Functionality
 Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm_library:
 - The firmware sets up a connection with the boiler
-- And then boiler can be controlled using HTTP, MQTT or the builtin UI (http://domesphelper or http://IP_adress_of_device)
+- The boiler can be controlled using the builtin thermostat mode via HTTP, MQTT or the builtin UI (http://domesphelper or http://IP_adress_of_device)
 - Autodiscovery supported, so easy integration for Domoticz and/or Home Assistant
 - Made to work perfectly for domoticz weather dependent heating plugin (https://github.com/akamming/Domoticz_Thermostate_Plugin), 
-- As of release 1.0, the thermostat functionality is also included in the firmware itself, See thermostat mode  
+- The thermostat functionality is included in the firmware itself, See thermostat mode  
 
 ### WiFi RSSI Monitoring
 - The device monitors the WiFi signal strength (RSSI) and publishes it as a sensor to MQTT for Home Assistant/Domoticz integration.
@@ -75,92 +75,53 @@ Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm
 - Config is preserved across firmware updates if uploaded via OTA filesystem.
 
 ### Supported HTTP commands:
-Controlling the boiler commands:
+Controlling the thermostat and hot water:
 - http://domesphelper/GetSensors will return a JSON formatted status of all sensors
-- http://domesphelper/command allows you to control the boiler (response also gives JSON formatted status of alle sensors):
-    - HotWater=<on|off>  will enable or disable DHT
-    - CentralHeating=<on|off> will enable or disable Central Heating
-    - Cooling=<on|off> will enable or disable heating
-    - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
-    - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
+- http://domesphelper/command allows you to control the thermostat and hot water (response also gives JSON formatted status of all sensors):
+    - HotWater=<on|off> will enable or disable hot water production
+    - DHWTemperature=<desired temperature> will set the setpoint for the hot water temperature
     - climateMode=<off|heat|cool|auto> will set the thermostat mode
     - climateSetpoint=<desired temperature> will set the target temperature for thermostat mode
     - weatherDependentMode=<on|off> will enable or disable weather dependent heating
     - holidayMode=<on|off> will enable or disable holiday mode (frost protection only)
-    - e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
-NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
-
-**Deprecated HTTP commands:** The following parameters are deprecated and will be removed in a future version. They will probably still work but are no longer tested:
-- CentralHeating=<on|off>
-- Cooling=<on|off>
-- BoilerTemperature=<desired temperature>
+    - e.g. http://domesphelper/command?HotWater=on&DHWTemperature=60&climateMode=heat&climateSetpoint=20 will enable hot water at 60°C and set thermostat to heat mode with setpoint 20°C
 
 Managing the device (are used by the UI):
 - http://domesphelper/info gives a lot of technical info on the device
 - http://domesphelper/getconfig retrieves the configuration file (e.g. with MQTT settings)
 - http://domesphelper/saveconfig stores the configuration file (e.g. with MQTT settings) and reboot
-- http://domesphelper/removeconfig deleters the config
-- http://domesphelper/ResetWifiCredentials will clear wifi credentials and reboots the device, making the wifimanager portal to re-appear so you can add new WIFI connection settings
-- http://domesphelper/reset reboots the device
-Controlling the boiler commands:
-- http://domesphelper/GetSensors will return a JSON formatted status of all sensors
-- http://domesphelper/command allows you to control the boiler (response also gives JSON formatted status of alle sensors):
-    - HotWater=<on|off>  will enable or disable DHT
-    - CentralHeating=<on|off> will enable or disable Central Heating
-    - Cooling=<on|off> will enable or disable heating
-    - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
-    - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
-    - climateMode=<off|heat|cool|auto> will set the thermostat mode
-    - climateSetpoint=<desired temperature> will set the target temperature for thermostat mode
-    - weatherDependentMode=<on|off> will enable or disable weather dependent heating
-    - holidayMode=<on|off> will enable or disable holiday mode (frost protection only)
-    - e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
-NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
-
-**Deprecated HTTP commands:** The following parameters are deprecated and will be removed in a future version. They still work but are no longer tested:
-- CentralHeating=<on|off>
-- Cooling=<on|off>
-- BoilerTemperature=<desired temperature>
-- DHWTemperature=<desired temperature>
-
-Managing the device (are used by the UI):
-- http://domesphelper/info gives a lot of technical info on the device
-- http://domesphelper/getconfig retrieves the configuration file (e.g. with MQTT settings)
-- http://domesphelper/saveconfig stores the configuration file (e.g. with MQTT settings) and reboot
-- http://domesphelper/removeconfig deleters the config
+- http://domesphelper/removeconfig deletes the config
 - http://domesphelper/ResetWifiCredentials will clear wifi credentials and reboots the device, making the wifimanager portal to re-appear so you can add new WIFI connection settings
 - http://domesphelper/reset reboots the device
 
 ## support MQTT commands
-The following device are created using MQTT autodiscovery in domoticz and home assistant
-- An EnableHotWater device: Set to ON if your heating/cooling system should produce warm water when needed
-- An EnableCooling device: Set to ON if your heating/cooling system start cooling when needed
-- An EnableCentralHeating device: Set to ON if your heating/cooling system 
-- A Boiler setpoint device: Set the temperature to which you want the heating/cooling system to heat or cool
-- A HotWater Setpoint device: (if supported by your boiler): The to be temperature of the hot water reserve in your heating/cooling system
-- Several sensors containing the state of the heating/cooling system
+The following devices are created using MQTT autodiscovery in Domoticz and Home Assistant for thermostat and hot water control:
+- A Climate device: Controls the thermostat mode and setpoint
+- An EnableHotWater device: Set to ON if your heating system should produce warm water when needed
+- A HotWater Setpoint device: (if supported by your boiler) The desired temperature of the hot water reserve in your heating system
+- A Holiday Mode switch: Prevents heating when in thermostat mode (only frost protection)
+- A Weather Dependent Mode switch: When in thermostat mode, decides whether to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature
+- Several sensors containing the state of the heating system
 - WiFi RSSI sensor: Monitors signal strength in dBm
 - Log sensor: Receives debug and info messages from the device
 - IP Address sensor: Shows current device IP
-NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
-
-**Deprecated MQTT devices:** The following devices are deprecated and will be removed in a future version. They probably still work but are no longer tested:
-- EnableCooling device
-- EnableCentralHeating device
-- Boiler setpoint device
 
 ### Thermostat mode
-Additional 3 more devices :
-- a Climate setpoint Device (when you want to use the firmware in thermostat mode)
-- a Holiday Mode  switch: Prevents heating when in themostat mode (only frostprotection)
-- a Weather Dependent Mode switch: When in thermostat mode decides wheter to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature 
+The device operates primarily in thermostat mode for controlling the boiler and hot water. Direct boiler commands have been removed to ensure safe and efficient operation through the thermostat logic.
+
+Additional devices:
+- A Climate setpoint Device (main control for thermostat mode)
+- An EnableHotWater device and HotWater Setpoint device for hot water control
+- A Holiday Mode switch: Prevents heating when in thermostat mode (only frost protection)
+- A Weather Dependent Mode switch: When in thermostat mode, decides whether to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature
 
 Thermostat mode includes:
 - PID-based temperature control for precise regulation
 - Frost protection when thermostat is off
 - Weather dependent heating based on outside temperature
 - Holiday mode for absence periods
-- Automatic switching between heating/cooling/auto modes 
+- Automatic switching between heating/cooling/auto modes
+- Hot water production control 
 
 ## Installation
 
