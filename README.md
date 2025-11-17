@@ -232,6 +232,70 @@ About the mqtt temperature topic: If you want to use a domoticz sensor to be use
 - Weather Dependent Mode: Enable/disable weather-based setpoint adjustment
 - Holiday Mode: Enable/disable holiday mode (frost protection only)
 
+### Configuration File (config.json)
+The device configuration is stored in a JSON file on the LittleFS filesystem. You can backup and restore this file via the web interface or HTTP API. Below is a sample configuration with all available options:
+
+```json
+{
+  "usemqtt": true,
+  "usemqttauthentication": true,
+  "mqttserver": "your_mqtt_server_ip",
+  "mqttport": 1883,
+  "mqttuser": "your_mqtt_username",
+  "mqttpass": "your_mqtt_password",
+  "mqttretained": true,
+  "mqtttemptopic": "your_room_temperature_topic",
+  "mqttoutsidetemptopic": "your_outside_temperature_topic",
+  "debugtomqtt": false,
+  "infotomqtt": true,
+  "climateMode": "heat",
+  "climateSetpoint": 20,
+  "weatherDependentMode": false,
+  "holidayMode": false,
+  "MinBoilerTemp": 10,
+  "MaxBoilerTemp": 50,
+  "minimumTempDifference": 3,
+  "FrostProtectionSetPoint": 6,
+  "BoilerTempAtPlus20": 20,
+  "BoilerTempAtMinus10": 50,
+  "Curvature": 10,
+  "SwitchHeatingOffAt": 19,
+  "ReferenceRoomCompensation": 3,
+  "KP": 30,
+  "KI": 0.01,
+  "KD": 2.5
+}
+```
+
+#### Field Descriptions:
+- `usemqtt` (boolean): Enable/disable MQTT functionality
+- `usemqttauthentication` (boolean): Enable/disable MQTT authentication
+- `mqttserver` (string): MQTT broker IP address or hostname
+- `mqttport` (integer): MQTT broker port (default: 1883)
+- `mqttuser` (string): MQTT username (if authentication enabled)
+- `mqttpass` (string): MQTT password (if authentication enabled)
+- `mqttretained` (boolean): Enable/disable retained MQTT messages
+- `mqtttemptopic` (string): MQTT topic for room temperature sensor (leave empty to use internal DS18B20)
+- `mqttoutsidetemptopic` (string): MQTT topic for outside temperature sensor (leave empty to use boiler-reported temperature)
+- `debugtomqtt` (boolean): Send debug messages to MQTT (warning: can cause instability)
+- `infotomqtt` (boolean): Send info messages to MQTT
+- `climateMode` (string): Thermostat mode ("off", "heat", "cool", "auto")
+- `climateSetpoint` (integer): Target temperature for thermostat mode
+- `weatherDependentMode` (boolean): Enable/disable weather-dependent heating
+- `holidayMode` (boolean): Enable/disable holiday mode (frost protection only)
+- `MinBoilerTemp` (integer): Minimum boiler temperature limit
+- `MaxBoilerTemp` (integer): Maximum boiler temperature limit
+- `minimumTempDifference` (integer): Minimum temperature difference before heating/cooling activates
+- `FrostProtectionSetPoint` (integer): Temperature threshold for frost protection
+- `BoilerTempAtPlus20` (integer): Boiler temperature at +20°C outside temperature (for weather-dependent mode)
+- `BoilerTempAtMinus10` (integer): Boiler temperature at -10°C outside temperature (for weather-dependent mode)
+- `Curvature` (integer): Curvature adjustment for weather-dependent heating curve (0=none, 10=small, 20=medium, 30=large, 40=extra large)
+- `SwitchHeatingOffAt` (integer): Disable heating when outside temperature exceeds this value
+- `ReferenceRoomCompensation` (integer): Adjust setpoint if room temperature deviates from climate setpoint
+- `KP` (integer): PID proportional gain
+- `KI` (float): PID integral gain
+- `KD` (float): PID derivative gain
+
 
 ## Troubleshooting
 - **WiFi Connection Issues**: Check RSSI sensor in HA/Domoticz. If low, move device closer to router or use WiFi extender. Connection losses are logged as Info messages.
