@@ -32,19 +32,16 @@
     </div>
     <div class="outer_frame">
         <p>Opentherm Status <input type="text" class="hn_input" id="otstatus" size="10" disabled></p><br />
-        Take Control: <label class="switch"><input type="checkbox" id="takecontrol" onchange="ontakecontrolchanged()"><span class="slider round"></span></label>
-        <br /><br />
         General (<input type="number" class="temp_input" id="statuscode" size="10" disabled>)<br />
         <label><input type="checkbox" name="flame" id="flame" disabled>flame</label><label><input type="checkbox" name="fault" id="fault" disabled>fault</label><label><input type="checkbox" name="diagnostic" id="diagnostic" disabled>diagnostic</label><br />
         Modulation <input type="range" class="modulation_input" id="modulation" min="0" max="100" size="10"  disabled><br />
         <br />Enable<br />
-        <label><input type="checkbox" name="enableheating" id="enableheating" disabled>heating</label><label><input type="checkbox" name="enablecooling" id="enablecooling" disabled>cooling</label><label><input type="checkbox" name="enablehotwater" id="enablehotwater" disabled>hotwater</label><br />
+        <label><input type="checkbox" name="enablehotwater" id="enablehotwater">hotwater</label><br />
         <br />Actual<br />
         <label><input type="checkbox" name="heating" id="heating" disabled>heating</label><label><input type="checkbox" name="cooling" id="cooling" disabled>cooling</label><label><input type="checkbox" name="hotwater" id="hotwater" disabled>hotwater</label><br />
         <br /><b>Temperatures</b><br />
         Thermostat <input type="number" class="temp_input" id="thermostattemperature" size="10" disabled> Outside <input type="number" class="temp_input" id="outsidetemperature" size="10" disabled><br />
-        Heating SP <input type="number" class="temp_input" id="boilersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="boilertemperature" size="10" disabled><br />
-        Hotwater SP <input type="number" class="temp_input" id="hotwatersetpoint" size="10" disabled> Actual <input type="number" class="temp_input" id="hotwatertemperature" size="10" disabled><br />
+        Hotwater SP <input type="number" class="temp_input" id="hotwatersetpoint" onchange="onHotWaterChanged()"> Actual <input type="number" class="temp_input" id="hotwatertemperature" size="10" disabled><br />
     </div>
     <div class="outer_frame">
         <p>Device Config</p>
@@ -96,16 +93,15 @@
         <a href="debug.html">Debug Info</a> | <a href="index.html">Back to Thermostat</a>
     </div>
     <script>
-        function ontakecontrolchanged() {
-            NewValue = true;
-            if (document.getElementById('takecontrol').checked) {
-                NewValue = false;
-            }
-            document.getElementById("enableheating").disabled = NewValue;
-            document.getElementById("enablecooling").disabled = NewValue;
-            document.getElementById("enablehotwater").disabled = NewValue;
-            document.getElementById("boilersetpoint").disabled = NewValue;
-            document.getElementById("hotwatersetpoint").disabled = NewValue;
+        function onHotWaterChanged() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET",
+                "http://" + location.hostname +
+                "/command?DHWTemperature=" + document.getElementById('hotwatersetpoint').value +
+                "&HotWater=" + BooleanToString(document.getElementById('enablehotwater').checked),
+                true
+            );
+            xhttp.send();
         }
 
         function onmqttenabledchanged() {
@@ -171,14 +167,10 @@
                     document.getElementById('flame').checked = json.Flame;
                     document.getElementById('fault').checked = json.Fault;
                     document.getElementById('diagnostic').checked = json.Diagnostic;
-                    document.getElementById('enableheating').checked = json.EnableCentralHeating;
-                    document.getElementById('enablecooling').checked = json.EnableCooling;
                     document.getElementById('enablehotwater').checked = json.EnableHotWater;
                     document.getElementById('heating').checked = json.CentralHeating;
                     document.getElementById('cooling').checked = json.Cooling;
                     document.getElementById('hotwater').checked = json.HotWater;
-                    document.getElementById('boilersetpoint').value = json.BoilerSetpoint;
-                    document.getElementById('boilertemperature').value = json.BoilerTemperature;
                     document.getElementById('hotwatersetpoint').value = json.DHWSetpoint;
                     document.getElementById('hotwatertemperature').value = json.DhwTemperature;
                     document.getElementById('thermostattemperature').value = json.ThermostatTemperature;
@@ -199,19 +191,12 @@
                     document.getElementById('FrostProtectionActive').checked = json.FrostProtectionActive;
                 }
             };
-            if (document.getElementById('takecontrol').checked == false) {
-                xhttp.open("GET", "http://" + location.hostname + "/GetSensors", true);
-            } else {
-                xhttp.open("GET",
-                    "http://" + location.hostname +
-                    "/command?DHWTemperature=" + document.getElementById('hotwatersetpoint').value +
-                    "&BoilerTemperature=" + document.getElementById('boilersetpoint').value +
-                    "&Cooling=" + BooleanToString(document.getElementById('enablecooling').checked) +
-                    "&CentralHeating=" + BooleanToString(document.getElementById('enableheating').checked) +
-                    "&HotWater=" + BooleanToString(document.getElementById('enablehotwater').checked),
-                    true
-                );
-            }
+            xhttp.open("GET",
+                "http://" + location.hostname +
+                "/command?DHWTemperature=" + document.getElementById('hotwatersetpoint').value +
+                "&HotWater=" + BooleanToString(document.getElementById('enablehotwater').checked),
+                true
+            );
             xhttp.send();
             setTimeout(loadSensors, 5000);
         }

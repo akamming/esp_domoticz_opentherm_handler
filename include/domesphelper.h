@@ -42,10 +42,7 @@ const char CoolingActive_Name[] = "CoolingActive";
 const char CentralHeatingActive_Name[] = "CentralHeatingActive";   
 const char HotWaterActive_Name[] = "HotWaterActive";  
 const char FrostProtectionActive_Name[] = "FrostProtectionActive";
-const char EnableCooling_Name[] = "EnableCooling";   
-const char EnableCentralHeating_Name[] = "EnableCentralHeating";   
 const char EnableHotWater_Name[] = "EnableHotWater";   
-const char Boiler_Setpoint_Name[] = "Boiler_Setpoint";
 const char DHW_Setpoint_Name[] = "DHW_Setpoint";
 const char Modulation_Name[] = "Modulation";
 const char Pressure_Name[] = "Pressure";
@@ -79,12 +76,10 @@ const char WiFi_RSSI_Name[] = "WiFi_RSSI";
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
 const int MQTTConnectTimeoutInMillis = 3*1000;     // the time to reconnect if disconnect occurred 
-const int MQTTTimeoutInMillis = 15 * 1000;              // if no command was sent in this period, the program will assume the MQTT client is no longer there
-const int HTTPTimeoutInMillis = 10 * 1000;              // if no command was sent during this periode, the program will assume HTTP control stopped.
 const int heartbeatTickInMillis = 1000;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
 const int MQTTDiscoveryHeartbeatInMillis = 60*60*1000;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
 const int ClimateHeartbeatInMillis = 1000;        // Interval to do calculate new PID values when in CLimate mode
-const int MQTTTemperatureTimeoutInMillis = 60*60*1000; // no climate mode calculations when temperature reading is older than this value
+const int MQTTTemperatureTimeoutInMillis = 60*60*1000; // no climate mode calculations when temperature reading is older than this v
 float ThermostatTemperatureCalibration=0;         // set to a differenct value to zero is DS18B20 give a too high or low reading
 int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
@@ -184,7 +179,6 @@ bool HandleClimateMode(const char* mode);
 const char* SetpointIntToString(int value);
 void SetMQTTTemperature(float value);
 void SetMQTTOutsideTemperature(float value);
-bool HandleBoilerMode(const char* mode);
 bool HandleDHWMode(const char* mode);
 void DelayedSaveConfig();
 bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode);
@@ -220,7 +214,6 @@ void PublishMQTTTextSensor(const char* uniquename);
 bool UpdateMQTTTextSensor(const char* uniquename, const char* value, bool force = false);
 void PublishMQTTCurvatureSelect(const char* uniquename);
 void UpdateMQTTCurvatureSelect(const char* uniquename, int value, bool force = false);
-void UpdateMQTTBoilerSetpointMode();
 void UpdateMQTTSetpointMode(const char* uniquename, int value, bool force = false);
 bool UpdateMQTTSetpoint(const char* uniquename, float& currentValue, float newValue, bool force = false);
 void UpdateClimateSetpointMode(bool force = false);

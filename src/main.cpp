@@ -228,9 +228,6 @@ bool mqtt_Weather_Dependent_Mode=true;
 bool mqtt_Holiday_Mode=true;
 float mqtt_modulation=101;
 bool mqtt_enable_HotWater=false;
-bool mqtt_enable_CentralHeating=true;
-bool mqtt_enable_Cooling=true;
-float mqtt_boiler_setpoint=1;
 float mqtt_climate_setpoint=1;
 float mqtt_dhw_setpoint=0;
 float mqtt_pressure=3; 
@@ -262,19 +259,19 @@ String currentIP = "";  // Keep track of the current IP to only update on change
 int OpenThermCommandIndex = 0; // index of the OpenTherm command we are processing
 const char compile_date[] = __DATE__ " " __TIME__;  // Make sure we can output compile date
 unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat timestamp, init on previous heartbeat, so processing start right away
-unsigned long t_last_mqtt_command=millis()-MQTTTimeoutInMillis; // last MQTT command timestamp. init on previous timeout value, so processing start right away
-unsigned long t_last_http_command=millis()-HTTPTimeoutInMillis; // last HTTP command timestamp. init on previous timeout value, so processing start right away
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=0; // last climate heartbeat timestamp
 unsigned long t_last_tempreceived=0; // Time when last MQTT temp was received
 unsigned long t_last_outsidetempreceived=0; // Time when last MQTT temp was received
 unsigned long t_save_config; // timestamp for delayed save
 unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
+unsigned long t_last_mqtt_command=0;
+unsigned long t_last_http_command=0;
+bool controlledByHTTP=false;
 bool ClimateConfigSaved=true;
 float insideTempAt[60];
 float outsidetemp[NUMBEROFMEASUREMENTS];
 int outsidetempcursor;
-bool controlledByHTTP = false;
 bool debug=false;
 bool infotomqtt = DEFAULT_INFOTOMQTT;
 bool mqttConnectionLostLogged = false;
@@ -370,25 +367,14 @@ void SendHTTP(String command, String result) {
   }
 
   // Report if we are receiving commands
-  if (not (climate_Mode.equals("off") or Holiday_Mode==true)) {
-    json["ControlledBy"] = "Climate Mode";
-  } else if (millis()-t_last_http_command<HTTPTimeoutInMillis) {
-    json["ControlledBy"] = "HTTP";
-  } else if (millis()-t_last_mqtt_command<MQTTTimeoutInMillis) {
-    json["ControlledBy"] = "MQTT";
-  } else {
-    json["ControlledBy"] = "None";
-  }
+  json["ControlledBy"] = "Climate Mode";
   
   // Add MQTT Connection status 
   json["MQTTconnected"] = mqttConnected() ? "true" : "false";
   json["MQTTstate"] = mqttConnectError();
 
   // Add BoilerManagementVars
-  json["EnableCentralHeating"] = enableCentralHeating;
   json["EnableHotWater"] = enableHotWater;
-  json["EnableCooling"] = enableCooling;
-  json["BoilerSetpoint"] = float(int(boiler_SetPoint*100))/100;
   json["DHWSetpoint"] = dhw_SetPoint;
   json["climateSetpoint"] = climate_SetPoint;
   json["climateMode"] = climate_Mode;
@@ -468,10 +454,6 @@ void handleCommand() {
   Info("Handling Command: Number of args received: "+server.args());
   String Statustext="Unknown Command";
 
-  // we received a command, so someone is comunicating
-  t_last_http_command=millis();
-  controlledByHTTP=true;
-
   // blink the LED, so we can see a command was sent
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off , to indicate we are executing a command
 
@@ -487,17 +469,8 @@ void handleCommand() {
     Statustext="OK";
   }
 
-  // Set Boiler Temp
-  if (server.arg("BoilerTemperature")!="") {
-    Serial.println("Setting boiler temp to "+server.arg("BoilerTemperature"));
-    boiler_SetPoint=server.arg("BoilerTemperature").toFloat();
-    Statustext="OK";
-  }
-
   // handle http toggle commands
-  handleHTTPToggle("CentralHeating", enableCentralHeating);
   handleHTTPToggle("HotWater", enableHotWater);
-  handleHTTPToggle("Cooling", enableCooling);
   handleHTTPToggle("weatherDependentMode", Weather_Dependent_Mode);
   handleHTTPToggle("holidayMode", Holiday_Mode);
 
@@ -1046,7 +1019,6 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
 
     // Communicate the setpoints
     UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, false);
-    UpdateMQTTSetpoint(Boiler_Setpoint_Name, mqtt_boiler_setpoint, boiler_SetPoint, false);
     UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, false);
 
     // Communicate the steering vars
@@ -1076,18 +1048,6 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     if (mqttTemperature!=mqtt_mqttTemperature and insideTemperatureReceived) {
       UpdateMQTTSetpointTemperature(Climate_Name,mqttTemperature);
       mqtt_mqttTemperature=mqttTemperature;
-    }
-
-    // Enable CEntral Heating
-    if (UpdateMQTTSwitch(EnableCentralHeating_Name, mqtt_enable_CentralHeating, enableCentralHeating, false)) {
-      // Communicate to setpoint as well
-      UpdateMQTTBoilerSetpointMode();
-    }
-
-    // EnableCooling
-    if (UpdateMQTTSwitch(EnableCooling_Name, mqtt_enable_Cooling, enableCooling, false)) {
-      // Communicate to setpoint as well
-      UpdateMQTTBoilerSetpointMode();
     }
 
     //Enable HOt Water
@@ -1241,28 +1201,26 @@ void handleClimateProgram()
       Holiday_Mode==true or 
       (mqtttemptopic.length()!=0 and insideTemperatureReceived==true and millis()-t_last_tempreceived>MQTTTemperatureTimeoutInMillis) or 
       (mqtttemptopic.length()!=0 and insideTemperatureReceived==false) ){ 
-    if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis) { // allow HTTP or MQTT commands when not in climate mode
-      // Frost protection mode
-      if (roomTemperature<FrostProtectionSetPoint) {
-        // we need to act
-        FrostProtectionActive=true;
+    // Frost protection mode
+    if (roomTemperature<FrostProtectionSetPoint) {
+      // we need to act
+      FrostProtectionActive=true;
 
-        // Update PID
-        if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
-          // Check if we have to update the PID (only when boiler not in hotwater mode)
-          if (!HotWater) {
-            UpdatePID(FrostProtectionSetPoint,roomTemperature);
-          }
-          Debug("Frost protection: P = "+String(P)+", I="+String(I)+", D="+String(D));
-
-          // reset timestamp
-          t_last_climateheartbeat=millis();
+      // Update PID
+      if (millis()-ClimateHeartbeatInMillis>t_last_climateheartbeat) {
+        // Check if we have to update the PID (only when boiler not in hotwater mode)
+        if (!HotWater) {
+          UpdatePID(FrostProtectionSetPoint,roomTemperature);
         }
+        Debug("Frost protection: P = "+String(P)+", I="+String(I)+", D="+String(D));
 
-        // set boiler steering vars
-        enableCentralHeating=true;
-        boiler_SetPoint=P+I+D;
+        // reset timestamp
+        t_last_climateheartbeat=millis();
       }
+
+      // set boiler steering vars
+      enableCentralHeating=true;
+      boiler_SetPoint=P+I+D;
     } else {
       // no need to act, set the correct state
       FrostProtectionActive=false;
@@ -1415,9 +1373,7 @@ void handleGetBoilerTemperature()
 
   // Check if we have to send to MQTT
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    if (UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, false)) {
-      UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name,boiler_Temperature, false);
-    }
+    UpdateMQTTTemperatureSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, false);
   }
 }
 
@@ -1617,39 +1573,6 @@ void SetMQTTOutsideTemperature(float value) {
   }
 }
 
-bool HandleBoilerMode(const char* mode) 
-{
-  bool succeeded=true;
-  if (String(mode).equals("off")) {
-    enableCentralHeating=false;
-    enableCooling=false;
-  } else if (String(mode).equals("heat")) {
-    enableCentralHeating=true;
-    enableCooling=false;
-  } else if (String(mode).equals("cool")) {
-    enableCentralHeating=false;
-    enableCooling=true;
-  } else if (String(mode).equals("auto")) {
-    enableCentralHeating=true;
-    enableCooling=true;
-  } else {
-    Error("Unknown payload for central boiler setpoint mode command");
-    // sendback current mode to requester, so trick program into making it think it has to communicate
-    if (enableCentralHeating) {
-      mqtt_enable_CentralHeating=false;
-    } else {
-      mqtt_enable_CentralHeating=true;
-    }
-    if (enableCooling) {
-      mqtt_enable_Cooling=false;
-    } else {
-      mqtt_enable_Cooling=true;
-    }
-    succeeded=false;
-  }
-  return succeeded;
-}
-
 bool HandleDHWMode(const char* mode) 
 {
   bool succeeded=true;
@@ -1790,138 +1713,112 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // Assume succesful command 
   bool CommandSucceeded=false;
   
-  if (millis()-t_last_http_command>HTTPTimeoutInMillis) { // only execute mqtt commands if not commanded by http
+  // Domoticz devices
+  if (topicstr.equals(domoticzoutputtopic)) {
+    handleDomoticzOutputTopic(value, payloadstr);
 
-    // Domoticz devices
-    if (topicstr.equals(domoticzoutputtopic)) {
-      handleDomoticzOutputTopic(value, payloadstr);
+  // climate mode
+  } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+    CommandSucceeded=HandleClimateMode(value.c_str());
 
-    // climate mode
-    } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
-      CommandSucceeded=HandleClimateMode(value.c_str());
+  // Climate setpoint temperature command
+  } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
+    CommandSucceeded = handleClimateSetpoint(value.toFloat());
 
-    // Climate setpoint temperature command
-    } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
-      CommandSucceeded = handleClimateSetpoint(value.toFloat());
+  // DHW Setpoint mode receive
+  } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
+    CommandSucceeded=HandleDHWMode(value.c_str());
 
-    // Boiler Setpoint mode receive
-    } else if (topicstr.equals(host+"/climate/"+String(Boiler_Setpoint_Name)+"/mode/set")) {
-      CommandSucceeded=HandleBoilerMode(value.c_str());
+  // Handle Enable Hotwater switch command
+  } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
+    CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, value.c_str());
 
-    // DHW Setpoint mode receive
-    } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
-      CommandSucceeded=HandleDHWMode(value.c_str());
-
-    // Handle Enable Hotwater switch command
-    } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
-      CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, value.c_str());
-
-    // Handle EnableCooling switch command
-    } else if (topicstr.equals(CommandTopic(EnableCooling_Name))) {
-      CommandSucceeded=HandleSwitch(&enableCooling, &mqtt_enable_Cooling, value.c_str());
-
-    // Enable Central Heating switch command
-    } else if (topicstr.equals(CommandTopic(EnableCentralHeating_Name))) {
-      CommandSucceeded=HandleSwitch(&enableCentralHeating, &mqtt_enable_CentralHeating, value.c_str());
-
-    // Weather Dependent Mode command
-    } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
-      CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, value.c_str());
-      if (CommandSucceeded) {
-        InitPID();
-      }
-
-    // Holiday Mode command
-    } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
-      CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, value.c_str());
-      if (CommandSucceeded) {
-        InitPID();
-      }
-
-    // Handle debug switch command
-    } else if (topicstr.equals(CommandTopic(Debug_Name))) {
-      Info("Received debug command: "+value);
-      CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, value.c_str());
-      Info("Debugging switched "+String(value));
-
-    // Handle info switch command
-    } else if (topicstr.equals(CommandTopic(Info_Name))) {
-      Info("Received info command: "+value);
-      CommandSucceeded=HandleSwitch(&infotomqtt, &mqtt_infotomqtt, value.c_str());
-      Info("Info logging switched "+String(value));
-
-    // boiler setpoint command
-    } else if (topicstr.equals(SetpointCommandTopic(Boiler_Setpoint_Name))) {
-      boiler_SetPoint=String(payloadstr).toFloat();
-      CommandSucceeded=true; // we handled the command
-
-    // DHW Setpoint temperature commands
-    } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
-      dhw_SetPoint=String(payloadstr).toFloat();
-      CommandSucceeded=true; // we handled the command
-
-    // MQTT temperature received
-    } else if (topicstr.equals(mqtttemptopic)) {
-      SetMQTTTemperature(value.toFloat()); // Just try to convert
-
-    // MQTT outsidetemperature received
-    } else if (topicstr.equals(mqttoutsidetemptopic)) {
-      SetMQTTOutsideTemperature(value.toFloat()); // Just try to convert
-
-    // Boiler Vars
-    } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
-      MinBoilerTemp=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(MaxBoilerTemp_Name))) {
-      MaxBoilerTemp=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(MinimumTempDifference_Name))) {
-      minimumTempDifference=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(FrostProtectionSetPoint_Name))) {
-      FrostProtectionSetPoint=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtPlus20_Name))) {
-      BoilerTempAtPlus20=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtMinus10_Name))) {
-      BoilerTempAtMinus10=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(SwitchHeatingOffAt_Name))) {
-      SwitchHeatingOffAt=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
-      ReferenceRoomCompensation=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(KP_Name))) {
-      KP=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(KI_Name))) {
-      KI=value.toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(NumberCommandTopic(KD_Name))) {
-      KD=String(payloadstr).toFloat();
-      CommandSucceeded=true;
-    } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
-      Curvature=getCurvatureIntFromString(payloadstr);
-      CommandSucceeded=true;
-    } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
-      CommandSucceeded = handleMQTTTopicChange(mqtttemptopic, value);
-    }
-    else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
-      Info("Setting outsideTempTopic to "+String(payloadstr));
-      CommandSucceeded = handleMQTTTopicChange(mqttoutsidetemptopic, value);
-
-    // Unknown topic (this code should never be reached, indicates programming logic error)  
-    } else {
-      LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
-    }
-
+  // Weather Dependent Mode command
+  } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
+    CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, value.c_str());
     if (CommandSucceeded) {
-      // we received a succesful mqtt command, so someone is communicating correctly
-      DelayedSaveConfig(); // save the config
-      t_last_mqtt_command=millis();
+      InitPID();
     }
+
+  // Holiday Mode command
+  } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
+    CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, value.c_str());
+    if (CommandSucceeded) {
+      InitPID();
+    }
+
+  // Handle debug switch command
+  } else if (topicstr.equals(CommandTopic(Debug_Name))) {
+    Info("Received debug command: "+value);
+    CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, value.c_str());
+    Info("Debugging switched "+String(value));
+
+  // Handle info switch command
+  } else if (topicstr.equals(CommandTopic(Info_Name))) {
+    Info("Received info command: "+value);
+    CommandSucceeded=HandleSwitch(&infotomqtt, &mqtt_infotomqtt, value.c_str());
+    Info("Info logging switched "+String(value));
+
+  // DHW Setpoint temperature commands
+  } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
+    dhw_SetPoint=String(payloadstr).toFloat();
+    CommandSucceeded=true; // we handled the command
+
+  // MQTT temperature received
+  } else if (topicstr.equals(mqtttemptopic)) {
+    SetMQTTTemperature(value.toFloat()); // Just try to convert
+
+  // MQTT outsidetemperature received
+  } else if (topicstr.equals(mqttoutsidetemptopic)) {
+    SetMQTTOutsideTemperature(value.toFloat()); // Just try to convert
+
+  // Boiler Vars
+  } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
+    MinBoilerTemp=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(MaxBoilerTemp_Name))) {
+    MaxBoilerTemp=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(MinimumTempDifference_Name))) {
+    minimumTempDifference=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(FrostProtectionSetPoint_Name))) {
+    FrostProtectionSetPoint=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtPlus20_Name))) {
+    BoilerTempAtPlus20=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtMinus10_Name))) {
+    BoilerTempAtMinus10=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(SwitchHeatingOffAt_Name))) {
+    SwitchHeatingOffAt=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
+    ReferenceRoomCompensation=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(KP_Name))) {
+    KP=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(KI_Name))) {
+    KI=value.toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(NumberCommandTopic(KD_Name))) {
+    KD=String(payloadstr).toFloat();
+    CommandSucceeded=true;
+  } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
+    Curvature=getCurvatureIntFromString(payloadstr);
+    CommandSucceeded=true;
+  } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
+    CommandSucceeded = handleMQTTTopicChange(mqtttemptopic, value);
+  }
+  else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
+    Info("Setting outsideTempTopic to "+String(payloadstr));
+    CommandSucceeded = handleMQTTTopicChange(mqttoutsidetemptopic, value);
+
+  // Unknown topic (this code should never be reached, indicates programming logic error)  
+  } else {
+    LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
   }
 }
 
@@ -2620,28 +2517,6 @@ void UpdateMQTTCurvatureSelect(const char* uniquename,int value, bool force)
 }
 
 
-void UpdateMQTTBoilerSetpointMode()
-{
-  if (enableCentralHeating) {
-    if (enableCooling) {
-      // cooling and heating, set to Auto
-      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,21, true);
-    } else {
-      // only Central heating, set to Heating
-      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,1, true);
-    }
-  } else  {
-    if (enableCooling) {
-      // only cooling, set to Cooling
-      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,11, true);
-    } else {
-      // nothing, set to Off
-      UpdateMQTTSetpointMode(Boiler_Setpoint_Name,0, true);
-    }
-  }
-
-}
-
 void UpdateClimateSetpointMode(bool force)
 {
   if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
@@ -2785,66 +2660,58 @@ bool PublishAllMQTTSensors()
     case 36: UpdateMQTTBinarySensor(HotWaterActive_Name, mqtt_HotWater, HotWater, true); break;
     case 37: PublishMQTTBinarySensor(FrostProtectionActive_Name,"cold"); break;
     case 38: UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, true); break;
-    case 39: PublishMQTTSwitch(EnableCentralHeating_Name); break;
-    case 40: UpdateMQTTSwitch(EnableCentralHeating_Name, mqtt_enable_CentralHeating, enableCentralHeating, true); break;
-    case 41: PublishMQTTSwitch(EnableCooling_Name); break;
-    case 42: UpdateMQTTSwitch(EnableCooling_Name, mqtt_enable_Cooling, enableCooling, true); break;
-    case 43: PublishMQTTSwitch(EnableHotWater_Name); break;
-    case 44: UpdateMQTTSwitch(EnableHotWater_Name, mqtt_enable_HotWater, enableHotWater, true); break;
-    case 45: PublishMQTTSwitch(Weather_Dependent_Mode_Name); break;
-    case 46: UpdateMQTTSwitch(Weather_Dependent_Mode_Name, mqtt_Weather_Dependent_Mode, Weather_Dependent_Mode, true); break;
-    case 47: PublishMQTTSwitch(Holiday_Mode_Name); break;
-    case 48: UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, true); break;
-    case 49: PublishMQTTSwitch(Debug_Name); break;
-    case 50: UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, true); break;
-    case 51: PublishMQTTSwitch(Info_Name); break;
-    case 52: UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, true); break;
-    case 53: PublishMQTTSetpoint(Boiler_Setpoint_Name,10,90,true); break;
-    case 54: UpdateMQTTSetpoint(Boiler_Setpoint_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
-    case 55: UpdateMQTTSetpointTemperature(Boiler_Setpoint_Name, boiler_Temperature, true); break;
-    case 56: UpdateMQTTBoilerSetpointMode(); break;
-    case 57: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
-    case 58: UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true); break;
-    case 59: UpdateMQTTSetpointTemperature(DHW_Setpoint_Name, dhw_Temperature, true); break;
-    case 60: UpdateMQTTSetpointMode(DHW_Setpoint_Name, enableHotWater ? 1 : 0, true); break;
-    case 61: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
-    case 62: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
-    case 63: UpdateMQTTSetpointTemperature(Climate_Name, currentTemperature, true); break;
-    case 64: UpdateClimateSetpointMode(true); break;
-    case 65: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
-    case 66: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
-    case 67: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
-    case 68: UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); break;
-    case 69: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
-    case 70: UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); break;
-    case 71: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
-    case 72: UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); break;
-    case 73: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
-    case 74: UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); break;
-    case 75: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
-    case 76: UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); break;
-    case 77: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
-    case 78: UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); break;
-    case 79: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
-    case 80: UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); break;
-    case 81: PublishMQTTNumber(KP_Name,0,50,1,false); break;
-    case 82: UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); break;
-    case 83: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
-    case 84: UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); break;
-    case 85: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
-    case 86: UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); break;
-    case 87: PublishMQTTCurvatureSelect(Curvature_Name); break;
-    case 88: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature, true); break;
-    case 89: PublishMQTTText(MQTT_TempTopic_Name); break;
-    case 90: UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); break;
-    case 91: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
-    case 92: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); break;
-    case 93: PublishMQTTTextSensor(Log_Name); break;
-    case 94: PublishMQTTTextSensor(IP_Address_Name); break;
-    case 95: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true); break;
-    case 96: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
-    case 97: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI(), true); break;
-    case 98:
+    case 39: PublishMQTTSwitch(EnableHotWater_Name); break;
+    case 40: UpdateMQTTSwitch(EnableHotWater_Name, mqtt_enable_HotWater, enableHotWater, true); break;
+    case 41: PublishMQTTSwitch(Weather_Dependent_Mode_Name); break;
+    case 42: UpdateMQTTSwitch(Weather_Dependent_Mode_Name, mqtt_Weather_Dependent_Mode, Weather_Dependent_Mode, true); break;
+    case 43: PublishMQTTSwitch(Holiday_Mode_Name); break;
+    case 44: UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, true); break;
+    case 45: PublishMQTTSwitch(Debug_Name); break;
+    case 46: UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, true); break;
+    case 47: PublishMQTTSwitch(Info_Name); break;
+    case 48: UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, true); break;
+    case 49: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
+    case 50: UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true); break;
+    case 51: UpdateMQTTSetpointTemperature(DHW_Setpoint_Name, dhw_Temperature, true); break;
+    case 52: UpdateMQTTSetpointMode(DHW_Setpoint_Name, enableHotWater ? 1 : 0, true); break;
+    case 53: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
+    case 54: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
+    case 55: UpdateMQTTSetpointTemperature(Climate_Name, currentTemperature, true); break;
+    case 56: UpdateClimateSetpointMode(true); break;
+    case 57: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
+    case 58: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
+    case 59: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
+    case 60: UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); break;
+    case 61: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
+    case 62: UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); break;
+    case 63: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
+    case 64: UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); break;
+    case 65: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
+    case 66: UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); break;
+    case 67: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
+    case 68: UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); break;
+    case 69: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
+    case 70: UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); break;
+    case 71: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
+    case 72: UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); break;
+    case 73: PublishMQTTNumber(KP_Name,0,50,1,false); break;
+    case 74: UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); break;
+    case 75: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
+    case 76: UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); break;
+    case 77: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
+    case 78: UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); break;
+    case 79: PublishMQTTCurvatureSelect(Curvature_Name); break;
+    case 80: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature, true); break;
+    case 81: PublishMQTTText(MQTT_TempTopic_Name); break;
+    case 82: UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); break;
+    case 83: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
+    case 84: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); break;
+    case 85: PublishMQTTTextSensor(Log_Name); break;
+    case 86: PublishMQTTTextSensor(IP_Address_Name); break;
+    case 87: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true); break;
+    case 88: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
+    case 89: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI(), true); break;
+    case 90:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");
@@ -3026,11 +2893,7 @@ void loop()
     SaveConfig();
   }
 
-  // check if controlling by http stopped
-  if (controlledByHTTP and millis()-t_last_http_command>HTTPTimeoutInMillis) {
-    controlledByHTTP=false;
-    HandleClimateMode(climate_Mode.c_str()); // do whatever needs to be done to reset the thermostat to the correct climate mode
-  }
+
 
   // don't do anything if we are doing if OTA upgrade is in progress
   if (!OTAUpdateInProgress) {
@@ -3065,18 +2928,7 @@ void loop()
           }
         }
         
-        if (millis()-t_last_mqtt_command>MQTTTimeoutInMillis and millis()-t_last_http_command>HTTPTimeoutInMillis and climate_Mode.equals("off")) {
-            // No commands given for too long a time, so do nothing
-            Serial.print("."); // Just print a dot, so we can see the software in still running
-            digitalWrite(LED_BUILTIN, HIGH);    // switch the LED off, to indicate we lost connection
-
-            // Switch off Heating and Cooling since there is no one controlling it
-            enableCentralHeating=false;
-            enableCooling=false;
-            boiler_SetPoint=10;
-        } else {
             digitalWrite(LED_BUILTIN, LOW);    // switch the LED on , to indicate we have connection
-        }
 
         // handle MDNS
         unsigned long startTime = millis();
