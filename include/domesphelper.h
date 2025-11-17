@@ -86,7 +86,7 @@ float ThermostatTemperatureCalibration=0;         // set to a differenct value t
 int httpport=80;                                  // port for http interface
 String host = "domesphelper";                     // mdns hostname
 String mqttautodiscoverytopic = "homeassistant";  // On what topic are the MQTT autodiscovery messages expected
-const int ConfigSaveDelay=5000;                   // Number of milliseconds delay for when the climate settings are changed. (to prevent saving for every clock on the thermostat device in some UI)
+const unsigned long ConfigSaveDelay=5000UL;                   // Number of milliseconds delay for when the climate settings are changed. (to prevent saving for every clock on the thermostat device in some UI)
 
 // Constants for SetpointModes
 const int OFF = 0;
