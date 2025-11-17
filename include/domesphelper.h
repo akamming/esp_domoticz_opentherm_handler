@@ -35,6 +35,7 @@ const char Return_Temperature_Name[] = "Return_Temperature";
 const char Thermostat_Temperature_Name[] = "Thermostat_Temperature";   
 const char Outside_Temperature_Name[] = "Outside_Temperature";   
 const char OT_Outside_Temperature_Name[] = "OT_Outside_Temperature";   
+const char Boiler_Setpoint_Temperature_Name[] = "Boiler_Setpoint_Temperature";   
 const char FlameActive_Name[] = "FlameActive";   
 const char FaultActive_Name[] = "FaultActive";   
 const char DiagnosticActive_Name[] = "DiagnosticActive";   
@@ -194,7 +195,7 @@ bool UpdateMQTTSwitch(const char* uniquename, bool& currentValue, bool newValue,
 void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass);
 void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool newValue, bool force);
 void PublishMQTTTemperatureSensor(const char* uniquename);
-bool UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force);
+bool UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force = false);
 void PublishMQTTRSSISensor(const char* uniquename);
 void UpdateMQTTRSSISensor(const char* uniquename, int rssi, bool force = false);
 void UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force = false);

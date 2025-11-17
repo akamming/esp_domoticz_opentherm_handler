@@ -217,6 +217,7 @@ float mqtt_outside_Temperature=100;
 float mqtt_OT_outside_Temperature=100;
 float mqtt_currentTemperature=100;
 float mqtt_mqttTemperature=100;
+float mqtt_boiler_setpoint=0;
 bool mqtt_CentralHeating=true;
 bool mqtt_HotWater=true;
 bool mqtt_Cooling=true;
@@ -265,9 +266,6 @@ unsigned long t_last_tempreceived=0; // Time when last MQTT temp was received
 unsigned long t_last_outsidetempreceived=0; // Time when last MQTT temp was received
 unsigned long t_save_config; // timestamp for delayed save
 unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
-unsigned long t_last_mqtt_command=0;
-unsigned long t_last_http_command=0;
-bool controlledByHTTP=false;
 bool ClimateConfigSaved=true;
 float insideTempAt[60];
 float outsidetemp[NUMBEROFMEASUREMENTS];
@@ -397,6 +395,7 @@ void SendHTTP(String command, String result) {
 
    // Add boiler sensors
   json["BoilerTemperature"] = float(int(boiler_Temperature*100))/100;
+  json["BoilerSetpoint"] = float(int(boiler_SetPoint*100))/100;
   json["DhwTemperature"] = float(int(dhw_Temperature*100))/100;    
   json["ReturnTemperature"] = float(int(return_Temperature*100))/100;
   json["OutsideTemperature"] = float(int(outside_Temperature*100))/100;
@@ -434,7 +433,7 @@ void handleResetWifiCredentials() {
 
 void handleGetSensors() {
   Info("Getting the sensors");
-  SendHTTP("GetSensors","OK");
+  SendHTTP("GetSensors","OK"); // Add actual sensor data here
 }
 
 // Generic handler for enabling or disabling a function via HTTP argument
@@ -1020,6 +1019,7 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     // Communicate the setpoints
     UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, false);
     UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, false);
+    UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint);
 
     // Communicate the steering vars
     UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, false);
@@ -2711,7 +2711,9 @@ bool PublishAllMQTTSensors()
     case 87: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true); break;
     case 88: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
     case 89: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI(), true); break;
-    case 90:
+    case 90: PublishMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name); break;
+    case 91: UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
+    case 92:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");
