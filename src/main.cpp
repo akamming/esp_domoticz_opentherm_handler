@@ -266,6 +266,8 @@ unsigned long t_last_tempreceived=0; // Time when last MQTT temp was received
 unsigned long t_last_outsidetempreceived=0; // Time when last MQTT temp was received
 unsigned long t_save_config; // timestamp for delayed save
 unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
+unsigned long heatingOffConditionStart = 0; // Timestamp when heating off condition was first met
+unsigned long coolingOffConditionStart = 0; // Timestamp when cooling off condition was first met
 bool ClimateConfigSaved=true;
 float insideTempAt[60];
 float outsidetemp[NUMBEROFMEASUREMENTS];
@@ -1254,31 +1256,60 @@ void handleClimateProgram()
       boiler_SetPoint=P+I+D;
     }
 
-    // Enable heating and/or cooling
-    if (climate_Mode.equals("heat")) {
-      if (boiler_SetPoint>roomTemperature+minimumTempDifference) {
-        enableCentralHeating=true;
+    // Enable heating and/or cooling with hysteresis to prevent chattering
+    if (climate_Mode.equals("heat")) { // heating mode
+      if (boiler_SetPoint > roomTemperature + minimumTempDifference) { // heating required
+        enableCentralHeating = true; // Enable heating
+        heatingOffConditionStart = 0; // Reset timer
       } else {
-        enableCentralHeating=false;
+        if (heatingOffConditionStart == 0) { // Start timer
+          heatingOffConditionStart = millis(); 
+        }
+        if (millis() - heatingOffConditionStart > HysteresisDelayMillis) { // Check if timer exceeded
+          enableCentralHeating = false; 
+        }
       }
-      enableCooling=false;
-    } else if (climate_Mode.equals("cool")) {
-      enableCentralHeating=false;
-      if (boiler_SetPoint<roomTemperature-minimumTempDifference) {
-        enableCooling=true;
+      enableCooling = false; // cooling mode disabled
+      coolingOffConditionStart = 0; // Reset cooling timer
+    } else if (climate_Mode.equals("cool")) { // cooling mode
+      if (boiler_SetPoint < roomTemperature - minimumTempDifference) { // cooling required
+        enableCooling = true; // Enable cooling
+        coolingOffConditionStart = 0; // Reset timer
       } else {
-        enableCooling=false;
+        if (coolingOffConditionStart == 0) { // Start timer
+          coolingOffConditionStart = millis();
+        }
+        if (millis() - coolingOffConditionStart > HysteresisDelayMillis) { // Check if timer exceeded
+          enableCooling = false;
+        }
       }
-    } else if (climate_Mode.equals("auto")) {
-      if (boiler_SetPoint>roomTemperature+minimumTempDifference) {
-        enableCentralHeating=true;
-        enableCooling=false;
-      } else if (boiler_SetPoint<roomTemperature-minimumTempDifference) {
-        enableCentralHeating=false;
-        enableCooling=true;
+      enableCentralHeating = false; // heating mode disabled
+      heatingOffConditionStart = 0; // Reset heating timer
+    } else if (climate_Mode.equals("auto")) { // auto mode
+      if (boiler_SetPoint > roomTemperature + minimumTempDifference) { // heating required
+        enableCentralHeating = true; // Enable heating
+        enableCooling = false; // Disable cooling
+        heatingOffConditionStart = 0; // Reset heating timer
+        coolingOffConditionStart = 0; // Reset cooling timer
+      } else if (boiler_SetPoint < roomTemperature - minimumTempDifference) { // cooling required
+        enableCentralHeating = false; // Disable heating
+        enableCooling = true; // Enable cooling
+        heatingOffConditionStart = 0; // Reset heating timer
+        coolingOffConditionStart = 0; // Reset cooling timer
       } else {
-        enableCentralHeating=false;
-        enableCooling=false;
+        // Neither heating nor cooling condition met
+        if (heatingOffConditionStart == 0) { // Start heating timer
+          heatingOffConditionStart = millis(); 
+        }
+        if (coolingOffConditionStart == 0) { // Start cooling timer
+          coolingOffConditionStart = millis();
+        }
+        if (millis() - heatingOffConditionStart > HysteresisDelayMillis) { // Check if timer exceeded
+          enableCentralHeating = false;
+        }
+        if (millis() - coolingOffConditionStart > HysteresisDelayMillis) { // Check if timer exceeded
+          enableCooling = false;
+        }
       }
     }
   }
