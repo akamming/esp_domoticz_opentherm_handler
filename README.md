@@ -219,6 +219,7 @@ For connecting to wifi:
 - MQTT authentication: Enable if your broker requires username/password
 - MQTT persistence: Retain messages for HA/Domoticz
 - Debug to MQTT: Send debug logs to MQTT
+  - **Warning:** Enabling debug logging can make the application unstable due to the large number of log messages. It is only intended for debugging purposes and should not be used in normal operation.
 - Info to MQTT: Send info logs to MQTT
 
 About the mqtt temperature topic: If you want to use a domoticz sensor to be used, there are several options available, but this is the best way to do it:
