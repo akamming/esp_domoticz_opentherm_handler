@@ -83,8 +83,17 @@ Controlling the boiler commands:
     - Cooling=<on|off> will enable or disable heating
     - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
     - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
+    - climateMode=<off|heat|cool|auto> will set the thermostat mode
+    - climateSetpoint=<desired temperature> will set the target temperature for thermostat mode
+    - weatherDependentMode=<on|off> will enable or disable weather dependent heating
+    - holidayMode=<on|off> will enable or disable holiday mode (frost protection only)
     - e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
+
+**Deprecated HTTP commands:** The following parameters are deprecated and will be removed in a future version. They will probably still work but are no longer tested:
+- CentralHeating=<on|off>
+- Cooling=<on|off>
+- BoilerTemperature=<desired temperature>
 
 Managing the device (are used by the UI):
 - http://domesphelper/info gives a lot of technical info on the device
@@ -101,8 +110,18 @@ Controlling the boiler commands:
     - Cooling=<on|off> will enable or disable heating
     - BoilerTemperature=<desired temperature> will set the setpoint for the boiler temperature
     - DHWTemperature=<desired temperature> will set the setpoint for the Hot Water temperature
+    - climateMode=<off|heat|cool|auto> will set the thermostat mode
+    - climateSetpoint=<desired temperature> will set the target temperature for thermostat mode
+    - weatherDependentMode=<on|off> will enable or disable weather dependent heating
+    - holidayMode=<on|off> will enable or disable holiday mode (frost protection only)
     - e.g. http://domesphelper/command?Hotwater=on&BoilerTemperature=50 will enable hot water and set boiler temperature to 50. The other steering vars remain unchanged
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
+
+**Deprecated HTTP commands:** The following parameters are deprecated and will be removed in a future version. They still work but are no longer tested:
+- CentralHeating=<on|off>
+- Cooling=<on|off>
+- BoilerTemperature=<desired temperature>
+- DHWTemperature=<desired temperature>
 
 Managing the device (are used by the UI):
 - http://domesphelper/info gives a lot of technical info on the device
@@ -124,6 +143,11 @@ The following device are created using MQTT autodiscovery in domoticz and home a
 - Log sensor: Receives debug and info messages from the device
 - IP Address sensor: Shows current device IP
 NOTE: The command should be repeated every 10 seconds, otherwise the Boiler will switch off heating/cooling automatically
+
+**Deprecated MQTT devices:** The following devices are deprecated and will be removed in a future version. They probably still work but are no longer tested:
+- EnableCooling device
+- EnableCentralHeating device
+- Boiler setpoint device
 
 ### Thermostat mode
 Additional 3 more devices :
