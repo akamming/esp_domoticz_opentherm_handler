@@ -24,11 +24,14 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <DallasTemperature.h>    // temperature sensors by mile burton
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
-#define USE_PUBSUBCLIENT 1        // Set to 1 for PubSubClient, 0 for ArduinoMqttClient
-#if USE_PUBSUBCLIENT
+#define MQTT_LIBRARY 0        // Set to 0 for PubSubClient, 1 for ArduinoMqttClient, 2 for AsyncMQTTClient
+#if MQTT_LIBRARY == 0
 #include <PubSubClient.h>
-#else
+#elif MQTT_LIBRARY == 1
 #include <ArduinoMqttClient.h>
+#else
+#include <ESPAsyncTCP.h>
+#include <AsyncMqttClient.h>
 #endif
 #include "domesphelper.h"               // Set Configuration and default constants
 #include <LittleFS.h>             // Filesystem
@@ -45,80 +48,103 @@ const int MAX_LOG_BUFFER = 200;
 
 // Generic MQTT helper functions
 WiFiClient espClient;
-#if USE_PUBSUBCLIENT
+#if MQTT_LIBRARY == 0
 PubSubClient client(espClient);
-#else
+#elif MQTT_LIBRARY == 1
 MqttClient client(espClient);
+#else
+AsyncMqttClient client;
 #endif
 
 bool mqttConnected() {
-  return client.connected();
+  #if MQTT_LIBRARY == 2
+    return client.connected();
+  #else
+    return client.connected();
+  #endif
 }
 
 int mqttConnectError() {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     return client.state();
-  #else
+  #elif MQTT_LIBRARY == 1
     return client.connectError();
+  #else
+    return client.connected() ? 0 : -1; // AsyncMQTTClient doesn't have a direct error code
   #endif
 }
 
 void mqttSubscribe(const char* topic, int qos = 0) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     client.subscribe(topic);
+  #elif MQTT_LIBRARY == 1
+    client.subscribe(topic, qos);
   #else
     client.subscribe(topic, qos);
   #endif
 }
 
 void mqttPoll() {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     client.loop();
-  #else
+  #elif MQTT_LIBRARY == 1
     client.poll();
   #endif
+  // For AsyncMQTTClient, no loop needed
 }
 
 bool mqttPublish(const char* topic, const char* payload, bool retained, int qos = 0) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     return client.publish(topic, payload, retained);
-  #else
+  #elif MQTT_LIBRARY == 1
     client.beginMessage(topic, retained, qos);
     client.print(payload);
     return client.endMessage() != 0;
+  #else
+    return client.publish(topic, qos, retained, payload);
   #endif
 }
 
 void mqttSetConnectionTimeout(int timeout) {
-  #if !USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 1
     client.setConnectionTimeout(timeout);
+  #elif MQTT_LIBRARY == 2
+    // AsyncMQTTClient uses setKeepAlive
   #endif
 }
 
 void mqttSetKeepAliveInterval(int interval) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     // PubSubClient uses setKeepAlive in connect
-  #else
+  #elif MQTT_LIBRARY == 1
     client.setKeepAliveInterval(interval);
+  #else
+    client.setKeepAlive(interval);
   #endif
 }
 
 void mqttSetId(const char* clientId) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     // PubSubClient sets ID in connect
-  #else
+  #elif MQTT_LIBRARY == 1
     client.setId(clientId);
+  #else
+    client.setClientId(clientId);
   #endif
 }
 
-#if !USE_PUBSUBCLIENT
+#if MQTT_LIBRARY != 0
 void mqttSetUsernamePassword(const char* user, const char* pass) {
+  #if MQTT_LIBRARY == 1
     client.setUsernamePassword(user, pass);
+  #else
+    client.setCredentials(user, pass);
+  #endif
 }
 #endif
 
 bool mqttConnect(const char* server, int port) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     client.setServer(server, port);
     client.setBufferSize(2048); // For longer discoverymessages
     String willTopic = host + "/status";
@@ -132,13 +158,23 @@ bool mqttConnect(const char* server, int port) {
       mqttPublish(willTopic.c_str(), "online", true, 1);
     }
     return connected;
-  #else
+  #elif MQTT_LIBRARY == 1
     return client.connect(server, port);
+  #else
+    client.setServer(server, port);
+    client.setWill(host.c_str(), 1, true, "offline");
+    if (usemqttauthentication) {
+      client.setCredentials(mqttuser.c_str(), mqttpass.c_str());
+    }
+    client.connect();
+    return client.connected(); // Note: connect is async, but we check immediately
   #endif
 }
 
 void mqttUnsubscribe(const char* topic) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
+    client.unsubscribe(topic);
+  #elif MQTT_LIBRARY == 1
     client.unsubscribe(topic);
   #else
     client.unsubscribe(topic);
@@ -146,15 +182,14 @@ void mqttUnsubscribe(const char* topic) {
 }
 
 void mqttOnMessage(void (*callback)(int)) {
-  #if USE_PUBSUBCLIENT
-    // PubSubClient uses setCallback with different signature, so we need a wrapper
-  #else
+  #if MQTT_LIBRARY == 1
     client.onMessage(callback);
   #endif
+  // For AsyncMQTTClient, set in setup
 }
 
 // For PubSubClient callback
-#if USE_PUBSUBCLIENT
+#if MQTT_LIBRARY == 0
 void mqttSetCallback(void (*callback)(char*, byte*, unsigned int)) {
   client.setCallback(callback);
 }
@@ -537,10 +572,12 @@ void handleGetInfo()
   json["uptime"] = uptimeBuffer;
   json["compile_date"] = String(compile_date);
   json["logBufferSize"] = getLogBufferSizeInBytes();
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
   json["mqttLibrary"] = "PubSubClient";
-  #else
+  #elif MQTT_LIBRARY == 1
   json["mqttLibrary"] = "ArduinoMqttClient";
+  #else
+  json["mqttLibrary"] = "AsyncMQTTClient";
   #endif
   
   serializeJson(json, buf, sizeof(buf)); 
@@ -1851,7 +1888,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-#if !USE_PUBSUBCLIENT
+#if MQTT_LIBRARY == 1
 void onMessageCallback(int messageSize) {
   // Read topic and payload
   String topic = client.messageTopic();
@@ -1881,17 +1918,19 @@ void reconnect()
     }
     if (!mqttConnected()) {
       Serial.print("Attempting MQTT connection...");
-      bool mqttconnected;
       String clientId = "esp_ot_" + WiFi.macAddress();
       clientId.replace(":", "");
       mqttSetId(clientId.c_str());  // Set unique client ID based on MAC
       mqttSetKeepAliveInterval(300);  // Keep-alive in seconden
-      #if !USE_PUBSUBCLIENT
+      #if MQTT_LIBRARY != 0
       if (usemqttauthentication) {
         mqttSetUsernamePassword(mqttuser.c_str(), mqttpass.c_str());
       }
       #endif
-      mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
+      #if MQTT_LIBRARY == 2
+      mqttConnect(mqttserver.c_str(), mqttport);
+      #else
+      bool mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
       if (mqttconnected) {
         sensorIndex = 0; // Reset sensor index for discovery
         PublishAllMQTTSensors();
@@ -1910,6 +1949,7 @@ void reconnect()
         Serial.print("failed, rc=");
         Serial.print(mqttConnectError());
       }
+      #endif
     }
   }
 }
@@ -2820,10 +2860,146 @@ void setup()
   mqttSetConnectionTimeout(250);     // ArduinoMqttClient connection timeout in ms (halve seconde)
   mqttSetKeepAliveInterval(300);        // Keep-alive in seconden
 
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     mqttSetCallback(MQTTcallback);
-  #else
+  #elif MQTT_LIBRARY == 1
     mqttOnMessage(onMessageCallback); // listen to callbacks
+  #else
+    // AsyncMQTTClient callbacks
+    client.onConnect([](bool sessionPresent) {
+      Info("AsyncMQTT connected");
+      if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
+        SubScribeToDomoticz();
+      }
+      sensorIndex = 0; // Reset sensor index for discovery
+      PublishAllMQTTSensors();
+      mqttPublish(host.c_str(), "online", true, 1);
+    });
+    client.onDisconnect([](AsyncMqttClientDisconnectReason reason) {
+      Error("AsyncMQTT disconnected");
+    });
+    client.onMessage([](char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+      // Handle message similar to MQTTcallback
+      String topicstr = String(topic);
+      String payloadstr = String(payload);
+
+      String value = extractRelevantStringFromPayload(payloadstr.c_str());
+
+      if (!topicstr.equals(domoticzoutputtopic)) { // prevent flooding debug log with updates from domoticzdevices
+        Info("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
+      }
+
+      // Assume succesful command 
+      bool CommandSucceeded=false;
+      
+      // Domoticz devices
+      if (topicstr.equals(domoticzoutputtopic)) {
+        handleDomoticzOutputTopic(value, payloadstr.c_str());
+
+      // climate mode
+      } else if (topicstr.equals(host+"/climate/"+String(Climate_Name)+"/mode/set")) {
+        CommandSucceeded=HandleClimateMode(value.c_str());
+
+      // Climate setpoint temperature command
+      } else if (topicstr.equals(SetpointCommandTopic(Climate_Name))) {
+        CommandSucceeded = handleClimateSetpoint(value.toFloat());
+
+      // DHW Setpoint mode receive
+      } else if (topicstr.equals(host+"/climate/"+String(DHW_Setpoint_Name)+"/mode/set")) {
+        CommandSucceeded=HandleDHWMode(value.c_str());
+
+      // Handle Enable Hotwater switch command
+      } else if (topicstr.equals(CommandTopic(EnableHotWater_Name))) {
+        CommandSucceeded=HandleSwitch(&enableHotWater, &mqtt_enable_HotWater, value.c_str());
+
+      // Weather Dependent Mode command
+      } else if (topicstr.equals(CommandTopic(Weather_Dependent_Mode_Name))) {
+        CommandSucceeded=HandleSwitch(&Weather_Dependent_Mode, &mqtt_Weather_Dependent_Mode, value.c_str());
+        if (CommandSucceeded) {
+          InitPID();
+        }
+
+      // Holiday Mode command
+      } else if (topicstr.equals(CommandTopic(Holiday_Mode_Name))) {
+        CommandSucceeded=HandleSwitch(&Holiday_Mode, &mqtt_Holiday_Mode, value.c_str());
+        if (CommandSucceeded) {
+          InitPID();
+        }
+
+      // Handle debug switch command
+      } else if (topicstr.equals(CommandTopic(Debug_Name))) {
+        Info("Received debug command: "+value);
+        CommandSucceeded=HandleSwitch(&debug, &mqtt_debug, value.c_str());
+        Info("Debugging switched "+String(value));
+
+      // Handle info switch command
+      } else if (topicstr.equals(CommandTopic(Info_Name))) {
+        Info("Received info command: "+value);
+        CommandSucceeded=HandleSwitch(&infotomqtt, &mqtt_infotomqtt, value.c_str());
+        Info("Info logging switched "+String(value));
+
+      // DHW Setpoint temperature commands
+      } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
+        dhw_SetPoint=String(payloadstr).toFloat();
+        CommandSucceeded=true; // we handled the command
+
+      // MQTT temperature received
+      } else if (topicstr.equals(mqtttemptopic)) {
+        SetMQTTTemperature(value.toFloat()); // Just try to convert
+
+      // MQTT outsidetemperature received
+      } else if (topicstr.equals(mqttoutsidetemptopic)) {
+        SetMQTTOutsideTemperature(value.toFloat()); // Just try to convert
+
+      // Boiler Vars
+      } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
+        MinBoilerTemp=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(MaxBoilerTemp_Name))) {
+        MaxBoilerTemp=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(MinimumTempDifference_Name))) {
+        minimumTempDifference=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(FrostProtectionSetPoint_Name))) {
+        FrostProtectionSetPoint=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtPlus20_Name))) {
+        BoilerTempAtPlus20=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtMinus10_Name))) {
+        BoilerTempAtMinus10=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(SwitchHeatingOffAt_Name))) {
+        SwitchHeatingOffAt=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
+        ReferenceRoomCompensation=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(KP_Name))) {
+        KP=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(KI_Name))) {
+        KI=value.toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(NumberCommandTopic(KD_Name))) {
+        KD=String(payloadstr).toFloat();
+        CommandSucceeded=true;
+      } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
+        Curvature=getCurvatureIntFromString(payloadstr);
+        CommandSucceeded=true;
+      } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
+        CommandSucceeded = handleMQTTTopicChange(mqtttemptopic, value);
+      }
+      else if (topicstr.equals(String(host)+"/text/"+String(MQTT_OutsideTempTopic_Name)+"/set")) {
+        Info("Setting outsideTempTopic to "+String(payloadstr));
+        CommandSucceeded = handleMQTTTopicChange(mqttoutsidetemptopic, value);
+
+      // Unknown topic (this code should never be reached, indicates programming logic error)  
+      } else {
+        LogMQTT(topicstr.c_str(),payloadstr.c_str(),String(len).c_str(),"unknown topic");
+      }
+    });
   #endif
 }
 
