@@ -193,6 +193,25 @@ void mqttOnMessage(void (*callback)(int)) {
   // For AsyncMQTTClient, set in setup
 }
 
+#if MQTT_LIBRARY == 1 // ArduinoMqttClient
+void onMessageCallback(int messageSize) {
+  // Read topic and payload
+  String topic = client.messageTopic();
+  String payload = client.readString();
+
+  // Convert to old format for compatibility (optional, if you don't want to adjust the rest of the code)
+  char topicChar[topic.length() + 1];
+  topic.toCharArray(topicChar, topic.length() + 1);
+  char payloadChar[payload.length() + 1];
+  payload.toCharArray(payloadChar, payload.length() + 1);
+
+  // Call the old logic (adjust if necessary)
+  MQTTcallback(topicChar, (byte*)payloadChar, payload.length());
+}
+#endif
+
+
+
 // For PubSubClient callback
 #if MQTT_LIBRARY == 0 // PubSubClient
 void mqttSetCallback(void (*callback)(char*, byte*, unsigned int)) {
@@ -1893,23 +1912,6 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-#if MQTT_LIBRARY == 1
-void onMessageCallback(int messageSize) {
-  // Read topic and payload
-  String topic = client.messageTopic();
-  String payload = client.readString();
-
-  // Convert to old format for compatibility (optional, if you don't want to adjust the rest of the code)
-  char topicChar[topic.length() + 1];
-  topic.toCharArray(topicChar, topic.length() + 1);
-  char payloadChar[payload.length() + 1];
-  payload.toCharArray(payloadChar, payload.length() + 1);
-
-  // Call the old logic (adjust if necessary)
-  MQTTcallback(topicChar, (byte*)payloadChar, payload.length());
-}
-#endif
-
 void SubScribeToDomoticz() {
   mqttSubscribe(domoticzoutputtopic.c_str(), 0);
 }
@@ -1945,12 +1947,6 @@ void reconnect()
         if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();
         }  
-        Debug("attempting NTP.forceUpdate");    
-        if (timeClient.forceUpdate()) {
-          Info("Time was set");
-        } else {
-          Error("Time was not set");
-        }
       } else {
         Serial.print("failed, rc=");
         Serial.print(mqttConnectError());
