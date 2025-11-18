@@ -26,6 +26,7 @@ Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm
 - OTA updates preserve the filesystem (LittleFS) but may require re-uploading config if needed.
 
 ### MQTT Reliability Improvements
+- Uses AsyncMQTTClient library for asynchronous MQTT operations, improving performance and stability.
 - Connection checks ensure MQTT functions only run when connected, preventing errors.
 - Batch sensor publishing (one per heartbeat) prevents broker overload during discovery.
 - Detailed logging for WiFi/MQTT connections, PID values, and sensor publishing.
@@ -101,6 +102,7 @@ The following devices are created using MQTT autodiscovery in Domoticz and Home 
 - A HotWater Setpoint device: (if supported by your boiler) The desired temperature of the hot water reserve in your heating system
 - A Holiday Mode switch: Prevents heating when in thermostat mode (only frost protection)
 - A Weather Dependent Mode switch: When in thermostat mode, decides whether to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature
+- A Reset Device button: Triggers a device reboot (equivalent to HTTP /reset command)
 - Several sensors containing the state of the heating system
 - WiFi RSSI sensor: Monitors signal strength in dBm
 - Log sensor: Receives debug and info messages from the device
@@ -114,6 +116,7 @@ Additional devices:
 - An EnableHotWater device and HotWater Setpoint device for hot water control
 - A Holiday Mode switch: Prevents heating when in thermostat mode (only frost protection)
 - A Weather Dependent Mode switch: When in thermostat mode, decides whether to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature
+- A Reset Device button: Triggers a device reboot
 
 Thermostat mode includes:
 - PID-based temperature control for precise regulation
@@ -248,6 +251,9 @@ The device configuration is stored in a JSON file on the LittleFS filesystem. Yo
   "mqttoutsidetemptopic": "your_outside_temperature_topic",
   "debugtomqtt": false,
   "infotomqtt": true,
+  "inpin": 4,
+  "outpin": 5,
+  "temppin": 14,
   "climateMode": "heat",
   "climateSetpoint": 20,
   "weatherDependentMode": false,
@@ -279,6 +285,9 @@ The device configuration is stored in a JSON file on the LittleFS filesystem. Yo
 - `mqttoutsidetemptopic` (string): MQTT topic for outside temperature sensor (leave empty to use boiler-reported temperature)
 - `debugtomqtt` (boolean): Send debug messages to MQTT (warning: can cause instability)
 - `infotomqtt` (boolean): Send info messages to MQTT
+- `inpin` (integer): OpenTherm input pin (default: 4, not configurable in current firmware)
+- `outpin` (integer): OpenTherm output pin (default: 5, not configurable in current firmware)
+- `temppin` (integer): DS18B20 temperature sensor pin (default: 14, not configurable in current firmware)
 - `climateMode` (string): Thermostat mode ("off", "heat", "cool", "auto")
 - `climateSetpoint` (integer): Target temperature for thermostat mode
 - `weatherDependentMode` (boolean): Enable/disable weather-dependent heating
