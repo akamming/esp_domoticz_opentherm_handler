@@ -24,11 +24,14 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #include <DallasTemperature.h>    // temperature sensors by mile burton
 #include <ArduinoOTA.h>           // OTA updates
 #include <ArduinoJson.h>          // make JSON payloads
-#define USE_PUBSUBCLIENT 1        // Set to 1 for PubSubClient, 0 for ArduinoMqttClient
-#if USE_PUBSUBCLIENT
+#define MQTT_LIBRARY 2        // Set to 0 for PubSubClient, 1 for ArduinoMqttClient, 2 for AsyncMQTTClient
+#if MQTT_LIBRARY == 0
 #include <PubSubClient.h>
-#else
+#elif MQTT_LIBRARY == 1
 #include <ArduinoMqttClient.h>
+#else
+#include <ESPAsyncTCP.h>
+#include <AsyncMqttClient.h>
 #endif
 #include "domesphelper.h"               // Set Configuration and default constants
 #include <LittleFS.h>             // Filesystem
@@ -43,82 +46,108 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 std::vector<String> logBuffer;
 const int MAX_LOG_BUFFER = 200;
 
+// MQTT Async connect parameters
+String mqttClientId = "";
+
 // Generic MQTT helper functions
 WiFiClient espClient;
-#if USE_PUBSUBCLIENT
+#if MQTT_LIBRARY == 0
 PubSubClient client(espClient);
-#else
+#elif MQTT_LIBRARY == 1
 MqttClient client(espClient);
+#else
+AsyncMqttClient client;
 #endif
 
 bool mqttConnected() {
-  return client.connected();
+  #if MQTT_LIBRARY == 2 // async library
+    return client.connected();
+  #else // other libraries
+    return client.connected();
+  #endif
 }
 
 int mqttConnectError() {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     return client.state();
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
     return client.connectError();
+  #else // AsyncMQTTClient
+    return client.connected() ? 0 : -1; // AsyncMQTTClient doesn't have a direct error code
   #endif
 }
 
 void mqttSubscribe(const char* topic, int qos = 0) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     client.subscribe(topic);
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
+    client.subscribe(topic, qos);
+  #else // AsyncMQTTClient
     client.subscribe(topic, qos);
   #endif
 }
 
 void mqttPoll() {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     client.loop();
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.poll();
   #endif
+  // For AsyncMQTTClient, no loop needed
 }
 
 bool mqttPublish(const char* topic, const char* payload, bool retained, int qos = 0) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     return client.publish(topic, payload, retained);
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.beginMessage(topic, retained, qos);
     client.print(payload);
     return client.endMessage() != 0;
+  #else // AsyncMQTTClient
+    return client.publish(topic, qos, retained, payload);
   #endif
 }
 
 void mqttSetConnectionTimeout(int timeout) {
-  #if !USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.setConnectionTimeout(timeout);
+  #elif MQTT_LIBRARY == 2 // AsyncMQTTClient
+    // AsyncMQTTClient uses setKeepAlive
   #endif
 }
 
 void mqttSetKeepAliveInterval(int interval) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     // PubSubClient uses setKeepAlive in connect
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.setKeepAliveInterval(interval);
+  #else // AsyncMQTTClient
+    client.setKeepAlive(interval);
   #endif
 }
 
 void mqttSetId(const char* clientId) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     // PubSubClient sets ID in connect
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.setId(clientId);
+  #else // AsyncMQTTClient
+    client.setClientId(clientId);
   #endif
 }
 
-#if !USE_PUBSUBCLIENT
+#if MQTT_LIBRARY != 0 // pubsubclient does not support mqttset username/password
 void mqttSetUsernamePassword(const char* user, const char* pass) {
+  #if MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.setUsernamePassword(user, pass);
+  #else // AsyncMQTTClient
+    client.setCredentials(user, pass);
+  #endif
 }
 #endif
 
 bool mqttConnect(const char* server, int port) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     client.setServer(server, port);
     client.setBufferSize(2048); // For longer discoverymessages
     String willTopic = host + "/status";
@@ -132,29 +161,59 @@ bool mqttConnect(const char* server, int port) {
       mqttPublish(willTopic.c_str(), "online", true, 1);
     }
     return connected;
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
     return client.connect(server, port);
+  #else // AsyncMQTTClient
+    client.setServer(server, port);
+    client.setWill(host.c_str(), 1, true, "offline");
+    client.setClientId(mqttClientId.c_str());
+    client.setKeepAlive(300);
+    if (usemqttauthentication) {
+      client.setCredentials(mqttuser.c_str(), mqttpass.c_str());
+    }
+    client.connect();
+    return true; // Async connect started
   #endif
 }
 
 void mqttUnsubscribe(const char* topic) {
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0 // PubSubClient
     client.unsubscribe(topic);
-  #else
+  #elif MQTT_LIBRARY == 1 // ArduinoMqttClient
+    client.unsubscribe(topic);
+  #else // AsyncMQTTClient
     client.unsubscribe(topic);
   #endif
 }
 
 void mqttOnMessage(void (*callback)(int)) {
-  #if USE_PUBSUBCLIENT
-    // PubSubClient uses setCallback with different signature, so we need a wrapper
-  #else
+  #if MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.onMessage(callback);
   #endif
+  // For AsyncMQTTClient, set in setup
 }
 
+#if MQTT_LIBRARY == 1 // ArduinoMqttClient
+void onMessageCallback(int messageSize) {
+  // Read topic and payload
+  String topic = client.messageTopic();
+  String payload = client.readString();
+
+  // Convert to old format for compatibility (optional, if you don't want to adjust the rest of the code)
+  char topicChar[topic.length() + 1];
+  topic.toCharArray(topicChar, topic.length() + 1);
+  char payloadChar[payload.length() + 1];
+  payload.toCharArray(payloadChar, payload.length() + 1);
+
+  // Call the old logic (adjust if necessary)
+  MQTTcallback(topicChar, (byte*)payloadChar, payload.length());
+}
+#endif
+
+
+
 // For PubSubClient callback
-#if USE_PUBSUBCLIENT
+#if MQTT_LIBRARY == 0 // PubSubClient
 void mqttSetCallback(void (*callback)(char*, byte*, unsigned int)) {
   client.setCallback(callback);
 }
@@ -282,6 +341,7 @@ bool OTAUpdateInProgress = false;
 int sensorIndex = 0;
 bool isPublishingAllSensors = false;
 bool firstPublishDone = false;
+unsigned long resetButtonSubscribeTime = 0;
 
 // object for uploading files
 File fsUploadFile;
@@ -537,10 +597,12 @@ void handleGetInfo()
   json["uptime"] = uptimeBuffer;
   json["compile_date"] = String(compile_date);
   json["logBufferSize"] = getLogBufferSizeInBytes();
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
   json["mqttLibrary"] = "PubSubClient";
-  #else
+  #elif MQTT_LIBRARY == 1
   json["mqttLibrary"] = "ArduinoMqttClient";
+  #else
+  json["mqttLibrary"] = "AsyncMQTTClient";
   #endif
   
   serializeJson(json, buf, sizeof(buf)); 
@@ -1845,28 +1907,21 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     Info("Setting outsideTempTopic to "+String(payloadstr));
     CommandSucceeded = handleMQTTTopicChange(mqttoutsidetemptopic, value);
 
+  } else if (topicstr.equals(host+"/button/"+String(Reset_Device_Name)+"/set")) {
+    if (value.equals("PRESS")) {
+      if (millis() - resetButtonSubscribeTime < 5000) {
+        Info("Ignoring possible retained reset button press message");
+      } else {
+        handleReset();
+        CommandSucceeded = true;
+      }
+    }
+
   // Unknown topic (this code should never be reached, indicates programming logic error)  
   } else {
     LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
   }
 }
-
-#if !USE_PUBSUBCLIENT
-void onMessageCallback(int messageSize) {
-  // Read topic and payload
-  String topic = client.messageTopic();
-  String payload = client.readString();
-
-  // Convert to old format for compatibility (optional, if you don't want to adjust the rest of the code)
-  char topicChar[topic.length() + 1];
-  topic.toCharArray(topicChar, topic.length() + 1);
-  char payloadChar[payload.length() + 1];
-  payload.toCharArray(payloadChar, payload.length() + 1);
-
-  // Call the old logic (adjust if necessary)
-  MQTTcallback(topicChar, (byte*)payloadChar, payload.length());
-}
-#endif
 
 void SubScribeToDomoticz() {
   mqttSubscribe(domoticzoutputtopic.c_str(), 0);
@@ -1881,17 +1936,20 @@ void reconnect()
     }
     if (!mqttConnected()) {
       Serial.print("Attempting MQTT connection...");
-      bool mqttconnected;
       String clientId = "esp_ot_" + WiFi.macAddress();
       clientId.replace(":", "");
       mqttSetId(clientId.c_str());  // Set unique client ID based on MAC
       mqttSetKeepAliveInterval(300);  // Keep-alive in seconden
-      #if !USE_PUBSUBCLIENT
+      mqttClientId = clientId;
+      #if MQTT_LIBRARY != 0
       if (usemqttauthentication) {
         mqttSetUsernamePassword(mqttuser.c_str(), mqttpass.c_str());
       }
       #endif
-      mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
+      #if MQTT_LIBRARY == 2
+      mqttConnect(mqttserver.c_str(), mqttport);
+      #else
+      bool mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
       if (mqttconnected) {
         sensorIndex = 0; // Reset sensor index for discovery
         PublishAllMQTTSensors();
@@ -1900,16 +1958,11 @@ void reconnect()
         if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
           SubScribeToDomoticz();
         }  
-        Debug("attempting NTP.forceUpdate");    
-        if (timeClient.forceUpdate()) {
-          Info("Time was set");
-        } else {
-          Error("Time was not set");
-        }
       } else {
         Serial.print("failed, rc=");
         Serial.print(mqttConnectError());
       }
+      #endif
     }
   }
 }
@@ -1963,6 +2016,34 @@ bool UpdateMQTTSwitch(const char* uniquename, bool& currentValue, bool newValue,
     return true;
   }
   return false;
+}
+
+void PublishMQTTButton(const char* uniquename)
+{
+  Info("Publishing button: " + String(uniquename));
+  JsonDocument json;
+
+  // Construct JSON config message
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["cmd_t"] = host+"/button/"+String(uniquename)+"/set";
+  json["payload_press"] = "PRESS";
+  json["availability_topic"] = "domesphelper/status";
+
+  addDeviceToJson(&json);
+
+  // Publish config message
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/button/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+
+  // subscribe if need to listen to commands
+  mqttSubscribe((host+"/button/"+String(uniquename)+"/set").c_str(), 0);
+
+  // Record subscribe time for reset button to ignore retained messages
+  if (String(uniquename).equals(String(Reset_Device_Name))) {
+    resetButtonSubscribeTime = millis();
+  }
 }
 
 void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
@@ -2693,7 +2774,8 @@ bool PublishAllMQTTSensors()
     case 89: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI(), true); break;
     case 90: PublishMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name); break;
     case 91: UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
-    case 92:
+    case 92: PublishMQTTButton(Reset_Device_Name); break;
+    case 93:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");
@@ -2820,10 +2902,29 @@ void setup()
   mqttSetConnectionTimeout(250);     // ArduinoMqttClient connection timeout in ms (halve seconde)
   mqttSetKeepAliveInterval(300);        // Keep-alive in seconden
 
-  #if USE_PUBSUBCLIENT
+  #if MQTT_LIBRARY == 0
     mqttSetCallback(MQTTcallback);
-  #else
+  #elif MQTT_LIBRARY == 1
     mqttOnMessage(onMessageCallback); // listen to callbacks
+  #else
+    // AsyncMQTTClient callbacks
+    client.onConnect([](bool sessionPresent) {
+      Info("AsyncMQTT connected");
+      if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
+        SubScribeToDomoticz();
+      }
+      sensorIndex = 0; // Reset sensor index for discovery
+      PublishAllMQTTSensors();
+      String willTopic = host + "/status";
+      mqttPublish(willTopic.c_str(), "online", true, 1);
+    });
+    client.onDisconnect([](AsyncMqttClientDisconnectReason reason) {
+      Error("AsyncMQTT disconnected");
+    });
+    client.onMessage([](char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+      // Call the common MQTT callback
+      MQTTcallback(topic, (byte*)payload, (unsigned int)len);
+    });
   #endif
 }
 
