@@ -341,6 +341,7 @@ bool OTAUpdateInProgress = false;
 int sensorIndex = 0;
 bool isPublishingAllSensors = false;
 bool firstPublishDone = false;
+unsigned long resetButtonSubscribeTime = 0;
 
 // object for uploading files
 File fsUploadFile;
@@ -1906,6 +1907,16 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     Info("Setting outsideTempTopic to "+String(payloadstr));
     CommandSucceeded = handleMQTTTopicChange(mqttoutsidetemptopic, value);
 
+  } else if (topicstr.equals(host+"/button/"+String(Reset_Device_Name)+"/set")) {
+    if (value.equals("PRESS")) {
+      if (millis() - resetButtonSubscribeTime < 5000) {
+        Info("Ignoring possible retained reset button press message");
+      } else {
+        handleReset();
+        CommandSucceeded = true;
+      }
+    }
+
   // Unknown topic (this code should never be reached, indicates programming logic error)  
   } else {
     LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
@@ -2005,6 +2016,34 @@ bool UpdateMQTTSwitch(const char* uniquename, bool& currentValue, bool newValue,
     return true;
   }
   return false;
+}
+
+void PublishMQTTButton(const char* uniquename)
+{
+  Info("Publishing button: " + String(uniquename));
+  JsonDocument json;
+
+  // Construct JSON config message
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["cmd_t"] = host+"/button/"+String(uniquename)+"/set";
+  json["payload_press"] = "PRESS";
+  json["availability_topic"] = "domesphelper/status";
+
+  addDeviceToJson(&json);
+
+  // Publish config message
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/button/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+
+  // subscribe if need to listen to commands
+  mqttSubscribe((host+"/button/"+String(uniquename)+"/set").c_str(), 0);
+
+  // Record subscribe time for reset button to ignore retained messages
+  if (String(uniquename).equals(String(Reset_Device_Name))) {
+    resetButtonSubscribeTime = millis();
+  }
 }
 
 void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
@@ -2735,7 +2774,8 @@ bool PublishAllMQTTSensors()
     case 89: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI(), true); break;
     case 90: PublishMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name); break;
     case 91: UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
-    case 92:
+    case 92: PublishMQTTButton(Reset_Device_Name); break;
+    case 93:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");
