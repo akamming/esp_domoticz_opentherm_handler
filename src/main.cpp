@@ -308,7 +308,7 @@ float mqtt_kd=99;
 float mqtt_p=99;
 float mqtt_i=99;
 float mqtt_d=99;
-float mqtt_wifi_rssi=0;
+int mqtt_wifi_rssi=0;
 String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
@@ -1096,7 +1096,7 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     UpdateMQTTNumberSensor(P_Name, mqtt_p, P, 0.01);
     UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01);
     UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01);
-    UpdateMQTTNumberSensor(WiFi_RSSI_Name, mqtt_wifi_rssi, WiFi.RSSI(), 1.0);
+    UpdateMQTTRSSISensor(WiFi_RSSI_Name, mqtt_wifi_rssi, WiFi.RSSI(), false);
     UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic);
     UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic);
     if (mqtt_Curvature!=Curvature) {
@@ -2179,20 +2179,23 @@ void PublishMQTTRSSISensor(const char* uniquename)
   mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
-void UpdateMQTTRSSISensor(const char* uniquename, int rssi, bool force)
+void UpdateMQTTRSSISensor(const char* uniquename, int& currentValue, int newValue, bool force)
 {
   if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
 
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTRSSISensor");
-    JsonDocument json;
+  if (force || currentValue != newValue) {
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTRSSISensor");
+      JsonDocument json;
 
-    // Create message
-    char state[128];
-    json["value"] = rssi;
-    serializeJson(json, state);  // buf now contains the json 
+      // Create message
+      char state[128];
+      json["value"] = newValue;
+      serializeJson(json, state);  // buf now contains the json 
 
-    mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+    }
+    currentValue = newValue;
   }
 }
 
@@ -2793,7 +2796,7 @@ bool PublishAllMQTTSensors()
     case 86: PublishMQTTTextSensor(IP_Address_Name); break;
     case 87: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true); break;
     case 88: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
-    case 89: UpdateMQTTRSSISensor(WiFi_RSSI_Name, WiFi.RSSI(), true); break;
+    case 89: UpdateMQTTRSSISensor(WiFi_RSSI_Name, mqtt_wifi_rssi, WiFi.RSSI(), true); break;
     case 90: PublishMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name); break;
     case 91: UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
     case 92: PublishMQTTButton(Reset_Device_Name); break;

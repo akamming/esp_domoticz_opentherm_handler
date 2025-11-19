@@ -199,7 +199,7 @@ void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool new
 void PublishMQTTTemperatureSensor(const char* uniquename);
 bool UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force = false);
 void PublishMQTTRSSISensor(const char* uniquename);
-void UpdateMQTTRSSISensor(const char* uniquename, int rssi, bool force = false);
+void UpdateMQTTRSSISensor(const char* uniquename, int& currentValue, int newValue, bool force = false);
 void UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force = false);
 void PublishMQTTPressureSensor(const char* uniquename);
 void UpdateMQTTPressureSensor(const char* uniquename, float& currentValue, float newValue, bool force);
