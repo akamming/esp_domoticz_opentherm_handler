@@ -2666,21 +2666,27 @@ void updateTime() {
 }
 
 String getUptimeString() {
-  String uptimeStr = "";
-  if (y > 0) {
-    uptimeStr += String(y) + " years, ";
+  // Calculate total seconds (approximate, ignoring leap years)
+  unsigned long total_seconds = (unsigned long)y * 365 * 24 * 3600 + (unsigned long)d * 24 * 3600 + (unsigned long)h * 3600 + (unsigned long)m * 60 + s;
+  
+  unsigned long days = total_seconds / 86400;
+  unsigned long hours = (total_seconds % 86400) / 3600;
+  unsigned long minutes = (total_seconds % 3600) / 60;
+  unsigned long seconds = total_seconds % 60;
+  
+  String timeStr = "";
+  if (hours < 10) timeStr += "0";
+  timeStr += String(hours) + ":";
+  if (minutes < 10) timeStr += "0";
+  timeStr += String(minutes) + ":";
+  if (seconds < 10) timeStr += "0";
+  timeStr += String(seconds);
+  
+  if (days > 0) {
+    return String(days) + " days, " + timeStr;
+  } else {
+    return timeStr;
   }
-  if (d > 0 || y > 0) {
-    uptimeStr += String(d) + " days, ";
-  }
-  if (h > 0 || d > 0 || y > 0) {
-    uptimeStr += String(h) + " hrs, ";
-  }
-  if (m > 0 || h > 0 || d > 0 || y > 0) {
-    uptimeStr += String(m) + " mins, ";
-  }
-  uptimeStr += String(s) + " secs, " + String(ms) + " msec";
-  return uptimeStr;
 }
 
 void SubscribeToTempTopics() {
