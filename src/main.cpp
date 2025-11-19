@@ -411,7 +411,7 @@ void SendHTTP(String command, String result) {
   json["Command"] = command;
   json["Result"] = result;
   json["CompileDate"] = compile_date;
-  json["uptime"] =  String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" mins & "+String(s)+" secs";
+  json["uptime"] = getUptimeString();
 
   // Add Opentherm Status
   if (responseStatus == OpenThermResponseStatus::SUCCESS) {
@@ -592,9 +592,7 @@ void handleGetInfo()
   }
   json["mqttstate"] = mqttConnectError();
   json["currentTime"] = timeClient.getFormattedTime();
-  char uptimeBuffer[128];
-  snprintf(uptimeBuffer, sizeof(uptimeBuffer), "%d years, %d days, %d hrs, %d ms, %d secs, %d msec", y, d, h, m, s, ms);
-  json["uptime"] = uptimeBuffer;
+  json["uptime"] = getUptimeString();
   json["compile_date"] = String(compile_date);
   json["logBufferSize"] = getLogBufferSizeInBytes();
   #if MQTT_LIBRARY == 0
@@ -675,7 +673,7 @@ void handleGetConfig()
   
   // Add runtime info
   json["heap"] = ESP.getFreeHeap();
-  json["uptime"] = String(y)+" years, "+String(d)+" days, "+String(h)+" hrs, "+String(m)+" ms, "+String(s)+" secs, "+String(ms)+" msec";
+  json["uptime"] = getUptimeString();
 
   // Send output with pretty formatting
   char buf[2048];
@@ -2665,6 +2663,24 @@ void updateTime() {
     }
   }
   previousMillis=millis();
+}
+
+String getUptimeString() {
+  String uptimeStr = "";
+  if (y > 0) {
+    uptimeStr += String(y) + " years, ";
+  }
+  if (d > 0 || y > 0) {
+    uptimeStr += String(d) + " days, ";
+  }
+  if (h > 0 || d > 0 || y > 0) {
+    uptimeStr += String(h) + " hrs, ";
+  }
+  if (m > 0 || h > 0 || d > 0 || y > 0) {
+    uptimeStr += String(m) + " mins, ";
+  }
+  uptimeStr += String(s) + " secs, " + String(ms) + " msec";
+  return uptimeStr;
 }
 
 void SubscribeToTempTopics() {

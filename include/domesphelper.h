@@ -222,3 +222,4 @@ bool UpdateMQTTSetpoint(const char* uniquename, float& currentValue, float newVa
 void UpdateClimateSetpointMode(bool force = false);
 void updateTime();
 bool PublishAllMQTTSensors();
+String getUptimeString();
