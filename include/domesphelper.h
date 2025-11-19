@@ -73,6 +73,7 @@ const char Log_Name[] = "Log";
 const char Info_Name[] = "InfoToMQTT";
 const char IP_Address_Name[] = "Device_IP_Address";
 const char WiFi_RSSI_Name[] = "WiFi_RSSI";
+const char Uptime_Name[] = "Uptime";
 const char Reset_Device_Name[] = "Reset_Device";
                     
 //application constants
@@ -200,6 +201,8 @@ void PublishMQTTTemperatureSensor(const char* uniquename);
 bool UpdateMQTTTemperatureSensor(const char* uniquename, float& currentValue, float newValue, bool force = false);
 void PublishMQTTRSSISensor(const char* uniquename);
 void UpdateMQTTRSSISensor(const char* uniquename, int& currentValue, int newValue, bool force = false);
+void PublishMQTTUptimeSensor(const char* uniquename);
+void UpdateMQTTUptimeSensor(const char* uniquename, unsigned long& currentValue, unsigned long newValue, bool force = false);
 void UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force = false);
 void PublishMQTTPressureSensor(const char* uniquename);
 void UpdateMQTTPressureSensor(const char* uniquename, float& currentValue, float newValue, bool force);
@@ -223,3 +226,4 @@ void UpdateClimateSetpointMode(bool force = false);
 void updateTime();
 bool PublishAllMQTTSensors();
 String getUptimeString();
+unsigned long getUptimeSeconds();

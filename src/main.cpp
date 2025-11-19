@@ -309,6 +309,7 @@ float mqtt_p=99;
 float mqtt_i=99;
 float mqtt_d=99;
 int mqtt_wifi_rssi=0;
+unsigned long mqtt_uptime=0;
 String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
@@ -1134,6 +1135,8 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
 
     // Frost Protection Active
     UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, false);
+    // Uptime Sensor
+    UpdateMQTTUptimeSensor(Uptime_Name, mqtt_uptime, getUptimeSeconds(), false);
   }
 }
 
@@ -2578,6 +2581,47 @@ void UpdateMQTTCurvatureSelect(const char* uniquename,int value, bool force)
   }
 }
 
+void PublishMQTTUptimeSensor(const char* uniquename)
+{
+  Info("Publishing uptime sensor: " + String(uniquename));
+  JsonDocument json;
+
+  // Create message
+  json["value_template"] = "{{ value_json.value }}";
+  json["device_class"] = "duration";
+  json["unit_of_measurement"] = "s";
+  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["name"] = uniquename;
+  json["unique_id"] = host+"_"+uniquename;
+  json["availability_topic"] = "domesphelper/status";
+
+  addDeviceToJson(&json);
+
+  // publish the Message
+  char buf[1024];
+  serializeJson(json, buf);
+  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+}
+
+void UpdateMQTTUptimeSensor(const char* uniquename, unsigned long& currentValue, unsigned long newValue, bool force)
+{
+  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
+
+  if (force || (newValue - currentValue >= 5)) { // update every 5 seconds
+    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+      Serial.println("UpdateMQTTUptimeSensor");
+      // Create message
+      char state[128];
+      JsonDocument json;
+      json["value"] = newValue;
+      serializeJson(json, state);  // buf now contains the json
+      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+    }
+    currentValue = newValue;
+  }
+}
+
 
 void UpdateClimateSetpointMode(bool force)
 {
@@ -2692,6 +2736,11 @@ String getUptimeString() {
   }
 }
 
+unsigned long getUptimeSeconds() {
+  // Calculate total seconds (approximate, ignoring leap years)
+  return (unsigned long)y * 365 * 24 * 3600 + (unsigned long)d * 24 * 3600 + (unsigned long)h * 3600 + (unsigned long)m * 60 + s;
+}
+
 void SubscribeToTempTopics() {
   if (mqtttemptopic.length()>0 && mqtttemptopic.toInt()==0) {
     Info("Subscribing to temperature topic: " + mqtttemptopic);
@@ -2800,7 +2849,9 @@ bool PublishAllMQTTSensors()
     case 90: PublishMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name); break;
     case 91: UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
     case 92: PublishMQTTButton(Reset_Device_Name); break;
-    case 93:
+    case 93: PublishMQTTUptimeSensor(Uptime_Name); break;
+    case 94: UpdateMQTTUptimeSensor(Uptime_Name, mqtt_uptime, getUptimeSeconds(), true); break;
+    case 95:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");
