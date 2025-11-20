@@ -77,6 +77,7 @@ const char IP_Address_Name[] = "Device_IP_Address";
 const char WiFi_RSSI_Name[] = "WiFi_RSSI";
 const char Uptime_Name[] = "Uptime";
 const char Reset_Device_Name[] = "Reset_Device";
+const char Free_Heap_Name[] = "Free_Heap";
                     
 //application constants
 #define CONFIGFILE  "/config.json"                // name of the config file on the SPIFFS image
