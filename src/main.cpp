@@ -353,7 +353,7 @@ OneWire oneWire(14);                  // for OneWire Bus. Data wire is connected
 DallasTemperature sensors(&oneWire);  // for the temp sensor on one wire bus
 OpenTherm ot(4,5);                    // pin number for opentherm adapter connection, 2/3 for Arduino, 4/5 for ESP8266 (D2), 21/22 for ESP32
 WiFiUDP ntpUDP;                       // for NTP client
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 3600000); //  Set the timeserver (incl offset and interval)
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 24 * 60 * 60 * 1000); //  Set the timeserver (incl offset and interval)
 
 
 
@@ -857,6 +857,17 @@ bool serveFile(const char url[])
   return false;
 }
 
+
+void handleDir() {
+  String html = "<html><head><title>SPIFFS Directory</title></head><body><h1>SPIFFS Files</h1><p><a href=\"/upload\">upload files</a></p><ul>";
+  Dir dir = LittleFS.openDir("/");
+  while (dir.next()) {
+    String fileName = dir.fileName();
+    html += "<li><a href=\"" + fileName + "\">" + fileName + "</a></li>";
+  }
+  html += "</ul></body></html>";
+  server.send(200, "text/html", html);
+}
 
 void handleNotFound()
 {
@@ -2910,6 +2921,7 @@ void setup()
   server.on("/upload", HTTP_GET, sendUploadForm);  
   server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
   server.on("/config.json", handleConfigJsonFile); // serve config.json from file, masking password
+  server.on("/dir", handleDir);
   server.onNotFound(handleNotFound);
 
   // Initialize OTA
