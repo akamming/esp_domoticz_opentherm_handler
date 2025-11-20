@@ -859,14 +859,27 @@ bool serveFile(const char url[])
 
 
 void handleDir() {
-  String html = "<html><head><title>SPIFFS Directory</title></head><body><h1>SPIFFS Files</h1><p><a href=\"/upload\">upload files</a></p><ul>";
+  String html = "<html><head><title>SPIFFS Directory</title></head><body><h1>SPIFFS Files</h1><ul>";
   Dir dir = LittleFS.openDir("/");
   while (dir.next()) {
     String fileName = dir.fileName();
-    html += "<li><a href=\"" + fileName + "\">" + fileName + "</a></li>";
+    html += "<li><a href=\"" + fileName + "\">" + fileName + "</a> <a href=\"/delete?file=" + fileName + "\">(delete)</a></li>";
   }
-  html += "</ul></body></html>";
+  html += "</ul><p><a href=\"/upload\">upload files</a> <a href=\"http://" + host + "/\">back to GUI</a></p></body></html>";
   server.send(200, "text/html", html);
+}
+
+void handleDelete() {
+  if (server.hasArg("file")) {
+    String fileName = server.arg("file");
+    if (LittleFS.remove("/" + fileName)) {
+      server.send(200, "text/html", "<p>File deleted. <a href=\"/dir\">Back to dir</a></p>");
+    } else {
+      server.send(200, "text/html", "<p>Failed to delete file. <a href=\"/dir\">Back to dir</a></p>");
+    }
+  } else {
+    server.send(400, "text/plain", "Missing file parameter");
+  }
 }
 
 void handleNotFound()
@@ -2922,6 +2935,7 @@ void setup()
   server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
   server.on("/config.json", handleConfigJsonFile); // serve config.json from file, masking password
   server.on("/dir", handleDir);
+  server.on("/delete", handleDelete);
   server.onNotFound(handleNotFound);
 
   // Initialize OTA
