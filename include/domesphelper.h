@@ -10,6 +10,7 @@ const char*  DEFAULT_MQTTTEMP_TOPIC = "";
 const char*  DEFAULT_MQTTOUTSIDETEMP_TOPIC = "";
 const bool   DEFAULT_DEBUG = true;
 const bool   DEFAULT_INFOTOMQTT = true;
+const bool   DEFAULT_ENABLE_LOG_TO_SPIFFS = true;
 const int    DEFAULT_KP = 30;
 const float  DEFAULT_KI = 0.01f;
 const float  DEFAULT_KD = 2.5f;
@@ -71,6 +72,7 @@ const char MQTT_OutsideTempTopic_Name[] = "MQTTOutsideTemperatureTopic";
 const char Debug_Name[] = "DebugToMQTT";
 const char Log_Name[] = "Log";
 const char Info_Name[] = "InfoToMQTT";
+const char EnableLogToSPIFFS_Name[] = "EnableLogToSPIFFS";
 const char IP_Address_Name[] = "Device_IP_Address";
 const char WiFi_RSSI_Name[] = "WiFi_RSSI";
 const char Uptime_Name[] = "Uptime";
@@ -112,8 +114,9 @@ String domoticzoutputtopic="domoticz/out";        // Topic where to listen to fo
 // Default values Climate Decice 
 float climate_SetPoint = 20;                      // default setpoint value for climate device
 String climate_Mode = "off";                      // Default mode for climate device
-bool Weather_Dependent_Mode = false;              // Default setting for weather dependent mode
+bool Weather_Dependent_Mode = false;                        // Default setting for weather dependent mode
 bool Holiday_Mode = false;                        // Default setting for holiday mode
+bool enableLogToSPIFFS = true;                          // Default setting for logging to SPIFFS
 
 // PID parameters
 float KP = 30; // Proportional gain: This is the Multiplier of  the error (e.g. KP=30: 1 degree error will result in 30 degrees change of the pid value)

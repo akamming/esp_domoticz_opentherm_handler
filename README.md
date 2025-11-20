@@ -102,6 +102,7 @@ The following devices are created using MQTT autodiscovery in Domoticz and Home 
 - A HotWater Setpoint device: (if supported by your boiler) The desired temperature of the hot water reserve in your heating system
 - A Holiday Mode switch: Prevents heating when in thermostat mode (only frost protection)
 - A Weather Dependent Mode switch: When in thermostat mode, decides whether to use the PID regulator or the Weather Dependent mode, where the boiler setpoint is derived from the outside temperature
+- An Enable Log to SPIFFS switch: Controls whether debug/info logs are written to the device's filesystem for debugging purposes
 - A Reset Device button: Triggers a device reboot (equivalent to HTTP /reset command)
 - Several sensors containing the state of the heating system
 - WiFi RSSI sensor: Monitors signal strength in dBm
@@ -209,6 +210,8 @@ For connecting to wifi:
 - Debug to MQTT: Send debug logs to MQTT
   - **Warning:** Enabling debug logging can make the application unstable due to the large number of log messages. It is only intended for debugging purposes and should not be used in normal operation.
 - Info to MQTT: Send info logs to MQTT
+- Enable Log to SPIFFS: Enable/disable logging to the device's filesystem
+  - **Warning:** Enabling SPIFFS logging can make the device less stable due to frequent file system writes. It is only intended for debugging purposes and should not be used in normal operation.
 
 About the mqtt temperature topic: If you want to use a domoticz sensor to be used, there are several options available, but this is the best way to do it:
 - Install Mosquitto (or another MQTT broker) of you did not yet install a MQTT broker
@@ -251,6 +254,7 @@ The device configuration is stored in a JSON file on the LittleFS filesystem. Yo
   "mqttoutsidetemptopic": "your_outside_temperature_topic",
   "debugtomqtt": false,
   "infotomqtt": true,
+  "enableLogToSPIFFS": false,
   "inpin": 4,
   "outpin": 5,
   "temppin": 14,
@@ -285,6 +289,7 @@ The device configuration is stored in a JSON file on the LittleFS filesystem. Yo
 - `mqttoutsidetemptopic` (string): MQTT topic for outside temperature sensor (leave empty to use boiler-reported temperature)
 - `debugtomqtt` (boolean): Send debug messages to MQTT (warning: can cause instability)
 - `infotomqtt` (boolean): Send info messages to MQTT
+- `enableLogToSPIFFS` (boolean): Enable/disable logging to SPIFFS filesystem (warning: can cause instability, for debugging only)
 - `inpin` (integer): OpenTherm input pin (default: 4, not configurable in current firmware)
 - `outpin` (integer): OpenTherm output pin (default: 5, not configurable in current firmware)
 - `temppin` (integer): DS18B20 temperature sensor pin (default: 14, not configurable in current firmware)

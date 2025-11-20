@@ -313,6 +313,7 @@ String mqtt_mqtttemptopic="xyzxyz";
 String mqtt_mqttoutsidetemptopic="xyzxyz";
 bool mqtt_debug=false;
 bool mqtt_infotomqtt = true;
+bool mqtt_enableLogToSPIFFS = true;
 String currentIP = "";  // Keep track of the current IP to only update on change
 
 // vars for program logic
@@ -412,7 +413,7 @@ void logToSPIFFS(String message) {
 
 void Log(String level, String text) {
   text = timeClient.getFormattedTime() + " " + level + ": " + text;
-  logToSPIFFS(text);
+  if (enableLogToSPIFFS) logToSPIFFS(text);
   if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
     UpdateMQTTTextSensor(Log_Name, text.c_str(), true);
   }
@@ -893,7 +894,8 @@ void handleDir() {
   Dir dir = LittleFS.openDir("/");
   while (dir.next()) {
     String fileName = dir.fileName();
-    html += "<li><a href=\"" + fileName + "\">" + fileName + "</a> <a href=\"/delete?file=" + fileName + "\">(delete)</a></li>";
+    size_t fileSize = dir.fileSize();
+    html += "<li><a href=\"" + fileName + "\">" + fileName + "</a> (" + String(fileSize) + " bytes) <a href=\"/delete?file=" + fileName + "\">(delete)</a></li>";
   }
   html += "</ul><p><a href=\"/upload\">upload files</a> <a href=\"http://" + host + "/\">back to GUI</a></p></body></html>";
   server.send(200, "text/html", html);
@@ -914,7 +916,7 @@ void handleDelete() {
 
 void handleNotFound()
 {
-  Info("Not found: " + server.uri());
+  Info("HandleNotFound: " + server.uri());
   // first, try to serve the requested file from flash
   if (!serveFile(server.uri().c_str()))
   {
@@ -995,6 +997,8 @@ void readConfig()
 
         infotomqtt = json["infotomqtt"].is<bool>() ? json["infotomqtt"].as<bool>() : DEFAULT_INFOTOMQTT;
 
+        enableLogToSPIFFS = json["enableLogToSPIFFS"].is<bool>() ? json["enableLogToSPIFFS"].as<bool>() : DEFAULT_ENABLE_LOG_TO_SPIFFS;
+
         // PID Settings
         KP = json["KP"].is<int>() ? json["KP"].as<int>() : DEFAULT_KP;
         KI = json["KI"].is<float>() ? json["KI"].as<float>() : DEFAULT_KI;
@@ -1040,6 +1044,7 @@ void readConfig()
   mqttoutsidetemptopic = DEFAULT_MQTTOUTSIDETEMP_TOPIC;
   debug = DEFAULT_DEBUG;
   infotomqtt = DEFAULT_INFOTOMQTT;
+  enableLogToSPIFFS = DEFAULT_ENABLE_LOG_TO_SPIFFS;
   KP = DEFAULT_KP;
   KI = DEFAULT_KI;
   KD = DEFAULT_KD;
@@ -1077,6 +1082,7 @@ void SaveConfig()
   json["mqttoutsidetemptopic"] = mqttoutsidetemptopic;
   json["debugtomqtt"] = debug;
   json["infotomqtt"] = infotomqtt;
+  json["enableLogToSPIFFS"] = enableLogToSPIFFS;
   
   // add/change the Climate settings
   json["climateMode"] = climate_Mode;
@@ -1186,6 +1192,9 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
 
     // Info
     UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, false);
+
+    // Enable Log to SPIFFS
+    UpdateMQTTSwitch(EnableLogToSPIFFS_Name, mqtt_enableLogToSPIFFS, enableLogToSPIFFS, false);
 
     // Frost Protection Active
     UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, false);
@@ -1904,6 +1913,12 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     Info("Received info command: "+value);
     CommandSucceeded=HandleSwitch(&infotomqtt, &mqtt_infotomqtt, value.c_str());
     Info("Info logging switched "+String(value));
+
+  // Handle enable log to SPIFFS switch command
+  } else if (topicstr.equals(CommandTopic(EnableLogToSPIFFS_Name))) {
+    Info("Received enable log to SPIFFS command: "+value);
+    CommandSucceeded=HandleSwitch(&enableLogToSPIFFS, &mqtt_enableLogToSPIFFS, value.c_str());
+    Info("Log to SPIFFS switched "+String(value));
 
   // DHW Setpoint temperature commands
   } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
@@ -2859,53 +2874,55 @@ bool PublishAllMQTTSensors()
     case 46: UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, true); break;
     case 47: PublishMQTTSwitch(Info_Name); break;
     case 48: UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, true); break;
-    case 49: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
-    case 50: UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true); break;
-    case 51: UpdateMQTTSetpointTemperature(DHW_Setpoint_Name, dhw_Temperature, true); break;
-    case 52: UpdateMQTTSetpointMode(DHW_Setpoint_Name, enableHotWater ? 1 : 0, true); break;
-    case 53: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
-    case 54: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
-    case 55: UpdateMQTTSetpointTemperature(Climate_Name, mqttTemperature, true); break;
-    case 56: UpdateClimateSetpointMode(true); break;
-    case 57: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
-    case 58: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
-    case 59: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
-    case 60: UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); break;
-    case 61: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
-    case 62: UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); break;
-    case 63: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
-    case 64: UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); break;
-    case 65: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
-    case 66: UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); break;
-    case 67: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
-    case 68: UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); break;
-    case 69: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
-    case 70: UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); break;
-    case 71: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
-    case 72: UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); break;
-    case 73: PublishMQTTNumber(KP_Name,0,50,1,false); break;
-    case 74: UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); break;
-    case 75: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
-    case 76: UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); break;
-    case 77: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
-    case 78: UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); break;
-    case 79: PublishMQTTCurvatureSelect(Curvature_Name); break;
-    case 80: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature, true); break;
-    case 81: PublishMQTTText(MQTT_TempTopic_Name); break;
-    case 82: UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); break;
-    case 83: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
-    case 84: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); break;
-    case 85: PublishMQTTTextSensor(Log_Name); break;
-    case 86: PublishMQTTTextSensor(IP_Address_Name); break;
-    case 87: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true); break;
-    case 88: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
-    case 89: UpdateMQTTRSSISensor(WiFi_RSSI_Name, mqtt_wifi_rssi, WiFi.RSSI(), true); break;
-    case 90: PublishMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name); break;
-    case 91: UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
-    case 92: PublishMQTTButton(Reset_Device_Name); break;
-    case 93: PublishMQTTUptimeSensor(Uptime_Name); break;
-    case 94: UpdateMQTTUptimeSensor(Uptime_Name, mqtt_uptime, getUptimeSeconds(), true); break;
-    case 95:
+    case 49: PublishMQTTSwitch(EnableLogToSPIFFS_Name); break;
+    case 50: UpdateMQTTSwitch(EnableLogToSPIFFS_Name, mqtt_enableLogToSPIFFS, enableLogToSPIFFS, true); break;
+    case 51: PublishMQTTSetpoint(DHW_Setpoint_Name,10,90,false); break;
+    case 52: UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true); break;
+    case 53: UpdateMQTTSetpointTemperature(DHW_Setpoint_Name, dhw_Temperature, true); break;
+    case 54: UpdateMQTTSetpointMode(DHW_Setpoint_Name, enableHotWater ? 1 : 0, true); break;
+    case 55: PublishMQTTSetpoint(Climate_Name,5,30,true); break;
+    case 56: UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true); break;
+    case 57: UpdateMQTTSetpointTemperature(Climate_Name, mqttTemperature, true); break;
+    case 58: UpdateClimateSetpointMode(true); break;
+    case 59: PublishMQTTNumber(MinBoilerTemp_Name,10,50,0.5,true); break;
+    case 60: UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); break;
+    case 61: PublishMQTTNumber(MaxBoilerTemp_Name,30,90,0.5,true); break;
+    case 62: UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); break;
+    case 63: PublishMQTTNumber(MinimumTempDifference_Name,0,20,0.5,true); break;
+    case 64: UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); break;
+    case 65: PublishMQTTNumber(FrostProtectionSetPoint_Name,0,90,0.5,true); break;
+    case 66: UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); break;
+    case 67: PublishMQTTNumber(BoilerTempAtPlus20_Name,10,90,0.5,true); break;
+    case 68: UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); break;
+    case 69: PublishMQTTNumber(BoilerTempAtMinus10_Name,10,90,0.5,true); break;
+    case 70: UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); break;
+    case 71: PublishMQTTNumber(SwitchHeatingOffAt_Name,10,90,0.5,true); break;
+    case 72: UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); break;
+    case 73: PublishMQTTNumber(ReferenceRoomCompensation_Name,0,30,0.5,true); break;
+    case 74: UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); break;
+    case 75: PublishMQTTNumber(KP_Name,0,50,1,false); break;
+    case 76: UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); break;
+    case 77: PublishMQTTNumber(KI_Name,0,1,0.01,false); break;
+    case 78: UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); break;
+    case 79: PublishMQTTNumber(KD_Name,0,5,0.1,false); break;
+    case 80: UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); break;
+    case 81: PublishMQTTCurvatureSelect(Curvature_Name); break;
+    case 82: UpdateMQTTCurvatureSelect(Curvature_Name, Curvature, true); break;
+    case 83: PublishMQTTText(MQTT_TempTopic_Name); break;
+    case 84: UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); break;
+    case 85: PublishMQTTText(MQTT_OutsideTempTopic_Name); break;
+    case 86: UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); break;
+    case 87: PublishMQTTTextSensor(Log_Name); break;
+    case 88: PublishMQTTTextSensor(IP_Address_Name); break;
+    case 89: UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true); break;
+    case 90: PublishMQTTRSSISensor(WiFi_RSSI_Name); break;
+    case 91: UpdateMQTTRSSISensor(WiFi_RSSI_Name, mqtt_wifi_rssi, WiFi.RSSI(), true); break;
+    case 92: PublishMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name); break;
+    case 93: UpdateMQTTTemperatureSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, true); break;
+    case 94: PublishMQTTButton(Reset_Device_Name); break;
+    case 95: PublishMQTTUptimeSensor(Uptime_Name); break;
+    case 96: UpdateMQTTUptimeSensor(Uptime_Name, mqtt_uptime, getUptimeSeconds(), true); break;
+    case 97:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");
