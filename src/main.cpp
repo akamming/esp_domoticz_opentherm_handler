@@ -436,6 +436,10 @@ void Info(String text) {
   }
 }
 
+void feedWatchdog() {
+  ESP.wdtFeed();  // Feed the hardware watchdog
+}
+
 void IRAM_ATTR handleInterrupt() {
     ot.handleInterrupt();
 }
@@ -3033,6 +3037,9 @@ void setup()
   server.begin();   
   Serial.println("Opentherm Helper is waiting for commands");   
 
+  // Enable watchdog timer (5 minutes timeout)
+  ESP.wdtEnable(300000); // 5 minutes in milliseconds
+
   //Init DS18B20 sensor
   sensors.begin();
 
@@ -3132,6 +3139,9 @@ void loop()
     if (millis()-t_heartbeat>heartbeatTickInMillis) {
       //reset tick time
       t_heartbeat=millis();
+
+      // Feed the watchdog
+      feedWatchdog();
 
       // (Re)connect MQTT
       if (WiFi.status() == WL_CONNECTED) {
