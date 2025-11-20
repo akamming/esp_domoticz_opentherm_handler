@@ -43,8 +43,7 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #define MQTT_QOS_CONFIG 1
 #define MQTT_QOS_STATE 0
 
-std::vector<String> logBuffer;
-const int MAX_LOG_BUFFER = 200;
+
 
 // MQTT Async connect parameters
 String mqttClientId = "";
@@ -357,27 +356,65 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 24 * 60 * 60 * 1000); 
 
 
 
-void Log(String level, String text) {
-  text = timeClient.getFormattedTime() + " " + level + ": " + text;
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    // First, send any buffered messages
-    for (auto& bufferedMsg : logBuffer) {
-      String msgWithBuffered = "[buffered] " + bufferedMsg;
-      UpdateMQTTTextSensor(Log_Name, msgWithBuffered.c_str(), true);
-    }
-    logBuffer.clear();
-
-    // Then send the new message
-    if (!UpdateMQTTTextSensor(Log_Name, text.c_str(), true)) {
-      // If failed, buffer it
-      if (logBuffer.size() < MAX_LOG_BUFFER) {
-        logBuffer.push_back(text);
+void logToSPIFFS(String message) {
+  // Check size of log0.txt
+  if (LittleFS.exists("/log0.txt")) {
+    File logFile = LittleFS.open("/log0.txt", "r");
+    if (logFile) {
+      size_t size = logFile.size();
+      logFile.close();
+      if (size >= 51200) { // 50KB
+        // Rotate files
+        for (int i = 9; i >= 0; i--) {
+          String oldName = "/log" + String(i) + ".txt";
+          String newName = "/log" + String(i + 1) + ".txt";
+          if (LittleFS.exists(oldName)) {
+            if (LittleFS.exists(newName)) {
+              LittleFS.remove(newName);
+            }
+            LittleFS.rename(oldName, newName);
+          }
+        }
+        // Delete log10.txt if exists
+        if (LittleFS.exists("/log10.txt")) {
+          LittleFS.remove("/log10.txt");
+        }
       }
     }
-  } else {
-    if (logBuffer.size() < MAX_LOG_BUFFER) {
-      logBuffer.push_back(text);
+  }
+
+  // Check total log size and remove oldest if > 512KB
+  size_t totalSize = 0;
+  for (int i = 0; i <= 10; i++) {
+    String fileName = "/log" + String(i) + ".txt";
+    if (LittleFS.exists(fileName)) {
+      File f = LittleFS.open(fileName, "r");
+      if (f) {
+        totalSize += f.size();
+        f.close();
+      }
     }
+  }
+  if (totalSize > 524288) { // 512KB
+    // Remove oldest (log10.txt)
+    if (LittleFS.exists("/log10.txt")) {
+      LittleFS.remove("/log10.txt");
+    }
+  }
+
+  // Append message to log0.txt
+  File logFile = LittleFS.open("/log0.txt", "a");
+  if (logFile) {
+    logFile.println(message);
+    logFile.close();
+  }
+}
+
+void Log(String level, String text) {
+  text = timeClient.getFormattedTime() + " " + level + ": " + text;
+  logToSPIFFS(text);
+  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+    UpdateMQTTTextSensor(Log_Name, text.c_str(), true);
   }
   Serial.println(text);
 }
@@ -558,13 +595,7 @@ void handleCommand() {
   SendHTTP("HandleCommand",Statustext);
 }
 
-size_t getLogBufferSizeInBytes() {
-  size_t totalSize = 0;
-  for (const auto& msg : logBuffer) {
-    totalSize += msg.length();  // String::length() geeft het aantal bytes terug
-  }
-  return totalSize;
-}
+
 
 void handleGetInfo()
 {
@@ -595,7 +626,6 @@ void handleGetInfo()
   json["currentTime"] = timeClient.getFormattedTime();
   json["uptime"] = getUptimeString();
   json["compile_date"] = String(compile_date);
-  json["logBufferSize"] = getLogBufferSizeInBytes();
   #if MQTT_LIBRARY == 0
   json["mqttLibrary"] = "PubSubClient";
   #elif MQTT_LIBRARY == 1
