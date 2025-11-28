@@ -75,7 +75,7 @@
         <b>Weather Dependent Mode</b><br />
         BoilerTempAtPlus20 <input type="number" class="pin_input" id="BoilerTempAtPlus20" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         BoilerTempAtMinus10 <input type="number" class="pin_input" id="BoilerTempAtMinus10" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
-        <label for="Curvature">Curvature </label><select name="Curvature" id="Curvature"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="extralarge">Extra Large</option></select><br />
+        <label for="Curvature">Curvature </label><select name="Curvature" id="Curvature"><option value="none">None</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="extralarge">Extra Large</option></select><br />
         SwitchHeatingOffAt <input type="number" class="pin_input" id="SwitchHeatingOffAt" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         RefRoomCompensation <input type="number" class="pin_input" id="ReferenceRoomCompensation" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
@@ -224,7 +224,7 @@
                     document.getElementById('FrostProtectionSetPoint').value = +json.FrostProtectionSetPoint;
                     document.getElementById('BoilerTempAtPlus20').value = +json.BoilerTempAtPlus20;
                     document.getElementById('BoilerTempAtMinus10').value = +json.BoilerTempAtMinus10;
-                    document.getElementById('Curvature').value = json.Curvature;
+                    document.getElementById('Curvature').value = getCurvatureStringFromInt(json.Curvature);
                     document.getElementById('SwitchHeatingOffAt').value = +json.SwitchHeatingOffAt;
                     document.getElementById('ReferenceRoomCompensation').value = +json.ReferenceRoomCompensation;
                     onmqttenabledchanged();
@@ -354,6 +354,22 @@
                 }
             };
             xhttp.send();
+        }
+
+        function getCurvatureStringFromInt(i) {
+            if (i == 0) {
+                return "none";
+            } else if (i == 10) {
+                return "small";
+            } else if (i == 20) {
+                return "medium";
+            } else if (i == 30) {
+                return "large";
+            } else if (i == 40) {
+                return "extralarge";
+            } else {
+                return "none";
+            }
         }
 
         function loadSettings() {
