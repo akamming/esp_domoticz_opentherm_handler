@@ -49,7 +49,7 @@ Basically a HTTP and MQTT wrapper around https://github.com/ihormelnyk/opentherm
 - Uses a linear curve between BoilerTempAtPlus20 and BoilerTempAtMinus10.
 - Curvature parameter allows non-linear adjustments.
 - Heating is disabled when outside temperature exceeds SwitchHeatingOffAt.
-- Reference Room Compensation adjusts setpoint if room temperature deviates from climate setpoint.
+- Reference Room Compensation adjusts setpoint if room temperature deviates from climate setpoint. Can be configured to work in one direction (only increase when room temp < setpoint) or bidirectional (also decrease when room temp > setpoint).
 
 ### Holiday Mode
 - Disables thermostat control while maintaining frost protection.

@@ -301,6 +301,7 @@ float mqtt_BoilerTempAtMinus10 = 99;               // for calculating when in we
 float mqtt_Curvature=99;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 float mqtt_SwitchHeatingOffAt = 99;                // Automatic switch off when in weather dependent mode when outside temp too high
 float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode: Correct with this number per degree celsius difference (air temperature - setpoint) 
+bool mqtt_BidirectionalReferenceRoomCompensation = false; // MQTT value for bidirectional compensation
 float mqtt_kp=99;
 float mqtt_ki=99;
 float mqtt_kd=99;
@@ -803,6 +804,7 @@ void handleSaveConfig() {
     BoilerTempAtMinus10 = json["BoilerTempAtMinus10"] | BoilerTempAtMinus10;  
     SwitchHeatingOffAt = json["SwitchHeatingOffAt"] | SwitchHeatingOffAt;
     ReferenceRoomCompensation = json["ReferenceRoomCompensation"] | ReferenceRoomCompensation;
+    BidirectionalReferenceRoomCompensation = json["BidirectionalReferenceRoomCompensation"] | BidirectionalReferenceRoomCompensation;
     if (json["Curvature"].is<const char*>() ) {
       Curvature=getCurvatureIntFromString(json["Curvature"] | "small");
     }
@@ -1020,6 +1022,7 @@ void readConfig()
         Curvature = getCurvatureIntFromString(json["Curvature"].is<String>() ? json["Curvature"].as<String>() : String(DEFAULT_CURVATURE_STRING));
         SwitchHeatingOffAt = json["SwitchHeatingOffAt"].is<int>() ? json["SwitchHeatingOffAt"].as<int>() : DEFAULT_SWITCHHEATINGOFFAT;
         ReferenceRoomCompensation = json["ReferenceRoomCompensation"].is<int>() ? json["ReferenceRoomCompensation"].as<int>() : DEFAULT_REFERENCEROOMCOMPENSATION;
+        BidirectionalReferenceRoomCompensation = json["BidirectionalReferenceRoomCompensation"].is<bool>() ? json["BidirectionalReferenceRoomCompensation"].as<bool>() : DEFAULT_BIDIRECTIONAL_REFERENCEROOMCOMPENSATION;
 
         // persistent climate mode
         climate_Mode = json["climateMode"].is<String>() ? json["climateMode"].as<String>() : String(DEFAULT_CLIMATE_MODE);
@@ -1063,6 +1066,7 @@ void readConfig()
   Curvature = getCurvatureIntFromString(DEFAULT_CURVATURE_STRING);
   SwitchHeatingOffAt = DEFAULT_SWITCHHEATINGOFFAT;
   ReferenceRoomCompensation = DEFAULT_REFERENCEROOMCOMPENSATION;
+  BidirectionalReferenceRoomCompensation = DEFAULT_BIDIRECTIONAL_REFERENCEROOMCOMPENSATION;
   climate_Mode = DEFAULT_CLIMATE_MODE;
   climate_SetPoint = DEFAULT_CLIMATE_SETPOINT;
   Weather_Dependent_Mode = DEFAULT_WEATHERDEPENDENTMODE;
@@ -1106,6 +1110,7 @@ void SaveConfig()
   json["Curvature"] = Curvature;
   json["SwitchHeatingOffAt"] = SwitchHeatingOffAt;
   json["ReferenceRoomCompensation"] = ReferenceRoomCompensation;
+  json["BidirectionalReferenceRoomCompensation"] = BidirectionalReferenceRoomCompensation;
   json["KP"] = KP;
   json["KI"] = KI;
   json["KD"] = KD;
@@ -1192,6 +1197,9 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
 
     // Holiday Mode
     UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, false);
+
+    // Bidirectional Reference Room Compensation
+    UpdateMQTTSwitch(BidirectionalReferenceRoomCompensation_Name, mqtt_BidirectionalReferenceRoomCompensation, BidirectionalReferenceRoomCompensation, false);
 
     // Debug
     UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, false);
@@ -1309,8 +1317,10 @@ float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, fl
   float TargetTemperature=ExtraCurvature+TargetTemperatureWithoutCurvature;
 
   //Apply reference room compensation
-  if (ReferenceRoomCompensation>0 and CurrentInsideTemperature<climate_SetPoint) {
-    TargetTemperature+=(climate_SetPoint-CurrentInsideTemperature)*ReferenceRoomCompensation;
+  if (ReferenceRoomCompensation > 0) {
+    if (BidirectionalReferenceRoomCompensation || CurrentInsideTemperature < climate_SetPoint) {
+      TargetTemperature += (climate_SetPoint - CurrentInsideTemperature) * ReferenceRoomCompensation;
+    }
   }
 
   // Make sure target temp remains within set boundaries
@@ -1929,6 +1939,12 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     Info("Received enable log to SPIFFS command: "+value);
     CommandSucceeded=HandleSwitch(&enableLogToSPIFFS, &mqtt_enableLogToSPIFFS, value.c_str());
     Info("Log to SPIFFS switched "+String(value));
+
+  // Handle bidirectional reference room compensation switch command
+  } else if (topicstr.equals(CommandTopic(BidirectionalReferenceRoomCompensation_Name))) {
+    Info("Received bidirectional reference room compensation command: "+value);
+    CommandSucceeded=HandleSwitch(&BidirectionalReferenceRoomCompensation, &mqtt_BidirectionalReferenceRoomCompensation, value.c_str());
+    Info("Bidirectional reference room compensation switched "+String(value));
 
   // DHW Setpoint temperature commands
   } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
@@ -2969,6 +2985,12 @@ bool PublishAllMQTTSensors()
       UpdateMQTTNumberSensor(Free_Heap_Name, mqtt_free_heap, ESP.getFreeHeap(), 0.0, true);
       break;
     case 97:
+      PublishMQTTSwitch(BidirectionalReferenceRoomCompensation_Name);
+      break;
+    case 98:
+      UpdateMQTTSwitch(BidirectionalReferenceRoomCompensation_Name, mqtt_BidirectionalReferenceRoomCompensation, BidirectionalReferenceRoomCompensation, true);
+      break;
+    case 99:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");

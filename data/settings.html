@@ -78,6 +78,7 @@
         <label for="Curvature">Curvature </label><select name="Curvature" id="Curvature"><option value="none">None</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="extralarge">Extra Large</option></select><br />
         SwitchHeatingOffAt <input type="number" class="pin_input" id="SwitchHeatingOffAt" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
         RefRoomCompensation <input type="number" class="pin_input" id="ReferenceRoomCompensation" size="10" onClick="this.setSelectionRange(0, this.value.length)"><br />
+        <label><input type="checkbox" name="BidirectionalReferenceRoomCompensation" id="BidirectionalReferenceRoomCompensation">Bidirectional Reference Room Compensation</label><br />
         <br /><button class="colorbutton" onclick="saveSettings()">Save and Restart</button>
     </div>
     <div class="outer_frame">
@@ -227,6 +228,7 @@
                     document.getElementById('Curvature').value = getCurvatureStringFromInt(json.Curvature);
                     document.getElementById('SwitchHeatingOffAt').value = +json.SwitchHeatingOffAt;
                     document.getElementById('ReferenceRoomCompensation').value = +json.ReferenceRoomCompensation;
+                    document.getElementById('BidirectionalReferenceRoomCompensation').checked = json.BidirectionalReferenceRoomCompensation;
                     onmqttenabledchanged();
                 }
             };
@@ -294,6 +296,7 @@
             obj.Curvature = document.getElementById('Curvature').value;
             obj.SwitchHeatingOffAt = +document.getElementById('SwitchHeatingOffAt').value;
             obj.ReferenceRoomCompensation = +document.getElementById('ReferenceRoomCompensation').value;
+            obj.BidirectionalReferenceRoomCompensation = document.getElementById('BidirectionalReferenceRoomCompensation').checked;
             var data = JSON.stringify(obj);
             xhttp.send(data);
         }
