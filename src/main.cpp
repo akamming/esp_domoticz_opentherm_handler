@@ -1765,6 +1765,10 @@ bool HandleDHWMode(const char* mode)
     }
     succeeded=false;
   }
+  if (succeeded) {
+    // Save the config if successful
+    DelayedSaveConfig();
+  }
   return succeeded;
 }
 
@@ -1792,6 +1796,10 @@ bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode)
     }
     succeeded=false;
   }
+  if (succeeded) {
+    // Save the config if successful
+    DelayedSaveConfig();
+  } 
   return succeeded;
 }
 
@@ -1800,6 +1808,12 @@ bool handleClimateSetpoint(float setpoint) {
     InitPID();
     DelayedSaveConfig();
   return true;
+}
+
+bool SetBoilerVar(float& BoilerVar, const char* Payload) {
+    BoilerVar = String(Payload).toFloat();
+    DelayedSaveConfig();
+    return true;
 }
 
 String extractRelevantStringFromPayload(const char* payload) {
@@ -1870,6 +1884,7 @@ bool handleMQTTTopicChange(String& topicVar, const String& newValue) {
   topicVar = newValue;
   mqttSubscribe(topicVar.c_str(), 0);    // Subscribe to new topic
   return true; // Config must be saved
+  DelayedSaveConfig();
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -1885,7 +1900,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     Info("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
   }
 
-  // Assume succesful command 
+  // Assume unsuccesful command 
   bool CommandSucceeded=false;
   
   // Domoticz devices
@@ -1949,6 +1964,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // DHW Setpoint temperature commands
   } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
     dhw_SetPoint=String(payloadstr).toFloat();
+    DelayedSaveConfig();
     CommandSucceeded=true; // we handled the command
 
   // MQTT temperature received
@@ -1961,40 +1977,30 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   // Boiler Vars
   } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
-    MinBoilerTemp=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(MinBoilerTemp, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(MaxBoilerTemp_Name))) {
-    MaxBoilerTemp=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(MaxBoilerTemp, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(MinimumTempDifference_Name))) {
-    minimumTempDifference=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(minimumTempDifference, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(FrostProtectionSetPoint_Name))) {
-    FrostProtectionSetPoint=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(FrostProtectionSetPoint, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtPlus20_Name))) {
-    BoilerTempAtPlus20=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(BoilerTempAtPlus20, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtMinus10_Name))) {
-    BoilerTempAtMinus10=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(BoilerTempAtMinus10, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(SwitchHeatingOffAt_Name))) {
-    SwitchHeatingOffAt=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(SwitchHeatingOffAt, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
-    ReferenceRoomCompensation=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(ReferenceRoomCompensation, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(KP_Name))) {
-    KP=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(KP, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(KI_Name))) {
-    KI=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(KI, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(KD_Name))) {
-    KD=String(payloadstr).toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(KD, payloadstr);
   } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
     Curvature=getCurvatureIntFromString(payloadstr);
+    DelayedSaveConfig();
     CommandSucceeded=true;
   } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
     CommandSucceeded = handleMQTTTopicChange(mqtttemptopic, value);
@@ -2016,6 +2022,11 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // Unknown topic (this code should never be reached, indicates programming logic error)  
   } else {
     LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
+  }
+  if (CommandSucceeded) {
+    Debug("Command succeeded for topic ["+topicstr+"]");
+  } else {
+    Debug("Command failed for topic ["+topicstr+"]");
   }
 }
 
