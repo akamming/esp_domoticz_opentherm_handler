@@ -301,6 +301,7 @@ float mqtt_BoilerTempAtMinus10 = 99;               // for calculating when in we
 float mqtt_Curvature=99;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 float mqtt_SwitchHeatingOffAt = 99;                // Automatic switch off when in weather dependent mode when outside temp too high
 float mqtt_ReferenceRoomCompensation = 99;          // In weather dependent mode: Correct with this number per degree celsius difference (air temperature - setpoint) 
+bool mqtt_BidirectionalReferenceRoomCompensation = false; // MQTT value for bidirectional compensation
 float mqtt_kp=99;
 float mqtt_ki=99;
 float mqtt_kd=99;
@@ -803,6 +804,7 @@ void handleSaveConfig() {
     BoilerTempAtMinus10 = json["BoilerTempAtMinus10"] | BoilerTempAtMinus10;  
     SwitchHeatingOffAt = json["SwitchHeatingOffAt"] | SwitchHeatingOffAt;
     ReferenceRoomCompensation = json["ReferenceRoomCompensation"] | ReferenceRoomCompensation;
+    BidirectionalReferenceRoomCompensation = json["BidirectionalReferenceRoomCompensation"] | BidirectionalReferenceRoomCompensation;
     if (json["Curvature"].is<const char*>() ) {
       Curvature=getCurvatureIntFromString(json["Curvature"] | "small");
     }
@@ -1020,6 +1022,7 @@ void readConfig()
         Curvature = getCurvatureIntFromString(json["Curvature"].is<String>() ? json["Curvature"].as<String>() : String(DEFAULT_CURVATURE_STRING));
         SwitchHeatingOffAt = json["SwitchHeatingOffAt"].is<int>() ? json["SwitchHeatingOffAt"].as<int>() : DEFAULT_SWITCHHEATINGOFFAT;
         ReferenceRoomCompensation = json["ReferenceRoomCompensation"].is<int>() ? json["ReferenceRoomCompensation"].as<int>() : DEFAULT_REFERENCEROOMCOMPENSATION;
+        BidirectionalReferenceRoomCompensation = json["BidirectionalReferenceRoomCompensation"].is<bool>() ? json["BidirectionalReferenceRoomCompensation"].as<bool>() : DEFAULT_BIDIRECTIONAL_REFERENCEROOMCOMPENSATION;
 
         // persistent climate mode
         climate_Mode = json["climateMode"].is<String>() ? json["climateMode"].as<String>() : String(DEFAULT_CLIMATE_MODE);
@@ -1063,6 +1066,7 @@ void readConfig()
   Curvature = getCurvatureIntFromString(DEFAULT_CURVATURE_STRING);
   SwitchHeatingOffAt = DEFAULT_SWITCHHEATINGOFFAT;
   ReferenceRoomCompensation = DEFAULT_REFERENCEROOMCOMPENSATION;
+  BidirectionalReferenceRoomCompensation = DEFAULT_BIDIRECTIONAL_REFERENCEROOMCOMPENSATION;
   climate_Mode = DEFAULT_CLIMATE_MODE;
   climate_SetPoint = DEFAULT_CLIMATE_SETPOINT;
   Weather_Dependent_Mode = DEFAULT_WEATHERDEPENDENTMODE;
@@ -1106,6 +1110,7 @@ void SaveConfig()
   json["Curvature"] = Curvature;
   json["SwitchHeatingOffAt"] = SwitchHeatingOffAt;
   json["ReferenceRoomCompensation"] = ReferenceRoomCompensation;
+  json["BidirectionalReferenceRoomCompensation"] = BidirectionalReferenceRoomCompensation;
   json["KP"] = KP;
   json["KI"] = KI;
   json["KD"] = KD;
@@ -1192,6 +1197,9 @@ if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
 
     // Holiday Mode
     UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, false);
+
+    // Bidirectional Reference Room Compensation
+    UpdateMQTTSwitch(BidirectionalReferenceRoomCompensation_Name, mqtt_BidirectionalReferenceRoomCompensation, BidirectionalReferenceRoomCompensation, false);
 
     // Debug
     UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, false);
@@ -1309,8 +1317,10 @@ float GetBoilerSetpointFromOutsideTemperature(float CurrentInsideTemperature, fl
   float TargetTemperature=ExtraCurvature+TargetTemperatureWithoutCurvature;
 
   //Apply reference room compensation
-  if (ReferenceRoomCompensation>0 and CurrentInsideTemperature<climate_SetPoint) {
-    TargetTemperature+=(climate_SetPoint-CurrentInsideTemperature)*ReferenceRoomCompensation;
+  if (ReferenceRoomCompensation > 0) {
+    if (BidirectionalReferenceRoomCompensation || CurrentInsideTemperature < climate_SetPoint) {
+      TargetTemperature += (climate_SetPoint - CurrentInsideTemperature) * ReferenceRoomCompensation;
+    }
   }
 
   // Make sure target temp remains within set boundaries
@@ -1755,6 +1765,10 @@ bool HandleDHWMode(const char* mode)
     }
     succeeded=false;
   }
+  if (succeeded) {
+    // Save the config if successful
+    DelayedSaveConfig();
+  }
   return succeeded;
 }
 
@@ -1782,6 +1796,10 @@ bool HandleSwitch(bool *Switch, bool *mqtt_switch, const char* mode)
     }
     succeeded=false;
   }
+  if (succeeded) {
+    // Save the config if successful
+    DelayedSaveConfig();
+  } 
   return succeeded;
 }
 
@@ -1790,6 +1808,12 @@ bool handleClimateSetpoint(float setpoint) {
     InitPID();
     DelayedSaveConfig();
   return true;
+}
+
+bool SetBoilerVar(float& BoilerVar, const char* Payload) {
+    BoilerVar = String(Payload).toFloat();
+    DelayedSaveConfig();
+    return true;
 }
 
 String extractRelevantStringFromPayload(const char* payload) {
@@ -1860,6 +1884,7 @@ bool handleMQTTTopicChange(String& topicVar, const String& newValue) {
   topicVar = newValue;
   mqttSubscribe(topicVar.c_str(), 0);    // Subscribe to new topic
   return true; // Config must be saved
+  DelayedSaveConfig();
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -1875,7 +1900,7 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     Info("Received message on topic ["+topicstr+"], payload: ["+payloadstr+"]");
   }
 
-  // Assume succesful command 
+  // Assume unsuccesful command 
   bool CommandSucceeded=false;
   
   // Domoticz devices
@@ -1930,9 +1955,16 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
     CommandSucceeded=HandleSwitch(&enableLogToSPIFFS, &mqtt_enableLogToSPIFFS, value.c_str());
     Info("Log to SPIFFS switched "+String(value));
 
+  // Handle bidirectional reference room compensation switch command
+  } else if (topicstr.equals(CommandTopic(BidirectionalReferenceRoomCompensation_Name))) {
+    Info("Received bidirectional reference room compensation command: "+value);
+    CommandSucceeded=HandleSwitch(&BidirectionalReferenceRoomCompensation, &mqtt_BidirectionalReferenceRoomCompensation, value.c_str());
+    Info("Bidirectional reference room compensation switched "+String(value));
+
   // DHW Setpoint temperature commands
   } else if (topicstr.equals(SetpointCommandTopic(DHW_Setpoint_Name))) {
     dhw_SetPoint=String(payloadstr).toFloat();
+    DelayedSaveConfig();
     CommandSucceeded=true; // we handled the command
 
   // MQTT temperature received
@@ -1945,40 +1977,30 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   // Boiler Vars
   } else if (topicstr.equals(NumberCommandTopic(MinBoilerTemp_Name))) {
-    MinBoilerTemp=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(MinBoilerTemp, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(MaxBoilerTemp_Name))) {
-    MaxBoilerTemp=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(MaxBoilerTemp, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(MinimumTempDifference_Name))) {
-    minimumTempDifference=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(minimumTempDifference, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(FrostProtectionSetPoint_Name))) {
-    FrostProtectionSetPoint=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(FrostProtectionSetPoint, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtPlus20_Name))) {
-    BoilerTempAtPlus20=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(BoilerTempAtPlus20, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(BoilerTempAtMinus10_Name))) {
-    BoilerTempAtMinus10=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(BoilerTempAtMinus10, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(SwitchHeatingOffAt_Name))) {
-    SwitchHeatingOffAt=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(SwitchHeatingOffAt, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(ReferenceRoomCompensation_Name))) {
-    ReferenceRoomCompensation=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(ReferenceRoomCompensation, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(KP_Name))) {
-    KP=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(KP, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(KI_Name))) {
-    KI=value.toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(KI, payloadstr);
   } else if (topicstr.equals(NumberCommandTopic(KD_Name))) {
-    KD=String(payloadstr).toFloat();
-    CommandSucceeded=true;
+    CommandSucceeded = SetBoilerVar(KD, payloadstr);
   } else if (topicstr.equals(String(host)+"/select/"+String(Curvature_Name)+"/set")) {
     Curvature=getCurvatureIntFromString(payloadstr);
+    DelayedSaveConfig();
     CommandSucceeded=true;
   } else if (topicstr.equals(String(host)+"/text/"+String(MQTT_TempTopic_Name)+"/set")) {
     CommandSucceeded = handleMQTTTopicChange(mqtttemptopic, value);
@@ -2000,6 +2022,11 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // Unknown topic (this code should never be reached, indicates programming logic error)  
   } else {
     LogMQTT(topicstr.c_str(),payloadstr,String(length).c_str(),"unknown topic");
+  }
+  if (CommandSucceeded) {
+    Debug("Command succeeded for topic ["+topicstr+"]");
+  } else {
+    Debug("Command failed for topic ["+topicstr+"]");
   }
 }
 
@@ -2969,6 +2996,12 @@ bool PublishAllMQTTSensors()
       UpdateMQTTNumberSensor(Free_Heap_Name, mqtt_free_heap, ESP.getFreeHeap(), 0.0, true);
       break;
     case 97:
+      PublishMQTTSwitch(BidirectionalReferenceRoomCompensation_Name);
+      break;
+    case 98:
+      UpdateMQTTSwitch(BidirectionalReferenceRoomCompensation_Name, mqtt_BidirectionalReferenceRoomCompensation, BidirectionalReferenceRoomCompensation, true);
+      break;
+    case 99:
       // Reset index and return true (done)
       sensorIndex = 0;
       Info("All MQTT sensors published and values sent");

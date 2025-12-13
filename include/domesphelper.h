@@ -23,6 +23,7 @@ const int    DEFAULT_BOILERTEMPATMINUS10 = 50;
 const char*  DEFAULT_CURVATURE_STRING = "small";
 const int    DEFAULT_SWITCHHEATINGOFFAT = 19;
 const int    DEFAULT_REFERENCEROOMCOMPENSATION = 3;
+const bool   DEFAULT_BIDIRECTIONAL_REFERENCEROOMCOMPENSATION = false;
 const char*  DEFAULT_CLIMATE_MODE = "off";
 const int    DEFAULT_CLIMATE_SETPOINT = 20;
 const bool   DEFAULT_WEATHERDEPENDENTMODE = false;
@@ -61,6 +62,7 @@ const char BoilerTempAtMinus10_Name[] = "BoilerTempAtMinus10";                  
 const char Curvature_Name[]="Curvature";                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 const char SwitchHeatingOffAt_Name[] = "SwitchHeatingOffAt";                    // Automatic switch off when in weather dependent mode when outside temp too high
 const char ReferenceRoomCompensation_Name[] = "ReferenceRoomCompensation";           // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
+const char BidirectionalReferenceRoomCompensation_Name[] = "BidirectionalReferenceRoomCompensation"; // Enable bidirectional reference room compensation
 const char KP_Name[] = "KP";
 const char KI_Name[] = "KI";
 const char KD_Name[] = "KD";
@@ -134,6 +136,7 @@ float BoilerTempAtMinus10 = 50;               // for calculating when in weather
 int Curvature=10;                           // 0=none, 10=small, 20=medium, 30=large, 40=Extra Large
 float SwitchHeatingOffAt = 19;                // Automatic switch off when in weather dependent mode when outside temp too high
 float ReferenceRoomCompensation = 3;          // In weather dependent mode: Correct with this number per degree celcius difference (air temperature - setpoint) 
+bool BidirectionalReferenceRoomCompensation = false; // If true, compensate in both directions; if false, only increase when room temp < setpoint
 
 // uploadform
 const char HTTP_UPLOAD_FORM[] PROGMEM = 
