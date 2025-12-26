@@ -1680,7 +1680,7 @@ bool HandleClimateMode(const char* mode)
 {
   bool CommandSucceeded=true;
   if (String(mode).equals(String(climate_Mode))) {
-    Error("Climate mode unchanged, ignoring command");
+    Debug("Climate mode unchanged, ignoring command");
   } else {
     // Init PID calculater
     InitPID();
