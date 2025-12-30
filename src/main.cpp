@@ -3207,8 +3207,8 @@ void loop()
   // update Uptime
   updateTime();
 
-  // Check if we have to save the config
-  if ((!ClimateConfigSaved) and (millis()>t_save_config)) {
+  // Check if we have to save the config (wrap-safe millis comparison)
+  if ((!ClimateConfigSaved) && ((long)(millis() - t_save_config) >= 0)) {
     SaveConfig();
   }
 
