@@ -716,7 +716,7 @@ void handleGetConfig()
 
   // Send output with pretty formatting
   char buf[2048];
-  serializeJsonPretty(json, buf);
+  serializeJsonPretty(json, buf, sizeof(buf));
   server.send(200, "application/json", buf);
 }
 
@@ -732,7 +732,7 @@ void handleConfigJsonFile() {
         // Mask the password
         json["mqttpass"] = "*****";
         char buf[2048];
-        serializeJsonPretty(json, buf);
+        serializeJsonPretty(json, buf, sizeof(buf));
         server.send(200, "application/json", buf);
         return;
       }
@@ -867,12 +867,12 @@ bool serveFile(const char url[])
 {
   Serial.printf("serveFile(): %s\n\rE",url);
 
-  char path[50];
-  
+  char path[128];
+
   if (url[strlen(url)-1]=='/') {
-    sprintf (path,"%sindex.html",url);
+    snprintf(path, sizeof(path), "%sindex.html", url);
   } else {
-    sprintf(path,"%s",url);
+    snprintf(path, sizeof(path), "%s", url);
   }
   if (LittleFS.exists(path))
   {
@@ -984,10 +984,11 @@ void readConfig()
     File configFile = LittleFS.open(CONFIGFILE, "r");
     if (configFile) {
       size_t size = configFile.size();
-      std::unique_ptr<char[]> buf(new char[size]);
+      std::unique_ptr<char[]> buf(new char[size + 1]);
       configFile.readBytes(buf.get(), size);
+      buf[size] = '\0';
       JsonDocument json;
-      auto deserializeError = deserializeJson(json, buf.get());
+      auto deserializeError = deserializeJson(json, buf.get(), size);
       serializeJson(json, Serial);
       if (!deserializeError) {
         // mqtt config
@@ -1891,8 +1892,12 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   // get vars from callback
   String topicstr=String(topic);
   char payloadstr[1024];
-  strncpy(payloadstr,(char *)payload,length);
-  payloadstr[length]='\0';
+  size_t copyLen = length < sizeof(payloadstr) - 1 ? length : sizeof(payloadstr) - 1;
+  memcpy(payloadstr, payload, copyLen);
+  payloadstr[copyLen] = '\0';
+  if (length >= sizeof(payloadstr)) {
+    Error("MQTT payload truncated: received " + String(length) + " bytes");
+  }
 
   String value = extractRelevantStringFromPayload(payloadstr);
 
