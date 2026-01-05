@@ -2064,7 +2064,9 @@ void reconnect()
       bool mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
       if (mqttconnected) {
         sensorIndex = 0; // Reset sensor index for discovery
-        PublishAllMQTTSensors();
+        if (!firstPublishDone) {
+          PublishAllMQTTSensors();
+        }
         Info("Succesfully (re)connected, starting operations");
         Info("None, all OK");
         if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
@@ -3150,7 +3152,9 @@ void setup()
         SubScribeToDomoticz();
       }
       sensorIndex = 0; // Reset sensor index for discovery
-      PublishAllMQTTSensors();
+      if (!firstPublishDone) {
+        PublishAllMQTTSensors();
+      }
       String willTopic = host + "/status";
       mqttPublish(willTopic.c_str(), "online", true, 1);
     });
