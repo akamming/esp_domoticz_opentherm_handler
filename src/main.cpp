@@ -326,6 +326,7 @@ unsigned long t_heartbeat=millis()-heartbeatTickInMillis; // last heartbeat time
 unsigned long t_last_mqtt_discovery=millis()-MQTTDiscoveryHeartbeatInMillis; // last mqqt discovery timestamp
 unsigned long t_last_climateheartbeat=0; // last climate heartbeat timestamp
 unsigned long t_last_tempreceived=0; // Time when last MQTT temp was received
+unsigned long t_last_outside_temp_update = 0;
 unsigned long t_last_outsidetempreceived=0; // Time when last MQTT temp was received
 unsigned long t_save_config; // timestamp for delayed save
 unsigned long t_last_mqtt_try_connect = millis()-MQTTConnectTimeoutInMillis; // the last time we tried to connect to mqtt server
@@ -346,6 +347,7 @@ int sensorIndex = 0;
 bool isPublishingAllSensors = false;
 bool firstPublishDone = false;
 unsigned long resetButtonSubscribeTime = 0;
+
 
 // object for uploading files
 File fsUploadFile;
@@ -1520,10 +1522,13 @@ void handleGetOutSideTemp(){
     outside_Temperature=OT_outside_Temperature;
   }
 
-  // Check if we have to send to MQTT
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.09, false);
-    UpdateMQTTNumberSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, 0.09, false);
+  // Check if we have to send to MQTT (throttled to once per 30 seconds, tolerance 0.1°C)
+  if (WiFi.status() == WL_CONNECTED && mqttConnected() && (millis() - t_last_outside_temp_update > 30000)) {
+    bool updated = UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.1, false);
+    updated |= UpdateMQTTNumberSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, 0.1, false);
+    if (updated) {
+      t_last_outside_temp_update = millis();
+    }
   }
 }
 
@@ -1547,9 +1552,12 @@ void handleGetBoilerTemperature()
   Debug("ot.getBoilerTemperature()");
   boiler_Temperature = ot.getBoilerTemperature();
 
-  // Check if we have to send to MQTT
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.09, false);
+  // Check if we have to send to MQTT (throttled to once per 10 seconds, tolerance 0.1°C)
+  static unsigned long last_boiler_temp_update = 0;
+  if (WiFi.status() == WL_CONNECTED && mqttConnected() && (millis() - last_boiler_temp_update > 10000)) {
+    if (UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.1, false)) {
+      last_boiler_temp_update = millis();
+    }
   }
 }
 
