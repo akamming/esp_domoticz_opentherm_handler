@@ -107,6 +107,17 @@ bool mqttPublish(const char* topic, const char* payload, bool retained, int qos 
   #endif
 }
 
+bool mqttPublishJson(const String& topic, JsonDocument& json, bool retained, int qos = 0) {
+  size_t payloadSize = measureJson(json) + 1;
+  std::unique_ptr<char[]> payload(new char[payloadSize]);
+  size_t bytesWritten = serializeJson(json, payload.get(), payloadSize);
+  if (bytesWritten == 0 || bytesWritten >= payloadSize) {
+    Serial.println("Failed to serialize MQTT JSON payload");
+    return false;
+  }
+  return mqttPublish(topic.c_str(), payload.get(), retained, qos);
+}
+
 void mqttSetConnectionTimeout(int timeout) {
   #if MQTT_LIBRARY == 1 // ArduinoMqttClient
     client.setConnectionTimeout(timeout);
@@ -2116,9 +2127,7 @@ void PublishMQTTSwitch(const char* uniquename)
   addDeviceToJson(&json);
 
   // Publish config message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
 
   // subscribe if need to listen to commands
   mqttSubscribe((host+"/light/"+String(uniquename)+"/set").c_str(), 0);
@@ -2155,9 +2164,7 @@ void PublishMQTTButton(const char* uniquename)
   addDeviceToJson(&json);
 
   // Publish config message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/button/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/button/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
 
   // subscribe if need to listen to commands
   mqttSubscribe((host+"/button/"+String(uniquename)+"/set").c_str(), 0);
@@ -2188,9 +2195,7 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
   addDeviceToJson(&json);
 
   // Publish config message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/binary_sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/binary_sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool newValue, bool force)
@@ -2201,14 +2206,11 @@ void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool new
     if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
       Serial.println("UpdateBinarySensor");
 
-       JsonDocument json;
-       json["value"] = newValue;
-
-       char message[512];
-       serializeJson(json,message);
+      JsonDocument json;
+      json["value"] = newValue;
 
       // publish state message
-      mqttPublish((host+"/binary_sensor/"+String(uniquename)+"/state").c_str(),message,mqttpersistence,MQTT_QOS_STATE);
+      mqttPublishJson(host+"/binary_sensor/"+String(uniquename)+"/state", json, mqttpersistence, MQTT_QOS_STATE);
     }
     currentValue = newValue;
   }
@@ -2236,9 +2238,7 @@ void PublishMQTTNumberSensor(const char* uniquename, const char* unit = "", cons
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 
@@ -2253,10 +2253,8 @@ bool UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float n
       JsonDocument json;
 
       // Create message
-      char state[128];
       json["value"] =  float(int(newValue*100))/100;   // ensures round to 1 decimal behind the comma
-      serializeJson(json, state);  // buf now contains the json 
-      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,MQTT_QOS_STATE);
+      mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, MQTT_QOS_STATE);
     }
     currentValue = newValue;
     return true;
@@ -2282,9 +2280,7 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTPercentageSensor(const char* uniquename, float& currentValue, float newValue, bool force)
@@ -2297,11 +2293,9 @@ void UpdateMQTTPercentageSensor(const char* uniquename, float& currentValue, flo
       JsonDocument json;
 
       // Create message
-      char data[128];
       json["value"]=newValue;
-      serializeJson(json,data);
-     
-      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),data,mqttpersistence,0);
+
+      mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, 0);
     }
     currentValue = newValue;
   }
@@ -2324,9 +2318,7 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char& currentValue, unsigned char newValue, bool force)
@@ -2336,13 +2328,12 @@ void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char& currentVal
   if (force || currentValue != newValue) {
     if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
       Serial.println("UpdateMQTTFaultCodeSensor");
-        // Create message
-      char state[128];
+
+      // Create message
       JsonDocument json;
       json["value"] = newValue;
-      serializeJson(json, state);  // buf now contains the json
 
-      mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(),state,mqttpersistence,0);
+      mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, 0);
     }
     currentValue = newValue;
   }
@@ -2382,9 +2373,7 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[2024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
   mqttSubscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str(), 0);
   mqttSubscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str(), 0);
 }
@@ -2427,9 +2416,7 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
   mqttSubscribe((host+"/number/"+String(uniquename)+"/set").c_str(), 0);
   // Debug("Publish to "+String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config");
 }
@@ -2466,9 +2453,7 @@ void PublishMQTTText(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
   mqttSubscribe((host+"/text/"+String(uniquename)+"/set").c_str(), 0);
   // Debug("Publish to "+String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config");
 }
@@ -2507,9 +2492,7 @@ void PublishMQTTTextSensor(const char* uniquename)
   addDeviceToJson(&json);
 
   // Publish config message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
 }
 
 bool UpdateMQTTTextSensor(const char* uniquename, const char* value, bool force)
@@ -2523,11 +2506,8 @@ bool UpdateMQTTTextSensor(const char* uniquename, const char* value, bool force)
     // Construct JSON state message
     json["value"] = value;
 
-    char state[128];
-    serializeJson(json, state);  // state now contains the json
-
     // Publish state message
-    return mqttPublish((host+"/sensor/"+String(uniquename)+"/state").c_str(), state, mqttpersistence, 0);
+    return mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, 0);
   }
   return false;
 }
@@ -2558,9 +2538,7 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
   addDeviceToJson(&json);
 
   // publish the Message
-  char buf[1024];
-  serializeJson(json, buf);
-  mqttPublish((String(mqttautodiscoverytopic)+"/select/"+host+"/"+String(uniquename)+"/config").c_str(), buf, mqttpersistence, MQTT_QOS_CONFIG);
+  mqttPublishJson(String(mqttautodiscoverytopic)+"/select/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
   mqttSubscribe((host+"/select/"+String(uniquename)+"/set").c_str(), 0);
 }
 
@@ -2575,10 +2553,7 @@ void UpdateMQTTCurvatureSelect(const char* uniquename,int value, bool force)
     // Construct JSON config message
     json["curvature"] = getCurvatureStringFromInt(value);
 
-    char jsonstr[128];
-    serializeJson(json, jsonstr);  // conf now contains the json
-
-    mqttPublish((host+"/select/"+String(uniquename)+"/state").c_str(),jsonstr,mqttpersistence,0);
+    mqttPublishJson(host+"/select/"+String(uniquename)+"/state", json, mqttpersistence, 0);
   }
 }
 
@@ -2631,10 +2606,7 @@ bool UpdateMQTTSetpoint(const char* uniquename, float& currentValue, float newVa
       // Construct JSON config message
       json["seltemp"] = newValue;
 
-      char value[128];
-      serializeJson(json, value);  // conf now contains the json
-
-      mqttPublish((host+"/climate/"+String(uniquename)+"/state").c_str(),value,mqttpersistence,0);
+      mqttPublishJson(host+"/climate/"+String(uniquename)+"/state", json, mqttpersistence, 0);
     }
     currentValue = newValue;
     return true;
