@@ -43,6 +43,9 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #define MQTT_QOS_CONFIG 1
 #define MQTT_QOS_STATE 0
 
+const long WIFI_RSSI_RECONNECT_THRESHOLD_DBM = -75;
+const unsigned long WIFI_RSSI_RECONNECT_DELAY_MS = 15UL * 60UL * 1000UL;
+
 
 
 // MQTT Async connect parameters
@@ -329,6 +332,7 @@ bool mqtt_debug=false;
 bool mqtt_infotomqtt = true;
 bool mqtt_enableLogToSPIFFS = true;
 String currentIP = "";  // Keep track of the current IP to only update on change
+unsigned long lowWiFiRSSISince = 0;
 
 // vars for program logic
 int OpenThermCommandIndex = 0; // index of the OpenTherm command we are processing
@@ -454,6 +458,35 @@ void Info(String text) {
 
 void feedWatchdog() {
   ESP.wdtFeed();  // Feed the hardware watchdog
+}
+
+void handleWiFiRSSIReconnect() {
+  if (WiFi.status() != WL_CONNECTED) {
+    lowWiFiRSSISince = 0;
+    return;
+  }
+
+  long currentRSSI = WiFi.RSSI();
+  if (currentRSSI >= WIFI_RSSI_RECONNECT_THRESHOLD_DBM) {
+    if (lowWiFiRSSISince != 0) {
+      Debug("WiFi RSSI recovered to " + String(currentRSSI) + " dBm, clearing reconnect timer");
+      lowWiFiRSSISince = 0;
+    }
+    return;
+  }
+
+  if (lowWiFiRSSISince == 0) {
+    lowWiFiRSSISince = millis();
+    Info("WiFi RSSI dropped to " + String(currentRSSI) + " dBm, starting reconnect timer");
+    return;
+  }
+
+  if ((long)(millis() - lowWiFiRSSISince) >= (long)WIFI_RSSI_RECONNECT_DELAY_MS) {
+    Info("WiFi RSSI below " + String(WIFI_RSSI_RECONNECT_THRESHOLD_DBM) + " dBm for 15 minutes, reconnecting WiFi");
+    lowWiFiRSSISince = 0;
+    WiFi.disconnect(false);
+    WiFi.reconnect();
+  }
 }
 
 void IRAM_ATTR handleInterrupt() {
@@ -3167,6 +3200,8 @@ void loop()
   }
 
   Debug("WiFi status: " + String(WiFi.status() == WL_CONNECTED ? "connected" : "not connected") + ", RSSI: " + String(WiFi.RSSI()) + " dBm");
+
+  handleWiFiRSSIReconnect();
 
   // Update Timeclient
   if (WiFi.status() == WL_CONNECTED) {
