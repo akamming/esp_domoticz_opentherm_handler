@@ -1055,20 +1055,20 @@ void readConfig()
         enableLogToSPIFFS = json["enableLogToSPIFFS"].is<bool>() ? json["enableLogToSPIFFS"].as<bool>() : DEFAULT_ENABLE_LOG_TO_SPIFFS;
 
         // PID Settings
-        KP = json["KP"].is<int>() ? json["KP"].as<int>() : DEFAULT_KP;
+        KP = json["KP"].is<float>() ? json["KP"].as<float>() : DEFAULT_KP;
         KI = json["KI"].is<float>() ? json["KI"].as<float>() : DEFAULT_KI;
         KD = json["KD"].is<float>() ? json["KD"].as<float>() : DEFAULT_KD;
 
         // Boiler Control Settings
-        MinBoilerTemp = json["MinBoilerTemp"].is<int>() ? json["MinBoilerTemp"].as<int>() : DEFAULT_MINBOILERTEMP;
-        MaxBoilerTemp = json["MaxBoilerTemp"].is<int>() ? json["MaxBoilerTemp"].as<int>() : DEFAULT_MAXBOILERTEMP;
-        minimumTempDifference = json["minimumTempDifference"].is<int>() ? json["minimumTempDifference"].as<int>() : DEFAULT_MINIMUMTEMPDIFFERENCE;
-        FrostProtectionSetPoint = json["FrostProtectionSetPoint"].is<int>() ? json["FrostProtectionSetPoint"].as<int>() : DEFAULT_FROSTPROTECTIONSETPOINT;
-        BoilerTempAtPlus20 = json["BoilerTempAtPlus20"].is<int>() ? json["BoilerTempAtPlus20"].as<int>() : DEFAULT_BOILERTEMPATPLUS20;
-        BoilerTempAtMinus10 = json["BoilerTempAtMinus10"].is<int>() ? json["BoilerTempAtMinus10"].as<int>() : DEFAULT_BOILERTEMPATMINUS10;
+        MinBoilerTemp = json["MinBoilerTemp"].is<float>() ? json["MinBoilerTemp"].as<float>() : DEFAULT_MINBOILERTEMP;
+        MaxBoilerTemp = json["MaxBoilerTemp"].is<float>() ? json["MaxBoilerTemp"].as<float>() : DEFAULT_MAXBOILERTEMP;
+        minimumTempDifference = json["minimumTempDifference"].is<float>() ? json["minimumTempDifference"].as<float>() : DEFAULT_MINIMUMTEMPDIFFERENCE;
+        FrostProtectionSetPoint = json["FrostProtectionSetPoint"].is<float>() ? json["FrostProtectionSetPoint"].as<float>() : DEFAULT_FROSTPROTECTIONSETPOINT;
+        BoilerTempAtPlus20 = json["BoilerTempAtPlus20"].is<float>() ? json["BoilerTempAtPlus20"].as<float>() : DEFAULT_BOILERTEMPATPLUS20;
+        BoilerTempAtMinus10 = json["BoilerTempAtMinus10"].is<float>() ? json["BoilerTempAtMinus10"].as<float>() : DEFAULT_BOILERTEMPATMINUS10;
         Curvature = getCurvatureIntFromString(json["Curvature"].is<String>() ? json["Curvature"].as<String>() : String(DEFAULT_CURVATURE_STRING));
-        SwitchHeatingOffAt = json["SwitchHeatingOffAt"].is<int>() ? json["SwitchHeatingOffAt"].as<int>() : DEFAULT_SWITCHHEATINGOFFAT;
-        ReferenceRoomCompensation = json["ReferenceRoomCompensation"].is<int>() ? json["ReferenceRoomCompensation"].as<int>() : DEFAULT_REFERENCEROOMCOMPENSATION;
+        SwitchHeatingOffAt = json["SwitchHeatingOffAt"].is<float>() ? json["SwitchHeatingOffAt"].as<float>() : DEFAULT_SWITCHHEATINGOFFAT;
+        ReferenceRoomCompensation = json["ReferenceRoomCompensation"].is<float>() ? json["ReferenceRoomCompensation"].as<float>() : DEFAULT_REFERENCEROOMCOMPENSATION;
         BidirectionalReferenceRoomCompensation = json["BidirectionalReferenceRoomCompensation"].is<bool>() ? json["BidirectionalReferenceRoomCompensation"].as<bool>() : DEFAULT_BIDIRECTIONAL_REFERENCEROOMCOMPENSATION;
 
         // persistent climate mode
@@ -1076,7 +1076,7 @@ void readConfig()
         if (climate_Mode.equals("null")) {
           climate_Mode = String(DEFAULT_CLIMATE_MODE);
         }
-        climate_SetPoint = json["climateSetpoint"].is<int>() ? json["climateSetpoint"].as<int>() : DEFAULT_CLIMATE_SETPOINT;
+        climate_SetPoint = json["climateSetpoint"].is<float>() ? json["climateSetpoint"].as<float>() : DEFAULT_CLIMATE_SETPOINT;
         Weather_Dependent_Mode = json["weatherDependentMode"].is<bool>() ? json["weatherDependentMode"].as<bool>() : DEFAULT_WEATHERDEPENDENTMODE;
         Holiday_Mode = json["holidayMode"].is<bool>() ? json["holidayMode"].as<bool>() : DEFAULT_HOLIDAYMODE;
         configFile.close();
