@@ -163,14 +163,6 @@ String mqttWillTopic() {
   return host + "/" + String(Status_Topic);
 }
 
-bool networkReady() {
-  return WiFi.status() == WL_CONNECTED && mqttConnected();
-}
-
-bool skipUpdate(bool force) {
-  return !force && (isPublishingAllSensors || !firstPublishDone);
-}
-
 bool mqttConnect(const char* server, int port) {
   #if MQTT_LIBRARY == 0 // PubSubClient
     client.setServer(server, port);
@@ -375,6 +367,14 @@ int sensorIndex = 0;
 bool isPublishingAllSensors = false;
 bool firstPublishDone = false;
 unsigned long resetButtonSubscribeTime = 0;
+
+bool networkReady() {
+  return WiFi.status() == WL_CONNECTED && mqttConnected();
+}
+
+bool skipUpdate(bool force) {
+  return !force && (isPublishingAllSensors || !firstPublishDone);
+}
 
 
 // object for uploading files
