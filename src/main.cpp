@@ -163,6 +163,14 @@ String mqttWillTopic() {
   return host + "/" + String(Status_Topic);
 }
 
+bool networkReady() {
+  return WiFi.status() == WL_CONNECTED && mqttConnected();
+}
+
+bool skipUpdate(bool force) {
+  return !force && (isPublishingAllSensors || !firstPublishDone);
+}
+
 bool mqttConnect(const char* server, int port) {
   #if MQTT_LIBRARY == 0 // PubSubClient
     client.setServer(server, port);
@@ -439,7 +447,7 @@ void logToSPIFFS(String message) {
 void Log(String level, String text) {
   text = timeClient.getFormattedTime() + " " + level + ": " + text;
   if (enableLogToSPIFFS) logToSPIFFS(text);
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+  if (networkReady()) {
     UpdateMQTTTextSensor(Log_Name, text.c_str(), true);
   }
   Serial.println(text);
@@ -675,7 +683,7 @@ void handleGetInfo()
   json["resetreason"] = ESP.getResetReason();
   json["resetinfo"] = ESP.getResetInfo();
   json["freeheap"] = ESP.getFreeHeap();
-  if (WiFi.status() == WL_CONNECTED && mqttConnected())
+  if (networkReady())
   {
     json["MQTTconnected"] = true;
   } else {
@@ -993,38 +1001,26 @@ void handleNotFound()
   }
 }
 
-String getCurvatureStringFromInt(int i) 
+struct CurvatureEntry { int value; const char* name; };
+static const CurvatureEntry curvatureTable[] = {
+  {0,  "none"}, {10, "small"}, {20, "medium"}, {30, "large"}, {40, "extralarge"}
+};
+static const int curvatureTableSize = sizeof(curvatureTable) / sizeof(curvatureTable[0]);
+
+String getCurvatureStringFromInt(int i)
 {
-  if (i==0) {
-    return "none";
-  } else if (i==10) {
-    return "small";
-  } else if (i==20) {
-    return "medium";
-  } else if (i==30) {
-    return "large";
-  } else if (i==40) {
-    return "extralarge";
-  } else {
-    return "none";
+  for (int j = 0; j < curvatureTableSize; j++) {
+    if (curvatureTable[j].value == i) return curvatureTable[j].name;
   }
+  return "none";
 }
 
 int getCurvatureIntFromString(String value) {
-  if (value=="none") {
-    return 0;
-  } else if (value=="small") {
-    return 10;
-  } else if (value=="medium") {
-    return 20;
-  } else if (value=="large") {
-    return 30;
-  } else if (value=="extralarge") {
-    return 40;
-  } else {
-    Debug("Unknown Curvature String: ["+value+"]");
-    return 10; // default value
+  for (int j = 0; j < curvatureTableSize; j++) {
+    if (value == curvatureTable[j].name) return curvatureTable[j].value;
   }
+  Debug("Unknown Curvature String: ["+value+"]");
+  return 10; // default value
 }
 
 void readConfig()
@@ -1196,7 +1192,7 @@ float getDHWFlowrate() {
 }
 
 void CommunicateSteeringVarsToMQTT() {
-if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+  if (networkReady()) {
     // Climate Mode
     UpdateClimateSetpointMode();
 
@@ -1535,7 +1531,7 @@ void handleSetBoilerStatus() {
     modulation = ot.getModulation();
 
     // Check if we have to send to MQTT for steering vars
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+    if (networkReady()) {
       UpdateMQTTBinarySensor(FlameActive_Name, mqtt_Flame, Flame, false);
       UpdateMQTTBinarySensor(FaultActive_Name, mqtt_Fault, Fault, false);
       UpdateMQTTBinarySensor(DiagnosticActive_Name, mqtt_Diagnostic, Diagnostic, false);
@@ -1572,7 +1568,7 @@ void handleGetOutSideTemp(){
   }
 
   // Check if we have to send to MQTT (throttled to once per 30 seconds, tolerance 0.1°C)
-  if (WiFi.status() == WL_CONNECTED && mqttConnected() && (millis() - t_last_outside_temp_update > 30000)) {
+  if (networkReady() && (millis() - t_last_outside_temp_update > 30000)) {
     bool updated = UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.1, false);
     updated |= UpdateMQTTNumberSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, 0.1, false);
     if (updated) {
@@ -1603,7 +1599,7 @@ void handleGetBoilerTemperature()
 
   // Check if we have to send to MQTT (throttled to once per 10 seconds, tolerance 0.1°C)
   static unsigned long last_boiler_temp_update = 0;
-  if (WiFi.status() == WL_CONNECTED && mqttConnected() && (millis() - last_boiler_temp_update > 10000)) {
+  if (networkReady() && (millis() - last_boiler_temp_update > 10000)) {
     if (UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.1, false)) {
       last_boiler_temp_update = millis();
     }
@@ -1617,7 +1613,7 @@ void handleGetDHWTemperature()
   dhw_Temperature = ot.getDHWTemperature();
 
   // Check if we have to send to MQTT
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+  if (networkReady()) {
     if (UpdateMQTTNumberSensor(DHW_Temperature_Name, mqtt_dhw_Temperature, dhw_Temperature, 0.09, false)) {
       UpdateMQTTSetpointTemperature(DHW_Setpoint_Name,dhw_Temperature, false);
     }
@@ -1631,7 +1627,7 @@ void handleGetReturnTemperature()
   return_Temperature = ot.getReturnTemperature();
 
   // Check if we have to send to MQTT
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+  if (networkReady()) {
     UpdateMQTTNumberSensor(Return_Temperature_Name, mqtt_return_Temperature, return_Temperature, 0.09, false);
   }
 }
@@ -1643,7 +1639,7 @@ void handleGetPressure()
   pressure = ot.getPressure();
 
   // Check if we have to send to MQTT
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+  if (networkReady()) {
     UpdateMQTTNumberSensor(Pressure_Name, mqtt_pressure, pressure, 0.009, false);
   }
 }
@@ -1671,7 +1667,7 @@ void handleGetFaultCode()
   FaultCode = ot.getFault();
 
   // Check if we have to send to MQTT
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+  if (networkReady()) {
     UpdateMQTTFaultCodeSensor(FaultCode_Name, mqtt_FaultCode, FaultCode, false);
   }
 }
@@ -1684,7 +1680,7 @@ void handleGetThermostatTemperature()
   currentTemperature = sensors.getTempCByIndex(0);
 
   // Check if we have to send to MQTT
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+  if (networkReady()) {
     UpdateMQTTNumberSensor(Thermostat_Temperature_Name, mqtt_currentTemperature, currentTemperature, 0.09, false);
     if (mqtttemptopic.length()==0) { // temptopic empty, use internal temperature
       SetMQTTTemperature(currentTemperature);
@@ -1718,16 +1714,23 @@ void handleOpenTherm() {
 
 
 String CommandTopic(const char* DeviceName){
-  return String(host)+String("/light/")+String(DeviceName)+String("/set");
+  return host + "/light/" + String(DeviceName) + "/set";
 }
 
 String SetpointCommandTopic(const char* DeviceName){
-  return String(host)+"/climate/"+String(DeviceName)+"/cmd_temp";
+  return host + "/climate/" + String(DeviceName) + "/cmd_temp";
 }
 
 String NumberCommandTopic(const char* DeviceName){
-  return String(host)+"/number/"+String(DeviceName)+"/set";
+  return host + "/number/" + String(DeviceName) + "/set";
 }
+
+String SensorStateTopic(const char* name) { return host + "/sensor/"        + name + "/state"; }
+String BinarySensorStateTopic(const char* name) { return host + "/binary_sensor/" + name + "/state"; }
+String SelectStateTopic(const char* name) { return host + "/select/"        + name + "/state"; }
+String TextStateTopic(const char* name) { return host + "/text/"          + name + "/state"; }
+String LightStateTopic(const char* name) { return host + "/light/"         + name + "/state"; }
+String ClimateStateTopic(const char* name) { return host + "/climate/"     + name; }
 
 
 void LogMQTT(const char* topic, const char* payloadstr, const char* length, const char* logtext) {
@@ -1941,8 +1944,8 @@ bool handleMQTTTopicChange(String& topicVar, const String& newValue) {
   }
   topicVar = newValue;
   mqttSubscribe(topicVar.c_str(), 0);    // Subscribe to new topic
-  return true; // Config must be saved
   DelayedSaveConfig();
+  return true;
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -2164,21 +2167,18 @@ void PublishMQTTSwitch(const char* uniquename)
 {
   Info("Publishing switch: " + String(uniquename));
   JsonDocument json;
-  json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
-  json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
+  json["cmd_t"] = CommandTopic(uniquename);
+  json["stat_t"] = LightStateTopic(uniquename);
   publishMQTTDiscoveryConfig("light", uniquename, json);
-  mqttSubscribe((host+"/light/"+String(uniquename)+"/set").c_str(), 0);
+  mqttSubscribe(CommandTopic(uniquename).c_str(), 0);
 }
 
 bool UpdateMQTTSwitch(const char* uniquename, bool& currentValue, bool newValue, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
-
+  if (skipUpdate(force)) return false;
   if (force || currentValue != newValue) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      // Serial.println("UpdateMQTTSwitch");
-      // publish state message
-      mqttPublish((host+"/light/"+String(uniquename)+"/state").c_str(),newValue?"ON":"OFF",mqttpersistence,MQTT_QOS_STATE);
+    if (networkReady()) {
+      mqttPublish(LightStateTopic(uniquename).c_str(), newValue?"ON":"OFF", mqttpersistence, MQTT_QOS_STATE);
     }
     currentValue = newValue;
     return true;
@@ -2203,7 +2203,7 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
 {
   Info("Publishing binary sensor: " + String(uniquename));
   JsonDocument json;
-  json["stat_t"] = host+"/binary_sensor/"+String(uniquename)+"/state";
+  json["stat_t"] = BinarySensorStateTopic(uniquename);
   json["payload_on"] = true;
   json["payload_off"] = false;
   json["val_tpl"] = "{{ value_json.value }}";
@@ -2215,17 +2215,12 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
 
 void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool newValue, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
+  if (skipUpdate(force)) return;
   if (force || currentValue != newValue) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      Serial.println("UpdateBinarySensor");
-
+    if (networkReady()) {
       JsonDocument json;
       json["value"] = newValue;
-
-      // publish state message
-      mqttPublishJson(host+"/binary_sensor/"+String(uniquename)+"/state", json, mqttpersistence, MQTT_QOS_STATE);
+      mqttPublishJson(BinarySensorStateTopic(uniquename), json, mqttpersistence, MQTT_QOS_STATE);
     }
     currentValue = newValue;
   }
@@ -2235,8 +2230,8 @@ void PublishMQTTNumberSensor(const char* uniquename, const char* unit = "", cons
 {
   Info("Publishing number sensor: " + String(uniquename));
   JsonDocument json;
-  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = SensorStateTopic(uniquename);
+  json["json_attributes_topic"] = SensorStateTopic(uniquename);
   json["value_template"] =  "{{ value_json.value }}";
   if (strlen(unit) > 0) {
     json["unit_of_measurement"] = unit;
@@ -2251,16 +2246,12 @@ void PublishMQTTNumberSensor(const char* uniquename, const char* unit = "", cons
 
 bool UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
-
+  if (skipUpdate(force)) return false;
   if (force || fabs(currentValue - newValue) > tolerance) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      Serial.println("UpdateMQTTGenericSensor");
+    if (networkReady()) {
       JsonDocument json;
-
-      // Create message
-      json["value"] =  float(int(newValue*100))/100;   // ensures round to 1 decimal behind the comma
-      mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, MQTT_QOS_STATE);
+      json["value"] =  float(int(newValue*100))/100;
+      mqttPublishJson(SensorStateTopic(uniquename), json, mqttpersistence, MQTT_QOS_STATE);
     }
     currentValue = newValue;
     return true;
@@ -2275,24 +2266,19 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "power_factor";
   json["unit_of_measurement"] = "%";
-  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = SensorStateTopic(uniquename);
+  json["json_attributes_topic"] = SensorStateTopic(uniquename);
   publishMQTTDiscoveryConfig("sensor", uniquename, json);
 }
 
 void UpdateMQTTPercentageSensor(const char* uniquename, float& currentValue, float newValue, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
+  if (skipUpdate(force)) return;
   if (force || fabs(currentValue - newValue) > 0.01) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      Serial.println("UpdateMQTTPercentageSensor");
+    if (networkReady()) {
       JsonDocument json;
-
-      // Create message
-      json["value"]=newValue;
-
-      mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, 0);
+      json["value"] = newValue;
+      mqttPublishJson(SensorStateTopic(uniquename), json, mqttpersistence, 0);
     }
     currentValue = newValue;
   }
@@ -2304,24 +2290,19 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   JsonDocument json;
   json["value_template"] =  "{{ value_json.value }}";
   json["unit_of_measurement"] = "";
-  json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
-  json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["state_topic"] = SensorStateTopic(uniquename);
+  json["json_attributes_topic"] = SensorStateTopic(uniquename);
   publishMQTTDiscoveryConfig("sensor", uniquename, json);
 }
 
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char& currentValue, unsigned char newValue, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
+  if (skipUpdate(force)) return;
   if (force || currentValue != newValue) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      Serial.println("UpdateMQTTFaultCodeSensor");
-
-      // Create message
+    if (networkReady()) {
       JsonDocument json;
       json["value"] = newValue;
-
-      mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, 0);
+      mqttPublishJson(SensorStateTopic(uniquename), json, mqttpersistence, 0);
     }
     currentValue = newValue;
   }
@@ -2333,13 +2314,13 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   JsonDocument json;
   json["min_temp"] = mintemp;
   json["max_temp"] = maxtemp;
-  json["temp_cmd_t"] = host+"/climate/"+String(uniquename)+"/cmd_temp";
-  json["temp_stat_t"] = host+"/climate/"+String(uniquename)+"/state";
+  json["temp_cmd_t"] = ClimateStateTopic(uniquename) + "/cmd_temp";
+  json["temp_stat_t"] = ClimateStateTopic(uniquename) + "/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
   json["temp_step"] = 0.5;
   json["temp_unit"] = "C";
   json["precision"] = 0.1;
-  json["curr_temp_t"] = host+"/climate/"+String(uniquename)+"/Air_temperature";
+  json["curr_temp_t"] = ClimateStateTopic(uniquename) + "/Air_temperature";
   json["curr_temp_tpl"] = "{{ value_json.value }}";
   JsonArray modes = json["modes"].to<JsonArray>();
   modes.add("off");
@@ -2348,23 +2329,21 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
     modes.add("cool");
     modes.add("auto");
   }
-  json["mode_stat_t"] = host+"/climate/"+String(uniquename)+"/mode";
-  json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
+  json["mode_stat_t"] = ClimateStateTopic(uniquename) + "/mode";
+  json["mode_cmd_t"] = ClimateStateTopic(uniquename) + "/mode/set";
   json["mode_stat_tpl"] =  "{{ {"+String(OFF)+": \"off\", "+String(HEAT)+": \"heat\", "+String(COOL)+": \"cool\", "+String(AUTO)+": \"auto\"}[value_json.value] | default('off') }}";
   publishMQTTDiscoveryConfig("climate", uniquename, json);
-  mqttSubscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str(), 0);
-  mqttSubscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str(), 0);
+  mqttSubscribe((ClimateStateTopic(uniquename) + "/mode/set").c_str(), 0);
+  mqttSubscribe((ClimateStateTopic(uniquename) + "/cmd_temp").c_str(), 0);
 }
 
-void UpdateMQTTSetpointTemperature(const char* uniquename,float value, bool force)
+void UpdateMQTTSetpointTemperature(const char* uniquename, float value, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTSetpointtemperature");
+  if (skipUpdate(force)) return;
+  if (networkReady()) {
     JsonDocument json;
-
-    mqttPublish((host+"/climate/"+String(uniquename)+"/Air_temperature").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+    json["value"] = value;
+    mqttPublishJson(ClimateStateTopic(uniquename) + "/Air_temperature", json, mqttpersistence, 0);
   }
 }
 
@@ -2373,24 +2352,22 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
   Info("Publishing number: " + String(uniquename));
   JsonDocument json;
   json["stat_t"] = host+"/number/"+String(uniquename)+"/state";
-  json["cmd_t"] = host+"/number/"+String(uniquename)+"/set";
+  json["cmd_t"] = NumberCommandTopic(uniquename);
   json["min"] = min;
   json["max"] = max;
   json["step"] = step;
   json["unit_of_measurement"] = "°C";
   json["mode"] = isSlider ? "slider" : "box";
   publishMQTTDiscoveryConfig("number", uniquename, json);
-  mqttSubscribe((host+"/number/"+String(uniquename)+"/set").c_str(), 0);
+  mqttSubscribe(NumberCommandTopic(uniquename).c_str(), 0);
 }
 
 bool UpdateMQTTNumber(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
-
+  if (skipUpdate(force)) return false;
   if (force || fabs(currentValue - newValue) > tolerance) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      Serial.println("UpdateMQTTNumber");
-      mqttPublish((host+"/number/"+String(uniquename)+"/state").c_str(),String(newValue).c_str(),mqttpersistence,0);
+    if (networkReady()) {
+      mqttPublish((host+"/number/"+String(uniquename)+"/state").c_str(), String(newValue).c_str(), mqttpersistence, 0);
     }
     currentValue = newValue;
     return true;
@@ -2402,7 +2379,7 @@ void PublishMQTTText(const char* uniquename)
 {
   Info("Publishing text: " + String(uniquename));
   JsonDocument json;
-  json["stat_t"] = host+"/text/"+String(uniquename)+"/state";
+  json["stat_t"] = TextStateTopic(uniquename);
   json["cmd_t"] = host+"/text/"+String(uniquename)+"/set";
   publishMQTTDiscoveryConfig("text", uniquename, json);
   mqttSubscribe((host+"/text/"+String(uniquename)+"/set").c_str(), 0);
@@ -2410,19 +2387,12 @@ void PublishMQTTText(const char* uniquename)
 
 void UpdateMQTTText(const char* uniquename, String& currentValue, String newValue, bool force)
 {
-  bool shouldPublish = force;
-  if (!newValue.equals(currentValue)) {
-    shouldPublish = true;
-  }
-
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
-  if (shouldPublish) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      mqttPublish((host+"/text/"+String(uniquename)+"/state").c_str(), newValue.c_str(), mqttpersistence, 0);
+  if (skipUpdate(force)) return;
+  if (force || !newValue.equals(currentValue)) {
+    if (networkReady()) {
+      mqttPublish(TextStateTopic(uniquename).c_str(), newValue.c_str(), mqttpersistence, 0);
     }
   }
-
   currentValue = newValue;
 }
 
@@ -2430,24 +2400,18 @@ void PublishMQTTTextSensor(const char* uniquename)
 {
   Info("Publishing text sensor: " + String(uniquename));
   JsonDocument json;
-  json["stat_t"] = host+"/sensor/"+String(uniquename)+"/state";
+  json["stat_t"] = SensorStateTopic(uniquename);
   json["value_template"] = "{{ value_json.value }}";
   publishMQTTDiscoveryConfig("sensor", uniquename, json);
 }
 
 bool UpdateMQTTTextSensor(const char* uniquename, const char* value, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
-
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTTextSensor");
+  if (skipUpdate(force)) return false;
+  if (networkReady()) {
     JsonDocument json;
-
-    // Construct JSON state message
     json["value"] = value;
-
-    // Publish state message
-    return mqttPublishJson(host+"/sensor/"+String(uniquename)+"/state", json, mqttpersistence, 0);
+    return mqttPublishJson(SensorStateTopic(uniquename), json, mqttpersistence, 0);
   }
   return false;
 }
@@ -2457,7 +2421,7 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
 {
   Info("Publishing curvature select: " + String(uniquename));
   JsonDocument json;
-  json["stat_t"] = host+"/select/"+String(uniquename)+"/state";
+  json["stat_t"] = SelectStateTopic(uniquename);
   json["cmd_t"] = host+"/select/"+String(uniquename)+"/set";
   json["val_tpl"] = "{{ value_json.curvature }}";
   JsonArray options = json["options"].to<JsonArray>();
@@ -2470,25 +2434,19 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
   mqttSubscribe((host+"/select/"+String(uniquename)+"/set").c_str(), 0);
 }
 
-void UpdateMQTTCurvatureSelect(const char* uniquename,int value, bool force)
+void UpdateMQTTCurvatureSelect(const char* uniquename, int value, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTCurvatureSelect");
+  if (skipUpdate(force)) return;
+  if (networkReady()) {
     JsonDocument json;
-
-    // Construct JSON config message
     json["curvature"] = getCurvatureStringFromInt(value);
-
-    mqttPublishJson(host+"/select/"+String(uniquename)+"/state", json, mqttpersistence, 0);
+    mqttPublishJson(SelectStateTopic(uniquename), json, mqttpersistence, 0);
   }
 }
 
 void UpdateClimateSetpointMode(bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
+  if (skipUpdate(force)) return;
   if (force || !climate_Mode.equals(mqtt_climate_Mode)) {
     if (climate_Mode.equals("off")) {
       UpdateMQTTSetpointMode(Climate_Name, OFF, force);
@@ -2503,38 +2461,25 @@ void UpdateClimateSetpointMode(bool force)
   }
 }
 
-void UpdateMQTTSetpointMode(const char* uniquename,int value, bool force)
+void UpdateMQTTSetpointMode(const char* uniquename, int value, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return;
-
-  if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-    Serial.println("UpdateMQTTSetpointmode");
+  if (skipUpdate(force)) return;
+  if (networkReady()) {
     JsonDocument json;
-
-    // Construct JSON config message
-    // json["value"] = value;
-
-    // char jsonstr[128];
-    // serializeJson(json, jsonstr);  // conf now contains the json
-
-    mqttPublish((host+"/climate/"+String(uniquename)+"/mode").c_str(),("{ \"value\": "+String(value)+" }").c_str(),mqttpersistence,0);
+    json["value"] = value;
+    mqttPublishJson(ClimateStateTopic(uniquename) + "/mode", json, mqttpersistence, 0);
   }
 }
 
 
 bool UpdateMQTTSetpoint(const char* uniquename, float& currentValue, float newValue, bool force)
 {
-  if (!force && (isPublishingAllSensors || !firstPublishDone)) return false;
-
+  if (skipUpdate(force)) return false;
   if (force || fabs(currentValue - newValue) > 0.01) {
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
-      Serial.println("UpdateMQTTSetpoint");
+    if (networkReady()) {
       JsonDocument json;
-
-      // Construct JSON config message
       json["seltemp"] = newValue;
-
-      mqttPublishJson(host+"/climate/"+String(uniquename)+"/state", json, mqttpersistence, 0);
+      mqttPublishJson(ClimateStateTopic(uniquename) + "/state", json, mqttpersistence, 0);
     }
     currentValue = newValue;
     return true;
@@ -2571,15 +2516,17 @@ void updateTime() {
   previousMillis=millis();
 }
 
+unsigned long getUptimeSeconds() {
+  return (unsigned long)y * 365 * 24 * 3600 + (unsigned long)d * 24 * 3600 + (unsigned long)h * 3600 + (unsigned long)m * 60 + s;
+}
+
 String getUptimeString() {
-  // Calculate total seconds (approximate, ignoring leap years)
-  unsigned long total_seconds = (unsigned long)y * 365 * 24 * 3600 + (unsigned long)d * 24 * 3600 + (unsigned long)h * 3600 + (unsigned long)m * 60 + s;
-  
-  unsigned long days = total_seconds / 86400;
-  unsigned long hours = (total_seconds % 86400) / 3600;
+  unsigned long total_seconds = getUptimeSeconds();
+  unsigned long days    = total_seconds / 86400;
+  unsigned long hours   = (total_seconds % 86400) / 3600;
   unsigned long minutes = (total_seconds % 3600) / 60;
   unsigned long seconds = total_seconds % 60;
-  
+
   String timeStr = "";
   if (hours < 10) timeStr += "0";
   timeStr += String(hours) + ":";
@@ -2587,17 +2534,8 @@ String getUptimeString() {
   timeStr += String(minutes) + ":";
   if (seconds < 10) timeStr += "0";
   timeStr += String(seconds);
-  
-  if (days > 0) {
-    return String(days) + " days, " + timeStr;
-  } else {
-    return timeStr;
-  }
-}
 
-unsigned long getUptimeSeconds() {
-  // Calculate total seconds (approximate, ignoring leap years)
-  return (unsigned long)y * 365 * 24 * 3600 + (unsigned long)d * 24 * 3600 + (unsigned long)h * 3600 + (unsigned long)m * 60 + s;
+  return days > 0 ? String(days) + " days, " + timeStr : timeStr;
 }
 
 void SubscribeToTempTopics() {
@@ -3155,7 +3093,7 @@ void loop()
           }
         }
 
-        if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+        if (networkReady()) {
           String newIP = WiFi.localIP().toString();
           if (!currentIP.equals(newIP)) {
             currentIP=newIP;
@@ -3177,7 +3115,7 @@ void loop()
       }
     }
 
-    if (WiFi.status() == WL_CONNECTED && mqttConnected()) {
+    if (networkReady()) {
       // we are connected, check if we have to resend discovery info
       if (millis()-t_last_mqtt_discovery>MQTTDiscoveryHeartbeatInMillis || sensorIndex > 0)
       {
