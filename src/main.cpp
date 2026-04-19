@@ -2123,8 +2123,8 @@ void reconnect()
       #else
       bool mqttconnected = mqttConnect(mqttserver.c_str(), mqttport);
       if (mqttconnected) {
-        sensorIndex = 0; // Reset sensor index for discovery
         if (!firstPublishDone) {
+          sensorIndex = 0; // Reset sensor index for discovery (only on first connect)
           PublishAllMQTTSensors();
         }
         Info("Succesfully (re)connected, starting operations");
@@ -2997,8 +2997,8 @@ void setup()
       if (mqtttemptopic.toInt()>0 or mqttoutsidetemptopic.toInt()>0) { // apparently it is a domoticz idx. So listen to domoticz/out
         SubScribeToDomoticz();
       }
-      sensorIndex = 0; // Reset sensor index for discovery
       if (!firstPublishDone) {
+        sensorIndex = 0; // Reset sensor index for discovery (only on first connect)
         PublishAllMQTTSensors();
       }
       String willTopic = mqttWillTopic();
