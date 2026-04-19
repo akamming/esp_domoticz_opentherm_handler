@@ -159,11 +159,15 @@ void mqttSetUsernamePassword(const char* user, const char* pass) {
 }
 #endif
 
+String mqttStatusTopic() {
+  return host + "/" + String(Status_Topic);
+}
+
 bool mqttConnect(const char* server, int port) {
   #if MQTT_LIBRARY == 0 // PubSubClient
     client.setServer(server, port);
     client.setBufferSize(2048); // For longer discoverymessages
-    String willTopic = host + "/status";
+    String willTopic = mqttStatusTopic();
     bool connected;
     if (usemqttauthentication) {
       connected = client.connect(host.c_str(), mqttuser.c_str(), mqttpass.c_str(), willTopic.c_str(), 1, true, "offline");
@@ -178,7 +182,8 @@ bool mqttConnect(const char* server, int port) {
     return client.connect(server, port);
   #else // AsyncMQTTClient
     client.setServer(server, port);
-    client.setWill(host.c_str(), 1, true, "offline");
+    String willTopic = mqttStatusTopic();
+    client.setWill(willTopic.c_str(), 1, true, "offline");
     client.setClientId(mqttClientId.c_str());
     client.setKeepAlive(300);
     if (usemqttauthentication) {
@@ -2155,7 +2160,7 @@ void PublishMQTTSwitch(const char* uniquename)
   json["unique_id"] = host+"_"+uniquename;
   json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2192,7 +2197,7 @@ void PublishMQTTButton(const char* uniquename)
   json["unique_id"] = host+"_"+uniquename;
   json["cmd_t"] = host+"/button/"+String(uniquename)+"/set";
   json["payload_press"] = "PRESS";
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2223,7 +2228,7 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
   if (!String(deviceclass).equals("None")) {
     json["device_class"] =deviceclass;
   }
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2260,7 +2265,7 @@ void PublishMQTTNumberSensor(const char* uniquename, const char* unit = "", cons
   json["value_template"] =  "{{ value_json.value }}";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
   if (strlen(unit) > 0) {
     json["unit_of_measurement"] = unit;
   }
@@ -2308,7 +2313,7 @@ void PublishMQTTPercentageSensor(const char* uniquename)
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2346,7 +2351,7 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["name"] = uniquename;
   json["unique_id"] = host+"_"+uniquename;
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2401,7 +2406,7 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   json["mode_stat_t"] = host+"/climate/"+String(uniquename)+"/mode";
   json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
   json["mode_stat_tpl"] =  "{{ {"+String(OFF)+": \"off\", "+String(HEAT)+": \"heat\", "+String(COOL)+": \"cool\", "+String(AUTO)+": \"auto\"}[value_json.value] | default('off') }}";
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2444,7 +2449,7 @@ void PublishMQTTNumber(const char* uniquename, int min, int max, float step, boo
   } else {
     json["mode"] = "box";
   }
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2481,7 +2486,7 @@ void PublishMQTTText(const char* uniquename)
   json["stat_t"] = host+"/text/"+String(uniquename)+"/state";
   json["cmd_t"] = host+"/text/"+String(uniquename)+"/set";
   // json["stat_tpl"] = "{{value_json.value}}";
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2520,7 +2525,7 @@ void PublishMQTTTextSensor(const char* uniquename)
   json["stat_t"] = host+"/sensor/"+String(uniquename)+"/state";
   json["value_template"] = "{{ value_json.value }}";
   // No cmd_t, so not editable
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -2566,7 +2571,7 @@ void PublishMQTTCurvatureSelect(const char* uniquename)
   options.add("medium");
   options.add("large");
   options.add("extralarge");
-  json["availability_topic"] = "domesphelper/status";
+  json["availability_topic"] = mqttStatusTopic();
 
   addDeviceToJson(&json);
 
@@ -3168,7 +3173,7 @@ void setup()
       if (!firstPublishDone) {
         PublishAllMQTTSensors();
       }
-      String willTopic = host + "/status";
+      String willTopic = mqttStatusTopic();
       mqttPublish(willTopic.c_str(), "online", true, 1);
     });
     client.onDisconnect([](AsyncMqttClientDisconnectReason reason) {
