@@ -159,7 +159,7 @@ void mqttSetUsernamePassword(const char* user, const char* pass) {
 }
 #endif
 
-String mqttStatusTopic() {
+String mqttWillTopic() {
   return host + "/" + String(Status_Topic);
 }
 
@@ -167,7 +167,7 @@ bool mqttConnect(const char* server, int port) {
   #if MQTT_LIBRARY == 0 // PubSubClient
     client.setServer(server, port);
     client.setBufferSize(2048); // For longer discoverymessages
-    String willTopic = mqttStatusTopic();
+    String willTopic = mqttWillTopic();
     bool connected;
     if (usemqttauthentication) {
       connected = client.connect(host.c_str(), mqttuser.c_str(), mqttpass.c_str(), willTopic.c_str(), 1, true, "offline");
@@ -182,7 +182,7 @@ bool mqttConnect(const char* server, int port) {
     return client.connect(server, port);
   #else // AsyncMQTTClient
     client.setServer(server, port);
-    String willTopic = mqttStatusTopic();
+    String willTopic = mqttWillTopic();
     client.setWill(willTopic.c_str(), 1, true, "offline");
     client.setClientId(mqttClientId.c_str());
     client.setKeepAlive(300);
@@ -2150,24 +2150,23 @@ void addDeviceToJson(JsonDocument *json) {
   dev["cu"] = "http://"+WiFi.localIP().toString()+"/";  
 }
 
+// Generic helper to publish MQTT discovery config messages
+void publishMQTTDiscoveryConfig(const char* component_type, const char* uniquename, JsonDocument& json) {
+  String discoveryTopic = String(mqttautodiscoverytopic) + "/" + String(component_type) + "/" + host + "/" + String(uniquename) + "/config";
+  json["name"] = uniquename;
+  json["unique_id"] = host + "_" + String(uniquename);
+  json["availability_topic"] = mqttWillTopic();
+  addDeviceToJson(&json);
+  mqttPublishJson(discoveryTopic, json, mqttpersistence, MQTT_QOS_CONFIG);
+}
+
 void PublishMQTTSwitch(const char* uniquename)
 {
   Info("Publishing switch: " + String(uniquename));
   JsonDocument json;
-
-  // Construct JSON config message
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["cmd_t"] = host+"/light/"+String(uniquename)+"/set";
   json["stat_t"] = host+"/light/"+String(uniquename)+"/state";
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // Publish config message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/light/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
-
-  // subscribe if need to listen to commands
+  publishMQTTDiscoveryConfig("light", uniquename, json);
   mqttSubscribe((host+"/light/"+String(uniquename)+"/set").c_str(), 0);
 }
 
@@ -2191,23 +2190,10 @@ void PublishMQTTButton(const char* uniquename)
 {
   Info("Publishing button: " + String(uniquename));
   JsonDocument json;
-
-  // Construct JSON config message
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["cmd_t"] = host+"/button/"+String(uniquename)+"/set";
   json["payload_press"] = "PRESS";
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // Publish config message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/button/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
-
-  // subscribe if need to listen to commands
+  publishMQTTDiscoveryConfig("button", uniquename, json);
   mqttSubscribe((host+"/button/"+String(uniquename)+"/set").c_str(), 0);
-
-  // Record subscribe time for reset button to ignore retained messages
   if (String(uniquename).equals(String(Reset_Device_Name))) {
     resetButtonSubscribeTime = millis();
   }
@@ -2217,23 +2203,14 @@ void PublishMQTTBinarySensor(const char* uniquename, const char* deviceclass)
 {
   Info("Publishing binary sensor: " + String(uniquename));
   JsonDocument json;
-
-  // Construct JSON config message
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/binary_sensor/"+String(uniquename)+"/state";
   json["payload_on"] = true;
   json["payload_off"] = false;
   json["val_tpl"] = "{{ value_json.value }}";
   if (!String(deviceclass).equals("None")) {
-    json["device_class"] =deviceclass;
+    json["device_class"] = deviceclass;
   }
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // Publish config message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/binary_sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("binary_sensor", uniquename, json);
 }
 
 void UpdateMQTTBinarySensor(const char* uniquename, bool& currentValue, bool newValue, bool force)
@@ -2258,25 +2235,16 @@ void PublishMQTTNumberSensor(const char* uniquename, const char* unit = "", cons
 {
   Info("Publishing number sensor: " + String(uniquename));
   JsonDocument json;
-
-  // Create message
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["value_template"] =  "{{ value_json.value }}";
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
-  json["availability_topic"] = mqttStatusTopic();
   if (strlen(unit) > 0) {
     json["unit_of_measurement"] = unit;
   }
   if (strlen(device_class) > 0) {
     json["device_class"] = device_class;
   }
-
-  addDeviceToJson(&json);
-
-  // publish the Message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("sensor", uniquename, json);
 }
 
 
@@ -2304,21 +2272,12 @@ void PublishMQTTPercentageSensor(const char* uniquename)
 {
   Info("Publishing percentage sensor: " + String(uniquename));
   JsonDocument json;
-
-  // Create message
   json["value_template"] =  "{{ value_json.value }}";
   json["device_class"] = "power_factor";
   json["unit_of_measurement"] = "%";
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // publish the Message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("sensor", uniquename, json);
 }
 
 void UpdateMQTTPercentageSensor(const char* uniquename, float& currentValue, float newValue, bool force)
@@ -2343,20 +2302,11 @@ void PublishMQTTFaultCodeSensor(const char* uniquename)
 {
   Info("Publishing fault code sensor: " + String(uniquename));
   JsonDocument json;
-
-  // Create message
   json["value_template"] =  "{{ value_json.value }}";
   json["unit_of_measurement"] = "";
   json["state_topic"] = host+"/sensor/"+String(uniquename)+"/state";
   json["json_attributes_topic"] = host+"/sensor/"+String(uniquename)+"/state";
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // publish the Message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("sensor", uniquename, json);
 }
 
 void UpdateMQTTFaultCodeSensor(const char* uniquename, unsigned char& currentValue, unsigned char newValue, bool force)
@@ -2381,13 +2331,8 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
 {
   Info("Publishing setpoint: " + String(uniquename));
   JsonDocument json;
-
-  // Create message
   json["min_temp"] = mintemp;
   json["max_temp"] = maxtemp;
-
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["temp_cmd_t"] = host+"/climate/"+String(uniquename)+"/cmd_temp";
   json["temp_stat_t"] = host+"/climate/"+String(uniquename)+"/state";
   json["temp_stat_tpl"] = "{{value_json.seltemp}}";
@@ -2406,12 +2351,7 @@ void PublishMQTTSetpoint(const char* uniquename, int mintemp, int maxtemp, bool 
   json["mode_stat_t"] = host+"/climate/"+String(uniquename)+"/mode";
   json["mode_cmd_t"] = host+"/climate/"+String(uniquename)+"/mode/set";
   json["mode_stat_tpl"] =  "{{ {"+String(OFF)+": \"off\", "+String(HEAT)+": \"heat\", "+String(COOL)+": \"cool\", "+String(AUTO)+": \"auto\"}[value_json.value] | default('off') }}";
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // publish the Message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/climate/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("climate", uniquename, json);
   mqttSubscribe((host+"/climate/"+String(uniquename)+"/mode/set").c_str(), 0);
   mqttSubscribe((host+"/climate/"+String(uniquename)+"/cmd_temp").c_str(), 0);
 }
@@ -2431,32 +2371,16 @@ void UpdateMQTTSetpointTemperature(const char* uniquename,float value, bool forc
 void PublishMQTTNumber(const char* uniquename, int min, int max, float step, bool isSlider)
 {
   Info("Publishing number: " + String(uniquename));
-  // Debug("PublishMQTTNumber");
   JsonDocument json;
-
-  // Create message
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/number/"+String(uniquename)+"/state";
   json["cmd_t"] = host+"/number/"+String(uniquename)+"/set";
-
   json["min"] = min;
   json["max"] = max;
   json["step"] = step;
   json["unit_of_measurement"] = "°C";
-  if (isSlider) {
-    json["mode"] = "slider"; 
-  } else {
-    json["mode"] = "box";
-  }
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // publish the Message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  json["mode"] = isSlider ? "slider" : "box";
+  publishMQTTDiscoveryConfig("number", uniquename, json);
   mqttSubscribe((host+"/number/"+String(uniquename)+"/set").c_str(), 0);
-  // Debug("Publish to "+String(mqttautodiscoverytopic)+"/number/"+host+"/"+String(uniquename)+"/config");
 }
 
 bool UpdateMQTTNumber(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force)
@@ -2477,23 +2401,11 @@ bool UpdateMQTTNumber(const char* uniquename, float& currentValue, float newValu
 void PublishMQTTText(const char* uniquename)
 {
   Info("Publishing text: " + String(uniquename));
-  // Debug("PublishMQTTText");
   JsonDocument json;
-
-  // Create message
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/text/"+String(uniquename)+"/state";
   json["cmd_t"] = host+"/text/"+String(uniquename)+"/set";
-  // json["stat_tpl"] = "{{value_json.value}}";
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // publish the Message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("text", uniquename, json);
   mqttSubscribe((host+"/text/"+String(uniquename)+"/set").c_str(), 0);
-  // Debug("Publish to "+String(mqttautodiscoverytopic)+"/text/"+host+"/"+String(uniquename)+"/config");
 }
 
 void UpdateMQTTText(const char* uniquename, String& currentValue, String newValue, bool force)
@@ -2518,19 +2430,9 @@ void PublishMQTTTextSensor(const char* uniquename)
 {
   Info("Publishing text sensor: " + String(uniquename));
   JsonDocument json;
-
-  // Construct JSON config message for a read-only sensor
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/sensor/"+String(uniquename)+"/state";
   json["value_template"] = "{{ value_json.value }}";
-  // No cmd_t, so not editable
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // Publish config message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/sensor/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("sensor", uniquename, json);
 }
 
 bool UpdateMQTTTextSensor(const char* uniquename, const char* value, bool force)
@@ -2554,29 +2456,17 @@ bool UpdateMQTTTextSensor(const char* uniquename, const char* value, bool force)
 void PublishMQTTCurvatureSelect(const char* uniquename)
 {
   Info("Publishing curvature select: " + String(uniquename));
-  // Debug("PublishMQTTRefRoomCurvatureSelect");
   JsonDocument json;
-
-  // Create message
-  json["name"] = uniquename;
-  json["unique_id"] = host+"_"+uniquename;
   json["stat_t"] = host+"/select/"+String(uniquename)+"/state";
   json["cmd_t"] = host+"/select/"+String(uniquename)+"/set";
-  json["platform"] = "select";
   json["val_tpl"] = "{{ value_json.curvature }}";
-
   JsonArray options = json["options"].to<JsonArray>();
   options.add("none");
   options.add("small");
   options.add("medium");
   options.add("large");
   options.add("extralarge");
-  json["availability_topic"] = mqttStatusTopic();
-
-  addDeviceToJson(&json);
-
-  // publish the Message
-  mqttPublishJson(String(mqttautodiscoverytopic)+"/select/"+host+"/"+String(uniquename)+"/config", json, mqttpersistence, MQTT_QOS_CONFIG);
+  publishMQTTDiscoveryConfig("select", uniquename, json);
   mqttSubscribe((host+"/select/"+String(uniquename)+"/set").c_str(), 0);
 }
 
@@ -3173,7 +3063,7 @@ void setup()
       if (!firstPublishDone) {
         PublishAllMQTTSensors();
       }
-      String willTopic = mqttStatusTopic();
+      String willTopic = mqttWillTopic();
       mqttPublish(willTopic.c_str(), "online", true, 1);
     });
     client.onDisconnect([](AsyncMqttClientDisconnectReason reason) {
