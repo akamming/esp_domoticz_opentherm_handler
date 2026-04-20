@@ -42,9 +42,13 @@ Hardware Connections (OpenTherm Adapter (http://ihormelnyk.com/pages/OpenTherm) 
 #define NUMBEROFMEASUREMENTS 10 // number of measurements over which to average for outside temp
 #define MQTT_QOS_CONFIG 1
 #define MQTT_QOS_STATE 0
+#define ENABLE_WIFI_RSSI_RECONNECT 0
+#define OTA_PASSWORD "domesphelper"
 
+#if ENABLE_WIFI_RSSI_RECONNECT
 const long WIFI_RSSI_RECONNECT_THRESHOLD_DBM = -75;
 const unsigned long WIFI_RSSI_RECONNECT_DELAY_MS = 15UL * 60UL * 1000UL;
+#endif
 
 
 
@@ -337,7 +341,9 @@ bool mqtt_debug=false;
 bool mqtt_infotomqtt = true;
 bool mqtt_enableLogToSPIFFS = true;
 String currentIP = "";  // Keep track of the current IP to only update on change
+#if ENABLE_WIFI_RSSI_RECONNECT
 unsigned long lowWiFiRSSISince = 0;
+#endif
 
 // vars for program logic
 int OpenThermCommandIndex = 0; // index of the OpenTherm command we are processing
@@ -473,6 +479,7 @@ void feedWatchdog() {
   ESP.wdtFeed();  // Feed the hardware watchdog
 }
 
+#if ENABLE_WIFI_RSSI_RECONNECT
 void handleWiFiRSSIReconnect() {
   if (WiFi.status() != WL_CONNECTED) {
     lowWiFiRSSISince = 0;
@@ -501,6 +508,7 @@ void handleWiFiRSSIReconnect() {
     WiFi.reconnect();
   }
 }
+#endif
 
 void IRAM_ATTR handleInterrupt() {
     ot.handleInterrupt();
@@ -2923,7 +2931,7 @@ void setup()
 
   // Set hostname & PAssword for OTA
   ArduinoOTA.setHostname(host.c_str());
-  ArduinoOTA.setPassword(host.c_str()); // Disable for data upload
+  ArduinoOTA.setPassword(OTA_PASSWORD);
 
   ArduinoOTA.onStart([]() {
     if (ArduinoOTA.getCommand() == U_FLASH) {
@@ -3034,7 +3042,9 @@ void loop()
 
   Debug("WiFi status: " + String(WiFi.status() == WL_CONNECTED ? "connected" : "not connected") + ", RSSI: " + String(WiFi.RSSI()) + " dBm");
 
+#if ENABLE_WIFI_RSSI_RECONNECT
   handleWiFiRSSIReconnect();
+#endif
 
   // Update Timeclient
   if (WiFi.status() == WL_CONNECTED) {
