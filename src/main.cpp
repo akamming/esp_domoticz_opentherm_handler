@@ -1224,7 +1224,7 @@ void CommunicateSteeringVarsToMQTT() {
     UpdateMQTTNumberSensor(P_Name, mqtt_p, P, 0.01);
     UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01);
     UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01);
-    UpdateMQTTNumberSensor(WiFi_RSSI_Name, mqtt_wifi_rssi, (float)WiFi.RSSI(), 2.0, false);
+    UpdateMQTTNumberSensor(WiFi_RSSI_Name, mqtt_wifi_rssi, (float)WiFi.RSSI(), 5.0, false);
     UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic);
     UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic);
     if (mqtt_Curvature!=Curvature) {
