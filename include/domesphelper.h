@@ -87,6 +87,7 @@ const char Status_Topic[] = "status";
 const unsigned long MQTTConnectTimeoutInMillis = 3UL*1000UL;     // the time to reconnect if disconnect occurred 
 const unsigned long heartbeatTickInMillis = 1000UL;                 // has to be max 1000, Opentherm assumes a command is sent to opentherm at least once per second
 const unsigned long MQTTDiscoveryHeartbeatInMillis = 60UL*60UL*1000UL;  // Send discovery messages every 10 minutes to make sure HA or Domoticz can use the devices after restart.
+const int MQTTDiscoverySensorsPerLoop = 5;                       // Number of discovery sensors processed per loop iteration (publish+update together)
 const unsigned long ClimateHeartbeatInMillis = 1000UL;        // Interval to do calculate new PID values when in CLimate mode
 const unsigned long MQTTTemperatureTimeoutInMillis = 60UL*60UL*1000UL; // no climate mode calculations when temperature reading is older than this v
 const unsigned long HysteresisDelayMillis = 10UL * 60UL * 1000UL; // Delay in milliseconds before turning off heating/cooling to prevent chattering

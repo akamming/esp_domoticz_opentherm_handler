@@ -2563,118 +2563,208 @@ bool PublishAllMQTTSensors()
   using PublishStep = void (*)();
   static const PublishStep steps[] = {
     []() { SubscribeToTempTopics(); },
-    []() { PublishMQTTNumberSensor(Boiler_Temperature_Name, "°C", "temperature"); },
-    []() { UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.09, true); },
-    []() { PublishMQTTNumberSensor(DHW_Temperature_Name, "°C", "temperature"); },
-    []() { UpdateMQTTNumberSensor(DHW_Temperature_Name, mqtt_dhw_Temperature, dhw_Temperature, 0.09, true); },
-    []() { PublishMQTTNumberSensor(Return_Temperature_Name, "°C", "temperature"); },
-    []() { UpdateMQTTNumberSensor(Return_Temperature_Name, mqtt_return_Temperature, return_Temperature, 0.09, true); },
-    []() { PublishMQTTNumberSensor(Thermostat_Temperature_Name, "°C", "temperature"); },
-    []() { UpdateMQTTNumberSensor(Thermostat_Temperature_Name, mqtt_currentTemperature, currentTemperature, 0.09, true); },
-    []() { PublishMQTTNumberSensor(Outside_Temperature_Name, "°C", "temperature"); },
-    []() { UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.09, true); },
-    []() { PublishMQTTNumberSensor(OT_Outside_Temperature_Name, "°C", "temperature"); },
-    []() { UpdateMQTTNumberSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, 0.09, true); },
-    []() { PublishMQTTNumberSensor(Pressure_Name, "bar", "pressure"); },
-    []() { UpdateMQTTNumberSensor(Pressure_Name, mqtt_pressure, pressure, 0.009, true); },
-    []() { PublishMQTTPercentageSensor(Modulation_Name); },
-    []() { UpdateMQTTPercentageSensor(Modulation_Name, mqtt_modulation, modulation, true); },
-    []() { PublishMQTTFaultCodeSensor(FaultCode_Name); },
-    []() { UpdateMQTTFaultCodeSensor(FaultCode_Name, mqtt_FaultCode, FaultCode, true); },
-    []() { PublishMQTTNumberSensor(P_Name); },
-    []() { UpdateMQTTNumberSensor(P_Name, mqtt_p, P, 0.01, true); },
-    []() { PublishMQTTNumberSensor(I_Name); },
-    []() { UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01, true); },
-    []() { PublishMQTTNumberSensor(D_Name); },
-    []() { UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01, true); },
-    []() { PublishMQTTBinarySensor(FlameActive_Name, "heat"); },
-    []() { UpdateMQTTBinarySensor(FlameActive_Name, mqtt_Flame, Flame, true); },
-    []() { PublishMQTTBinarySensor(FaultActive_Name, "problem"); },
-    []() { UpdateMQTTBinarySensor(FaultActive_Name, mqtt_Fault, Fault, true); },
-    []() { PublishMQTTBinarySensor(DiagnosticActive_Name, "problem"); },
-    []() { UpdateMQTTBinarySensor(DiagnosticActive_Name, mqtt_Diagnostic, Diagnostic, true); },
-    []() { PublishMQTTBinarySensor(CoolingActive_Name, "heat"); },
-    []() { UpdateMQTTBinarySensor(CoolingActive_Name, mqtt_Cooling, Cooling, true); },
-    []() { PublishMQTTBinarySensor(CentralHeatingActive_Name, "heat"); },
-    []() { UpdateMQTTBinarySensor(CentralHeatingActive_Name, mqtt_CentralHeating, CentralHeating, true); },
-    []() { PublishMQTTBinarySensor(HotWaterActive_Name, "heat"); },
-    []() { UpdateMQTTBinarySensor(HotWaterActive_Name, mqtt_HotWater, HotWater, true); },
-    []() { PublishMQTTBinarySensor(FrostProtectionActive_Name, "cold"); },
-    []() { UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, true); },
-    []() { PublishMQTTSwitch(EnableHotWater_Name); },
-    []() { UpdateMQTTSwitch(EnableHotWater_Name, mqtt_enable_HotWater, enableHotWater, true); },
-    []() { PublishMQTTSwitch(Weather_Dependent_Mode_Name); },
-    []() { UpdateMQTTSwitch(Weather_Dependent_Mode_Name, mqtt_Weather_Dependent_Mode, Weather_Dependent_Mode, true); },
-    []() { PublishMQTTSwitch(Holiday_Mode_Name); },
-    []() { UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, true); },
-    []() { PublishMQTTSwitch(Debug_Name); },
-    []() { UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, true); },
-    []() { PublishMQTTSwitch(Info_Name); },
-    []() { UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, true); },
-    []() { PublishMQTTSwitch(EnableLogToSPIFFS_Name); },
-    []() { UpdateMQTTSwitch(EnableLogToSPIFFS_Name, mqtt_enableLogToSPIFFS, enableLogToSPIFFS, true); },
-    []() { PublishMQTTSetpoint(DHW_Setpoint_Name, 10, 90, false); },
     []() {
+      PublishMQTTNumberSensor(Boiler_Temperature_Name, "°C", "temperature");
+      UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.09, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(DHW_Temperature_Name, "°C", "temperature");
+      UpdateMQTTNumberSensor(DHW_Temperature_Name, mqtt_dhw_Temperature, dhw_Temperature, 0.09, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(Return_Temperature_Name, "°C", "temperature");
+      UpdateMQTTNumberSensor(Return_Temperature_Name, mqtt_return_Temperature, return_Temperature, 0.09, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(Thermostat_Temperature_Name, "°C", "temperature");
+      UpdateMQTTNumberSensor(Thermostat_Temperature_Name, mqtt_currentTemperature, currentTemperature, 0.09, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(Outside_Temperature_Name, "°C", "temperature");
+      UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.09, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(OT_Outside_Temperature_Name, "°C", "temperature");
+      UpdateMQTTNumberSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, 0.09, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(Pressure_Name, "bar", "pressure");
+      UpdateMQTTNumberSensor(Pressure_Name, mqtt_pressure, pressure, 0.009, true);
+    },
+    []() {
+      PublishMQTTPercentageSensor(Modulation_Name);
+      UpdateMQTTPercentageSensor(Modulation_Name, mqtt_modulation, modulation, true);
+    },
+    []() {
+      PublishMQTTFaultCodeSensor(FaultCode_Name);
+      UpdateMQTTFaultCodeSensor(FaultCode_Name, mqtt_FaultCode, FaultCode, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(P_Name);
+      UpdateMQTTNumberSensor(P_Name, mqtt_p, P, 0.01, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(I_Name);
+      UpdateMQTTNumberSensor(I_Name, mqtt_i, I, 0.01, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(D_Name);
+      UpdateMQTTNumberSensor(D_Name, mqtt_d, D, 0.01, true);
+    },
+    []() {
+      PublishMQTTBinarySensor(FlameActive_Name, "heat");
+      UpdateMQTTBinarySensor(FlameActive_Name, mqtt_Flame, Flame, true);
+    },
+    []() {
+      PublishMQTTBinarySensor(FaultActive_Name, "problem");
+      UpdateMQTTBinarySensor(FaultActive_Name, mqtt_Fault, Fault, true);
+    },
+    []() {
+      PublishMQTTBinarySensor(DiagnosticActive_Name, "problem");
+      UpdateMQTTBinarySensor(DiagnosticActive_Name, mqtt_Diagnostic, Diagnostic, true);
+    },
+    []() {
+      PublishMQTTBinarySensor(CoolingActive_Name, "heat");
+      UpdateMQTTBinarySensor(CoolingActive_Name, mqtt_Cooling, Cooling, true);
+    },
+    []() {
+      PublishMQTTBinarySensor(CentralHeatingActive_Name, "heat");
+      UpdateMQTTBinarySensor(CentralHeatingActive_Name, mqtt_CentralHeating, CentralHeating, true);
+    },
+    []() {
+      PublishMQTTBinarySensor(HotWaterActive_Name, "heat");
+      UpdateMQTTBinarySensor(HotWaterActive_Name, mqtt_HotWater, HotWater, true);
+    },
+    []() {
+      PublishMQTTBinarySensor(FrostProtectionActive_Name, "cold");
+      UpdateMQTTBinarySensor(FrostProtectionActive_Name, mqtt_FrostProtectionActive, FrostProtectionActive, true);
+    },
+    []() {
+      PublishMQTTSwitch(EnableHotWater_Name);
+      UpdateMQTTSwitch(EnableHotWater_Name, mqtt_enable_HotWater, enableHotWater, true);
+    },
+    []() {
+      PublishMQTTSwitch(Weather_Dependent_Mode_Name);
+      UpdateMQTTSwitch(Weather_Dependent_Mode_Name, mqtt_Weather_Dependent_Mode, Weather_Dependent_Mode, true);
+    },
+    []() {
+      PublishMQTTSwitch(Holiday_Mode_Name);
+      UpdateMQTTSwitch(Holiday_Mode_Name, mqtt_Holiday_Mode, Holiday_Mode, true);
+    },
+    []() {
+      PublishMQTTSwitch(Debug_Name);
+      UpdateMQTTSwitch(Debug_Name, mqtt_debug, debug, true);
+    },
+    []() {
+      PublishMQTTSwitch(Info_Name);
+      UpdateMQTTSwitch(Info_Name, mqtt_infotomqtt, infotomqtt, true);
+    },
+    []() {
+      PublishMQTTSwitch(EnableLogToSPIFFS_Name);
+      UpdateMQTTSwitch(EnableLogToSPIFFS_Name, mqtt_enableLogToSPIFFS, enableLogToSPIFFS, true);
+    },
+    []() {
+      PublishMQTTSetpoint(DHW_Setpoint_Name, 10, 90, false);
       UpdateMQTTSetpoint(DHW_Setpoint_Name, mqtt_dhw_setpoint, dhw_SetPoint, true);
       UpdateMQTTSetpointTemperature(DHW_Setpoint_Name, dhw_Temperature, true);
       UpdateMQTTSetpointMode(DHW_Setpoint_Name, enableHotWater ? 1 : 0, true);
     },
-    []() { PublishMQTTSetpoint(Climate_Name, 5, 30, true); },
     []() {
+      PublishMQTTSetpoint(Climate_Name, 5, 30, true);
       UpdateMQTTSetpoint(Climate_Name, mqtt_climate_setpoint, climate_SetPoint, true);
       UpdateMQTTSetpointTemperature(Climate_Name, mqttTemperature, true);
       UpdateClimateSetpointMode(true);
     },
-    []() { PublishMQTTNumber(MinBoilerTemp_Name, 10, 50, 0.5, true); },
-    []() { UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true); },
-    []() { PublishMQTTNumber(MaxBoilerTemp_Name, 30, 90, 0.5, true); },
-    []() { UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true); },
-    []() { PublishMQTTNumber(MinimumTempDifference_Name, 0, 20, 0.5, true); },
-    []() { UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true); },
-    []() { PublishMQTTNumber(FrostProtectionSetPoint_Name, 0, 90, 0.5, true); },
-    []() { UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true); },
-    []() { PublishMQTTNumber(BoilerTempAtPlus20_Name, 10, 90, 0.5, true); },
-    []() { UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true); },
-    []() { PublishMQTTNumber(BoilerTempAtMinus10_Name, 10, 90, 0.5, true); },
-    []() { UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true); },
-    []() { PublishMQTTNumber(SwitchHeatingOffAt_Name, 10, 90, 0.5, true); },
-    []() { UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true); },
-    []() { PublishMQTTNumber(ReferenceRoomCompensation_Name, 0, 30, 0.5, true); },
-    []() { UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true); },
-    []() { PublishMQTTNumber(KP_Name, 0, 50, 1, false); },
-    []() { UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true); },
-    []() { PublishMQTTNumber(KI_Name, 0, 1, 0.01, false); },
-    []() { UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true); },
-    []() { PublishMQTTNumber(KD_Name, 0, 5, 0.1, false); },
-    []() { UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true); },
-    []() { PublishMQTTCurvatureSelect(Curvature_Name); },
-    []() { UpdateMQTTCurvatureSelect(Curvature_Name, Curvature, true); },
-    []() { PublishMQTTText(MQTT_TempTopic_Name); },
-    []() { UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true); },
-    []() { PublishMQTTText(MQTT_OutsideTempTopic_Name); },
-    []() { UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true); },
+    []() {
+      PublishMQTTNumber(MinBoilerTemp_Name, 10, 50, 0.5, true);
+      UpdateMQTTNumber(MinBoilerTemp_Name, mqtt_minboilertemp, MinBoilerTemp, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(MaxBoilerTemp_Name, 30, 90, 0.5, true);
+      UpdateMQTTNumber(MaxBoilerTemp_Name, mqtt_maxboilertemp, MaxBoilerTemp, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(MinimumTempDifference_Name, 0, 20, 0.5, true);
+      UpdateMQTTNumber(MinimumTempDifference_Name, mqtt_minimumTempDifference, minimumTempDifference, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(FrostProtectionSetPoint_Name, 0, 90, 0.5, true);
+      UpdateMQTTNumber(FrostProtectionSetPoint_Name, mqtt_FrostProtectionSetPoint, FrostProtectionSetPoint, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(BoilerTempAtPlus20_Name, 10, 90, 0.5, true);
+      UpdateMQTTNumber(BoilerTempAtPlus20_Name, mqtt_BoilerTempAtPlus20, BoilerTempAtPlus20, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(BoilerTempAtMinus10_Name, 10, 90, 0.5, true);
+      UpdateMQTTNumber(BoilerTempAtMinus10_Name, mqtt_BoilerTempAtMinus10, BoilerTempAtMinus10, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(SwitchHeatingOffAt_Name, 10, 90, 0.5, true);
+      UpdateMQTTNumber(SwitchHeatingOffAt_Name, mqtt_SwitchHeatingOffAt, SwitchHeatingOffAt, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(ReferenceRoomCompensation_Name, 0, 30, 0.5, true);
+      UpdateMQTTNumber(ReferenceRoomCompensation_Name, mqtt_ReferenceRoomCompensation, ReferenceRoomCompensation, 0.5, true);
+    },
+    []() {
+      PublishMQTTNumber(KP_Name, 0, 50, 1, false);
+      UpdateMQTTNumber(KP_Name, mqtt_kp, KP, 0.01, true);
+    },
+    []() {
+      PublishMQTTNumber(KI_Name, 0, 1, 0.01, false);
+      UpdateMQTTNumber(KI_Name, mqtt_ki, KI, 0.01, true);
+    },
+    []() {
+      PublishMQTTNumber(KD_Name, 0, 5, 0.1, false);
+      UpdateMQTTNumber(KD_Name, mqtt_kd, KD, 0.01, true);
+    },
+    []() {
+      PublishMQTTCurvatureSelect(Curvature_Name);
+      UpdateMQTTCurvatureSelect(Curvature_Name, Curvature, true);
+    },
+    []() {
+      PublishMQTTText(MQTT_TempTopic_Name);
+      UpdateMQTTText(MQTT_TempTopic_Name, mqtt_mqtttemptopic, mqtttemptopic, true);
+    },
+    []() {
+      PublishMQTTText(MQTT_OutsideTempTopic_Name);
+      UpdateMQTTText(MQTT_OutsideTempTopic_Name, mqtt_mqttoutsidetemptopic, mqttoutsidetemptopic, true);
+    },
     []() { PublishMQTTTextSensor(Log_Name); },
-    []() {},
-    []() { PublishMQTTTextSensor(IP_Address_Name); },
-    []() { UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true); },
-    []() { PublishMQTTNumberSensor(WiFi_RSSI_Name, "dBm"); },
-    []() { UpdateMQTTNumberSensor(WiFi_RSSI_Name, mqtt_wifi_rssi, (float)WiFi.RSSI(), 2.0, true); },
-    []() { PublishMQTTNumberSensor(Boiler_Setpoint_Temperature_Name, "°C", "temperature"); },
-    []() { UpdateMQTTNumberSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, 0.09, true); },
+    []() {
+      PublishMQTTTextSensor(IP_Address_Name);
+      UpdateMQTTTextSensor(IP_Address_Name, currentIP.c_str(), true);
+    },
+    []() {
+      PublishMQTTNumberSensor(WiFi_RSSI_Name, "dBm");
+      UpdateMQTTNumberSensor(WiFi_RSSI_Name, mqtt_wifi_rssi, (float)WiFi.RSSI(), 2.0, true);
+    },
+    []() {
+      PublishMQTTNumberSensor(Boiler_Setpoint_Temperature_Name, "°C", "temperature");
+      UpdateMQTTNumberSensor(Boiler_Setpoint_Temperature_Name, mqtt_boiler_setpoint, boiler_SetPoint, 0.09, true);
+    },
     []() { PublishMQTTButton(Reset_Device_Name); },
-    []() {},
-    []() { PublishMQTTTextSensor(Uptime_Name); },
-    []() { UpdateMQTTTextSensor(Uptime_Name, getUptimeString().c_str(), true); },
-    []() { PublishMQTTNumberSensor(Free_Heap_Name, "B"); },
-    []() { UpdateMQTTNumberSensor(Free_Heap_Name, mqtt_free_heap, ESP.getFreeHeap(), 0.0, true); },
-    []() { PublishMQTTSwitch(BidirectionalReferenceRoomCompensation_Name); },
-    []() { UpdateMQTTSwitch(BidirectionalReferenceRoomCompensation_Name, mqtt_BidirectionalReferenceRoomCompensation, BidirectionalReferenceRoomCompensation, true); }
+    []() {
+      PublishMQTTTextSensor(Uptime_Name);
+      UpdateMQTTTextSensor(Uptime_Name, getUptimeString().c_str(), true);
+    },
+    []() {
+      PublishMQTTNumberSensor(Free_Heap_Name, "B");
+      UpdateMQTTNumberSensor(Free_Heap_Name, mqtt_free_heap, ESP.getFreeHeap(), 0.0, true);
+    },
+    []() {
+      PublishMQTTSwitch(BidirectionalReferenceRoomCompensation_Name);
+      UpdateMQTTSwitch(BidirectionalReferenceRoomCompensation_Name, mqtt_BidirectionalReferenceRoomCompensation, BidirectionalReferenceRoomCompensation, true);
+    }
   };
 
   const int stepCount = sizeof(steps) / sizeof(steps[0]);
+  for (int i = 0; i < MQTTDiscoverySensorsPerLoop && sensorIndex < stepCount; i++) {
+    steps[sensorIndex++]();
+  }
+
   if (sensorIndex < stepCount) {
-    steps[sensorIndex]();
-    sensorIndex++;
     return false;
   }
 
