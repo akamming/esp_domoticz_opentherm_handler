@@ -1577,7 +1577,7 @@ void handleGetOutSideTemp(){
 
   // Check if we have to send to MQTT (throttled to once per 30 seconds, tolerance 0.1°C)
   if (networkReady() && (millis() - t_last_outside_temp_update > 30000)) {
-    bool updated = UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.1, false);
+    bool updated = UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.1, false, true);
     updated |= UpdateMQTTNumberSensor(OT_Outside_Temperature_Name, mqtt_OT_outside_Temperature, OT_outside_Temperature, 0.1, false);
     if (updated) {
       t_last_outside_temp_update = millis();
@@ -1608,7 +1608,7 @@ void handleGetBoilerTemperature()
   // Check if we have to send to MQTT (throttled to once per 10 seconds, tolerance 0.1°C)
   static unsigned long last_boiler_temp_update = 0;
   if (networkReady() && (millis() - last_boiler_temp_update > 10000)) {
-    if (UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.1, false)) {
+    if (UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.1, false, true)) {
       last_boiler_temp_update = millis();
     }
   }
@@ -2252,8 +2252,9 @@ void PublishMQTTNumberSensor(const char* uniquename, const char* unit = "", cons
 
 
 
-bool UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force)
+bool UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force, bool skipIfZero)
 {
+  if (skipIfZero && newValue == 0.0f) return false;
   if (skipUpdate(force)) return false;
   if (force || fabs(currentValue - newValue) > tolerance) {
     if (networkReady()) {
@@ -2565,7 +2566,7 @@ bool PublishAllMQTTSensors()
     []() { SubscribeToTempTopics(); },
     []() {
       PublishMQTTNumberSensor(Boiler_Temperature_Name, "°C", "temperature");
-      UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.09, true);
+      UpdateMQTTNumberSensor(Boiler_Temperature_Name, mqtt_boiler_Temperature, boiler_Temperature, 0.09, true, true);
     },
     []() {
       PublishMQTTNumberSensor(DHW_Temperature_Name, "°C", "temperature");
@@ -2581,7 +2582,7 @@ bool PublishAllMQTTSensors()
     },
     []() {
       PublishMQTTNumberSensor(Outside_Temperature_Name, "°C", "temperature");
-      UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.09, true);
+      UpdateMQTTNumberSensor(Outside_Temperature_Name, mqtt_outside_Temperature, outside_Temperature, 0.09, true, true);
     },
     []() {
       PublishMQTTNumberSensor(OT_Outside_Temperature_Name, "°C", "temperature");

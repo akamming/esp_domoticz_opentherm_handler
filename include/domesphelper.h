@@ -210,7 +210,7 @@ void PublishMQTTRSSISensor(const char* uniquename);
 void UpdateMQTTRSSISensor(const char* uniquename, int& currentValue, int newValue, bool force = false);
 void PublishMQTTUptimeSensor(const char* uniquename);
 void UpdateMQTTUptimeSensor(const char* uniquename, unsigned long& currentValue, unsigned long newValue, bool force = false);
-bool UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force = false);
+bool UpdateMQTTNumberSensor(const char* uniquename, float& currentValue, float newValue, float tolerance, bool force = false, bool skipIfZero = false);
 void PublishMQTTPercentageSensor(const char* uniquename);
 void UpdateMQTTPercentageSensor(const char* uniquename, float& currentValue, float newValue, bool force);
 void PublishMQTTFaultCodeSensor(const char* uniquename);
